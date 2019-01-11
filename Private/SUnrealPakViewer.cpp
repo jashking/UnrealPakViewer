@@ -395,7 +395,7 @@ void SUnrealPakViewer::GenerateTreeItemsFromPAK(const FString& PAKFile)
 	UE_LOG(LogUnrealPakViewer, Display, TEXT("Pak file[%s], PakInfo size[%lld]."), *PAKFile, PakFile->GetInfo().IndexSize + PakFile->GetInfo().GetSerializedSize());
 
 	TSharedPtr<FTreeItem> VirtualRootItem = MakeShareable(new FTreeItem());
-	VirtualRootItem->DisplayName = FPaths::GetCleanFilename(PAKFile);
+	VirtualRootItem->DisplayName = FPaths::GetBaseFilename(PAKFile);
 	TreeRootItems.Add(VirtualRootItem);
 
 	PakFilePathTextBox->SetText(FText::FromString(FPaths::ConvertRelativePathToFull(PAKFile)));
