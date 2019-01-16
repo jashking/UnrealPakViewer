@@ -247,6 +247,9 @@ public:
 
 protected:
 	FReply OnOpenPAKButtonClicked();
+	FReply OnAESKeyConfirmButtonClicked();
+
+	void ShowAESKeyWindow();
 
 	/** Creates a list item for the tree view */
 	virtual TSharedRef<ITableRow> GenerateTreeRow(TSharedPtr<FTreeItem> TreeItem, const TSharedRef<STableViewBase>& OwnerTable);
@@ -284,6 +287,9 @@ protected:
 	TSharedPtr<class STextBlock> CompressionBlockSizeTextBlock;
 	TSharedPtr<class SEditableTextBox> SHA1TextBox;
 	TSharedPtr<class STextBlock> IsEncryptedTextBlock;
+
+	TSharedPtr<class SWindow> AESKeyWindow;
+	TSharedPtr<class SEditableTextBox> AESKeyTextBox;
 
 	/** The list of folders in the tree */
 	TArray<TSharedPtr<FTreeItem>> TreeRootItems;

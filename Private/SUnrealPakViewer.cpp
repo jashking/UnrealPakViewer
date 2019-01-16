@@ -3,6 +3,9 @@
 #include "SUnrealPakViewer.h"
 
 #include "DesktopPlatformModule.h"
+#include "GenericPlatform/GenericPlatformFile.h"
+#include "HAL/PlatformApplicationMisc.h"
+#include "HAL/PlatformFilemanager.h"
 #include "IDesktopPlatform.h"
 #include "IPlatformFilePak.h"
 #include "Misc/CoreDelegates.h"
@@ -17,41 +20,6 @@
 
 void SUnrealPakViewer::Construct(const FArguments& InArgs)
 {
-	FString EncryptionKeyString;
-	FParse::Value(FCommandLine::Get(), TEXT("aes="), EncryptionKeyString, false);
-
-	if (EncryptionKeyString.Len() > 0)
-	{
-		const uint32 RequiredKeyLength = sizeof(AESKey.Key);
-
-		// Error checking
-		if (EncryptionKeyString.Len() < RequiredKeyLength)
-		{
-			UE_LOG(LogUnrealPakViewer, Error, TEXT("AES encryption key must be %d characters long"), RequiredKeyLength);
-		}
-
-		if (EncryptionKeyString.Len() > RequiredKeyLength)
-		{
-			UE_LOG(LogUnrealPakViewer, Warning, TEXT("AES encryption key is more than %d characters long, so will be truncated!"), RequiredKeyLength);
-			EncryptionKeyString = EncryptionKeyString.Left(RequiredKeyLength);
-		}
-
-		if (!FCString::IsPureAnsi(*EncryptionKeyString))
-		{
-			UE_LOG(LogUnrealPakViewer, Error, TEXT("AES encryption key must be a pure ANSI string!"));
-		}
-
-		ANSICHAR* AsAnsi = TCHAR_TO_ANSI(*EncryptionKeyString);
-		check(TCString<ANSICHAR>::Strlen(AsAnsi) == RequiredKeyLength);
-		FMemory::Memcpy(AESKey.Key, AsAnsi, RequiredKeyLength);
-		UE_LOG(LogUnrealPakViewer, Display, TEXT("Parsed AES encryption key from command line."));
-
-		if (AESKey.IsValid())
-		{
-			FCoreDelegates::GetPakEncryptionKeyDelegate().BindLambda([this](uint8 OutKey[32]) { FMemory::Memcpy(OutKey, AESKey.Key, sizeof(AESKey.Key)); });
-		}
-	}
-
 	SAssignNew(PakFilePathTextBox, SEditableTextBox).IsReadOnly(true);
 	SAssignNew(ExtractFolderPathTextBox, SEditableTextBox).IsReadOnly(true);
 
@@ -305,6 +273,95 @@ FReply SUnrealPakViewer::OnOpenPAKButtonClicked()
 	return FReply::Handled();
 }
 
+FReply SUnrealPakViewer::OnAESKeyConfirmButtonClicked()
+{
+	FString EncryptionKeyString = AESKeyTextBox->GetText().ToString();
+	if (EncryptionKeyString.Len() > 0)
+	{
+		const uint32 RequiredKeyLength = sizeof(AESKey.Key);
+		bool bCheckOK = true;
+
+		// Error checking
+		if (EncryptionKeyString.Len() < RequiredKeyLength)
+		{
+			UE_LOG(LogUnrealPakViewer, Error, TEXT("AES encryption key must be %d characters long"), RequiredKeyLength);
+			bCheckOK = false;
+		}
+
+		if (EncryptionKeyString.Len() > RequiredKeyLength)
+		{
+			UE_LOG(LogUnrealPakViewer, Warning, TEXT("AES encryption key is more than %d characters long, so will be truncated!"), RequiredKeyLength);
+			EncryptionKeyString = EncryptionKeyString.Left(RequiredKeyLength);
+		}
+
+		if (!FCString::IsPureAnsi(*EncryptionKeyString))
+		{
+			UE_LOG(LogUnrealPakViewer, Error, TEXT("AES encryption key must be a pure ANSI string!"));
+			bCheckOK = false;
+		}
+
+		if (bCheckOK)
+		{
+			ANSICHAR* AsAnsi = TCHAR_TO_ANSI(*EncryptionKeyString);
+			check(TCString<ANSICHAR>::Strlen(AsAnsi) == RequiredKeyLength);
+			FMemory::Memcpy(AESKey.Key, AsAnsi, RequiredKeyLength);
+			UE_LOG(LogUnrealPakViewer, Display, TEXT("Parsed AES encryption key from window. EncryptionKeyString[%s]."), *EncryptionKeyString);
+
+			if (AESKey.IsValid())
+			{
+				FCoreDelegates::GetPakEncryptionKeyDelegate().BindLambda([this](uint8 OutKey[32]) { FMemory::Memcpy(OutKey, AESKey.Key, sizeof(AESKey.Key)); });
+			}
+		}
+	}
+
+	if (AESKeyWindow.IsValid())
+	{
+		AESKeyWindow->RequestDestroyWindow();
+	}
+
+	return FReply::Handled();
+}
+
+void SUnrealPakViewer::ShowAESKeyWindow()
+{
+	const FSlateRect WorkArea = FSlateApplicationBase::Get().GetPreferredWorkArea();
+
+	const FVector2D InitialWindowDimensions(350, 40);
+
+	AESKeyWindow = SNew(SWindow)
+		.Title(LOCTEXT("AESKeyWindowTitle", "AES Key"))
+		.HasCloseButton(false)
+		.SupportsMaximize(false)
+		.SupportsMinimize(false)
+		.SizingRule(ESizingRule::FixedSize)
+		.ClientSize(InitialWindowDimensions * FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(WorkArea.Left, WorkArea.Top));
+
+	// Setup the content for the created login window.
+	AESKeyWindow->SetContent(
+		SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
+		[
+			SNew(SHorizontalBox)
+
+			+SHorizontalBox::Slot().AutoWidth().HAlign(EHorizontalAlignment::HAlign_Center).VAlign(EVerticalAlignment::VAlign_Center)
+			[
+				SNew(STextBlock).Text(LOCTEXT("AESKeyText", "AES Key: "))
+			]
+
+			+SHorizontalBox::Slot()
+			[
+				SAssignNew(AESKeyTextBox, SEditableTextBox)
+			]
+
+			+SHorizontalBox::Slot().AutoWidth()
+			[
+				SNew(SButton).Text(LOCTEXT("AESKeyConfirmButtonText", "Confirm")).HAlign(EHorizontalAlignment::HAlign_Center).VAlign(EVerticalAlignment::VAlign_Center).OnClicked(this, &SUnrealPakViewer::OnAESKeyConfirmButtonClicked)
+			]
+		]
+	);
+
+	FSlateApplication::Get().AddModalWindow(AESKeyWindow.ToSharedRef(), nullptr);
+}
+
 TSharedRef<ITableRow> SUnrealPakViewer::GenerateTreeRow(TSharedPtr<FTreeItem> TreeItem, const TSharedRef<STableViewBase>& OwnerTable)
 {
 	check(TreeItem.IsValid());
@@ -384,6 +441,22 @@ void SUnrealPakViewer::GenerateTreeItemsFromPAK(const FString& PAKFile)
 	PakFilePathTextBox->SetText(FText::FromString(TEXT("")));
 	TreeRootItems.Empty();
 	TreeViewPtr->RebuildList();
+
+	uint8 bEncryptedIndex = 0;
+	IFileHandle* PakHandle = FPlatformFileManager::Get().GetPlatformFile().OpenRead(*PAKFile);
+	if (!PakHandle)
+	{
+		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("PakFileOpenFailedMessage", "Pak file can't open!"));
+		return;
+	}
+	PakHandle->SeekFromEnd(-45);
+	PakHandle->Read(&bEncryptedIndex, 1);
+	if (bEncryptedIndex != 0)
+	{
+		ShowAESKeyWindow();
+	}
+	delete PakHandle;
+	PakHandle = nullptr;
 
 	PakFile = MakeShareable(new FPakFile(*PAKFile, false));
 	if (!PakFile->IsValid())
@@ -633,6 +706,11 @@ bool SUnrealPakViewer::ExtractFileFromPak(const FPakEntry& Entry, const FString&
 	EntryInfo.Serialize(PakReader, PakFile->GetInfo().Version);
 	if (EntryInfo == Entry)
 	{
+		if (Entry.bEncrypted && !FCoreDelegates::GetPakEncryptionKeyDelegate().IsBound())
+		{
+			ShowAESKeyWindow();
+		}
+
 		FString DestFilename(DestPath / FileInPak);
 
 		TUniquePtr<FArchive> FileHandle(IFileManager::Get().CreateFileWriter(*DestFilename));
