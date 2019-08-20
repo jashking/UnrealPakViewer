@@ -9,7 +9,7 @@ set "current_dir_name=%current_dir_name:*\=%"
 set "current_dir_nametmp=%current_dir_name:\=%"
 if not "%current_dir_nametmp%"=="%current_dir_name%" goto loop
 
-rem call GenerateProgramProject.bat
+call GenerateProgramProject.bat
 
 rem open project vs solution
 echo open Intermediate\ProjectFiles\%current_dir_name%.vcxproj
