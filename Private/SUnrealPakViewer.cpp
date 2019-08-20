@@ -15,6 +15,7 @@
 #include "Styling/SlateBrush.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/SBoxPanel.h"
+#include "PakFile/Public/IPlatformFilePak.h"
 
 #define LOCTEXT_NAMESPACE "UnrealPakViewer"
 
@@ -498,7 +499,7 @@ void SUnrealPakViewer::GenerateTreeItemsFromPAK(const FString& PAKFile)
 			Item->Size = Entry.Size;
 			Item->UncompressedSize = Entry.UncompressedSize;
 			Item->Offset = Entry.Offset;
-			Item->IsEncrypted = Entry.bEncrypted ? TEXT("true") : TEXT("false");
+			Item->IsEncrypted = Entry.IsEncrypted() ? TEXT("true") : TEXT("false");
 			Item->Hash = BytesToHex(Entry.Hash, sizeof(Entry.Hash));
 			Item->CompressionMethod = FormatCompressionMethod((ECompressionFlags)Entry.CompressionMethod);
 			Item->CompressionBlockCount = Entry.CompressionBlocks.Num();
@@ -607,7 +608,7 @@ void SUnrealPakViewer::ExecuteExtract()
 	for (const FString& File : Files)
 	{
 		const FString TrueFilePath = File.Mid(File.Find(TEXT("/")) + 1);
-		if (!PakFile->Find(FString::Printf(TEXT("%s%s"), *PakFile->GetMountPoint(), *TrueFilePath), &OutEntry))
+		if (!(uint8)PakFile->Find(FString::Printf(TEXT("%s%s"), *PakFile->GetMountPoint(), *TrueFilePath), &OutEntry))
 		{
 			continue;
 		}
@@ -646,10 +647,10 @@ bool SUnrealPakViewer::UncompressCopyFile(FArchive& Dest, FArchive& Source, cons
 		uint32 CompressedBlockSize = Entry.CompressionBlocks[BlockIndex].CompressedEnd - Entry.CompressionBlocks[BlockIndex].CompressedStart;
 		uint32 UncompressedBlockSize = (uint32)FMath::Min<int64>(Entry.UncompressedSize - Entry.CompressionBlockSize*BlockIndex, Entry.CompressionBlockSize);
 		Source.Seek(Entry.CompressionBlocks[BlockIndex].CompressedStart + (PakFile.GetInfo().HasRelativeCompressedChunkOffsets() ? Entry.Offset : 0));
-		uint32 SizeToRead = Entry.bEncrypted ? Align(CompressedBlockSize, FAES::AESBlockSize) : CompressedBlockSize;
+		uint32 SizeToRead = Entry.IsEncrypted() ? Align(CompressedBlockSize, FAES::AESBlockSize) : CompressedBlockSize;
 		Source.Serialize(PersistentBuffer, SizeToRead);
 
-		if (Entry.bEncrypted)
+		if (Entry.IsEncrypted())
 		{
 			FAES::DecryptData(PersistentBuffer, SizeToRead, Key);
 		}
@@ -673,10 +674,10 @@ bool SUnrealPakViewer::BufferedCopyFile(FArchive& Dest, FArchive& Source, const 
 	{
 		const int64 SizeToCopy = FMath::Min(BufferSize, RemainingSizeToCopy);
 		// If file is encrypted so we need to account for padding
-		int64 SizeToRead = Entry.bEncrypted ? Align(SizeToCopy, FAES::AESBlockSize) : SizeToCopy;
+		int64 SizeToRead = Entry.IsEncrypted() ? Align(SizeToCopy, FAES::AESBlockSize) : SizeToCopy;
 
 		Source.Serialize(Buffer, SizeToRead);
-		if (Entry.bEncrypted)
+		if (Entry.IsEncrypted())
 		{
 			FAES::DecryptData((uint8*)Buffer, SizeToRead, Key);
 		}
@@ -706,7 +707,7 @@ bool SUnrealPakViewer::ExtractFileFromPak(const FPakEntry& Entry, const FString&
 	EntryInfo.Serialize(PakReader, PakFile->GetInfo().Version);
 	if (EntryInfo == Entry)
 	{
-		if (Entry.bEncrypted && !FCoreDelegates::GetPakEncryptionKeyDelegate().IsBound())
+		if (Entry.IsEncrypted() && !FCoreDelegates::GetPakEncryptionKeyDelegate().IsBound())
 		{
 			ShowAESKeyWindow();
 		}
