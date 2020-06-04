@@ -18,6 +18,7 @@ public class UnrealPakViewer : ModuleRules
             {
                 "AppFramework",
                 "Core",
+                "ApplicationCore",
                 "Slate",
                 "SlateCore",
                 "StandaloneRenderer",
