@@ -1,45 +1,69 @@
-// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
-#include "UnrealPakViewer.h"
+#include "UnrealPakViewerMain.h"
 #include "HAL/ExceptionHandling.h"
-#include "Mac/MacPlatformCrashContext.h"
-#include "Mac/MacPlatformProcess.h"
+#include "LaunchEngineLoop.h"
 #include "Mac/CocoaThread.h"
-#include "HAL/PlatformApplicationMisc.h"
 
 static FString GSavedCommandLine;
 
-@interface UE4AppDelegate : NSObject <NSApplicationDelegate, NSFileManagerDelegate>
+@interface UE4AppDelegate : NSObject<NSApplicationDelegate, NSFileManagerDelegate>
 {
 }
 
 @end
 
+
 @implementation UE4AppDelegate
 
 //handler for the quit apple event used by the Dock menu
-- (void)handleQuitEvent:(NSAppleEventDescriptor*)Event withReplyEvent:(NSAppleEventDescriptor*)ReplyEvent
+- (void)handleQuitEvent:(NSAppleEventDescriptor*)Event withReplyEvent : (NSAppleEventDescriptor*)ReplyEvent
 {
-	[self requestQuit:self];
+	[self requestQuit : self];
 }
 
-- (IBAction)requestQuit:(id)Sender
+-(IBAction)requestQuit : (id)Sender
 {
-	GIsRequestingExit = true;
+	RequestEngineExit(TEXT("requestQuit"));
 }
 
-- (void) runGameThread:(id)Arg
+-(void)runGameThread : (id)Arg
 {
-	RunUnrealPakViewer(*GSavedCommandLine);
-	
-	[NSApp terminate: self];
-}
+	FPlatformMisc::SetGracefulTerminationHandler();
+	FPlatformMisc::SetCrashHandler(nullptr);
 
-- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)Sender;
-{
-	if(!GIsRequestingExit || ([NSThread gameThread] && [NSThread gameThread] != [NSThread mainThread]))
+#if !UE_BUILD_SHIPPING
+	if (FParse::Param(*GSavedCommandLine, TEXT("crashreports")))
 	{
-		[self requestQuit:self];
+		GAlwaysReportCrash = true;
+	}
+#endif
+
+#if UE_BUILD_DEBUG
+	if (!GAlwaysReportCrash)
+#else
+	if (FPlatformMisc::IsDebuggerPresent() && !GAlwaysReportCrash)
+#endif
+	{
+		UnrealPakViewerMain(*GSavedCommandLine);
+	}
+	else
+	{
+		GIsGuarded = 1;
+		UnrealPakViewerMain(*GSavedCommandLine);
+		GIsGuarded = 0;
+	}
+
+	FEngineLoop::AppExit();
+
+	[NSApp terminate : self];
+}
+
+-(NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)Sender;
+{
+	if (!IsEngineExitRequested() || ([NSThread gameThread] && [NSThread gameThread] != [NSThread mainThread]))
+	{
+		[self requestQuit : self];
 		return NSTerminateLater;
 	}
 	else
@@ -48,17 +72,17 @@ static FString GSavedCommandLine;
 	}
 }
 
-- (void)applicationDidFinishLaunching:(NSNotification *)Notification
+-(void)applicationDidFinishLaunching:(NSNotification *)Notification
 {
 	//install the custom quit event handler
 	NSAppleEventManager* appleEventManager = [NSAppleEventManager sharedAppleEventManager];
-	[appleEventManager setEventHandler:self andSelector:@selector(handleQuitEvent:withReplyEvent:) forEventClass:kCoreEventClass andEventID:kAEQuitApplication];
-	
-	FPlatformApplicationMisc::ActivateApplication();
+	[appleEventManager setEventHandler : self andSelector : @selector(handleQuitEvent : withReplyEvent : ) forEventClass:kCoreEventClass andEventID : kAEQuitApplication];
+
 	RunGameThread(self, @selector(runGameThread:));
 }
 
 @end
+
 
 int main(int argc, char *argv[])
 {
@@ -72,21 +96,20 @@ int main(int argc, char *argv[])
 			{
 				FString ArgName;
 				FString ArgValue;
-				Argument.Split( TEXT("="), &ArgName, &ArgValue );
-				Argument = FString::Printf( TEXT("%s=\"%s\""), *ArgName, *ArgValue );
+				Argument.Split(TEXT("="), &ArgName, &ArgValue);
+				Argument = FString::Printf(TEXT("%s=\"%s\""), *ArgName, *ArgValue);
 			}
 			else
 			{
 				Argument = FString::Printf(TEXT("\"%s\""), *Argument);
 			}
 		}
-
 		GSavedCommandLine += Argument;
 	}
-	
+
 	SCOPED_AUTORELEASE_POOL;
 	[NSApplication sharedApplication];
-	[NSApp setDelegate:[UE4AppDelegate new]];
+	[NSApp setDelegate : [UE4AppDelegate new]];
 	[NSApp run];
 	return 0;
 }
