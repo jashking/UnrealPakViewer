@@ -4,6 +4,8 @@
 
 #include "RequiredProgramMainCPPInclude.h"
 
+#include "UnrealPakViewerApplication.h"
+
 IMPLEMENT_APPLICATION(UnrealPakViewer, "UnrealPakViewer");
 
 /**
@@ -11,6 +13,11 @@ IMPLEMENT_APPLICATION(UnrealPakViewer, "UnrealPakViewer");
  */
 int32 UnrealPakViewerMain(const TCHAR* CommandLine)
 {
+#if defined(ParentProjectName)
+	const FString ProjectDir = FString::Printf(TEXT("../../../%s/Programs/%s/"), ParentProjectName, FApp::GetProjectName());
+	FPlatformMisc::SetOverrideProjectDir(ProjectDir);
+#endif
+
 	// Override the stack size for the thread pool.
 	FQueuedThreadPool::OverrideStackSize = 256 * 1024;
 
@@ -23,6 +30,9 @@ int32 UnrealPakViewerMain(const TCHAR* CommandLine)
 	// Tell the module manager it may now process newly-loaded UObjects when new C++ modules are loaded.
 	FModuleManager::Get().StartProcessingNewlyLoadedObjects();
 
+	// Run application
+	FUnrealPakViewerApplication::Exec();
+
 	// Shut down.
 	//im: ??? FCoreDelegates::OnExit.Broadcast();
 	FModuleManager::Get().UnloadModulesAtShutdown();
@@ -33,8 +43,6 @@ int32 UnrealPakViewerMain(const TCHAR* CommandLine)
 #endif
 
 	FTaskGraphInterface::Shutdown(); //im: ???
-
-	RequestEngineExit(TEXT("requestQuit"));
 
 	return 0;
 }
