@@ -12,10 +12,10 @@ public:
 
 	/** @return the global instance of the main manager (FPakAnalyzer). */
 	static TSharedPtr<FPakAnalyzer> Get();
+	static void Initialize();
+	void Shutdown();
 
 	bool LoadPakFile(const FString& InPakPath);
-
-	void Shutdown();
 
 protected:
 	TSharedPtr<class FPakFile> PakFile;

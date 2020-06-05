@@ -21,12 +21,20 @@ FPakAnalyzer::~FPakAnalyzer()
 
 TSharedPtr<FPakAnalyzer> FPakAnalyzer::Get()
 {
+	return FPakAnalyzer::Instance;
+}
+
+void FPakAnalyzer::Initialize()
+{
 	if (!FPakAnalyzer::Instance.IsValid())
 	{
 		FPakAnalyzer::Instance = MakeShared<FPakAnalyzer>();
 	}
+}
 
-	return FPakAnalyzer::Instance;
+void FPakAnalyzer::Shutdown()
+{
+	FPakAnalyzer::Instance.Reset();
 }
 
 bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
@@ -54,9 +62,3 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 
 	return true;
 }
-
-void FPakAnalyzer::Shutdown()
-{
-	FPakAnalyzer::Instance.Reset();
-}
-

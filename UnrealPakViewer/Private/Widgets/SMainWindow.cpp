@@ -78,6 +78,8 @@ void SMainWindow::Construct(const FArguments& Args)
 	);
 
 	OnWindowClosed.BindRaw(this, &SMainWindow::OnExit);
+
+	FPakAnalyzer::Initialize();
 }
 
 TSharedRef<SWidget> SMainWindow::MakeMainMenu()
@@ -142,7 +144,7 @@ TSharedRef<SDockTab> SMainWindow::OnSpawnTab(const FSpawnTabArgs& Args, FName Ta
 
 void SMainWindow::OnExit(const TSharedRef<SWindow>& InWindow)
 {
-
+	FPakAnalyzer::Get()->Shutdown();
 }
 
 void SMainWindow::OnLoadPakFile()
