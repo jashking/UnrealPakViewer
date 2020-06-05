@@ -93,6 +93,12 @@ TSharedRef<SWidget> SMainWindow::MakeMainMenu()
 	);
 
 	MenuBarBuilder.AddPullDownMenu(
+		LOCTEXT("ViewsMenu", "Views"),
+		FText::GetEmpty(),
+		FNewMenuDelegate::CreateRaw(this, &SMainWindow::FillViewsMenu)
+	);
+
+	MenuBarBuilder.AddPullDownMenu(
 		LOCTEXT("OptionsMenu", "Options"),
 		FText::GetEmpty(),
 		FNewMenuDelegate::CreateRaw(this, &SMainWindow::FillOptionsMenu)
@@ -100,6 +106,9 @@ TSharedRef<SWidget> SMainWindow::MakeMainMenu()
 
 	// Create the menu bar
 	TSharedRef<SWidget> MenuBarWidget = MenuBarBuilder.MakeWidget();
+
+	// Tell tab-manager about the multi-box for platforms with a global menu bar
+	TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox());
 
 	return MenuBarWidget;
 }
@@ -117,6 +126,20 @@ void SMainWindow::FillFileMenu(class FMenuBuilder& MenuBuilder)
 		NAME_None,
 		EUserInterfaceActionType::Button
 	);
+}
+
+void SMainWindow::FillViewsMenu(class FMenuBuilder& MenuBuilder)
+{
+	if (!TabManager.IsValid())
+	{
+		return;
+	}
+
+#if !WITH_EDITOR
+	//FGlobalTabmanager::Get()->PopulateTabSpawnerMenu(MenuBuilder, WorkspaceMenu::GetMenuStructure().GetStructureRoot());
+#endif //!WITH_EDITOR
+
+	TabManager->PopulateLocalTabSpawnerMenu(MenuBuilder);
 }
 
 void SMainWindow::FillOptionsMenu(class FMenuBuilder& MenuBuilder)

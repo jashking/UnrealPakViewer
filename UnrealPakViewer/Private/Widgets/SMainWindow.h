@@ -20,6 +20,7 @@ public:
 protected:
 	TSharedRef<SWidget> MakeMainMenu();
 	void FillFileMenu(class FMenuBuilder& MenuBuilder);
+	void FillViewsMenu(class FMenuBuilder& MenuBuilder);
 	void FillOptionsMenu(class FMenuBuilder& MenuBuilder);
 	TSharedRef<class SDockTab> OnSpawnTab(const FSpawnTabArgs& Args, FName TabIdentifier);
 
