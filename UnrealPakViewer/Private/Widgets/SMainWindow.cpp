@@ -9,6 +9,7 @@
 #include "Widgets/Docking/SDockTab.h"
 
 #include "PakAnalyzer.h"
+#include "SPakInfoWindow.h"
 
 #define LOCTEXT_NAMESPACE "SMainWindow"
 
@@ -67,6 +68,11 @@ void SMainWindow::Construct(const FArguments& Args)
 			.AutoHeight()
 			[
 				MakeMainMenu()
+			]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			[
+				SNew(SPakInfoWindow)
 			]
 			// Content Area
 			+ SVerticalBox::Slot()
