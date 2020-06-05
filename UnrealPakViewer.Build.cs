@@ -25,6 +25,7 @@ public class UnrealPakViewer : ModuleRules
                 "PakFile",
                 "DesktopPlatform",
                 "Projects",
+				"EditorStyle",
             }
         );
 

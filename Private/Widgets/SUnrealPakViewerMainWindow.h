@@ -17,15 +17,18 @@ public:
 	void Construct(const FArguments& Args);
 
 protected:
-	FReply Close();
-
 	TSharedRef<SWidget> MakeMainMenu();
 	void FillFileMenu(class FMenuBuilder& MenuBuilder);
 	void FillOptionsMenu(class FMenuBuilder& MenuBuilder);
+	TSharedRef<class SDockTab> OnSpawnTab(const FSpawnTabArgs& Args, FName TabIdentifier);
 
+	void OnExit(const TSharedRef<SWindow>& InWindow);
 	void OnOpenPakFile();
 
 protected:
 	static const int32 WINDOW_WIDTH = 1200;
 	static const int32 WINDOW_HEIGHT = 800;
+
+	/** Holds the tab manager that manages the front-end's tabs. */
+	TSharedPtr<class FTabManager> TabManager;
 };

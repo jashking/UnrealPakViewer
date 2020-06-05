@@ -1,14 +1,48 @@
 #include "SUnrealPakViewerMainWindow.h"
 
+#include "EditorStyleSet.h"
+#include "Framework/Docking/TabManager.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "Styling/CoreStyle.h"
+#include "Widgets/Docking/SDockTab.h"
 
 #define LOCTEXT_NAMESPACE "SUnrealPakViewerMainWindow"
+
+static const FName TreeViewTabId("UnrealPakViewerTreeView");
+static const FName FileViewTabId("UnrealPakViewerFileView");
 
 void SUnrealPakViewerMainWindow::Construct(const FArguments& Args)
 {
 	const float DPIScaleFactor = FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(10.0f, 10.0f);
+
+	const TSharedRef<SDockTab> DockTab = SNew(SDockTab).TabRole(ETabRole::MajorTab);
+
+	TabManager = FGlobalTabmanager::Get()->NewTabManager(DockTab);
+	TSharedRef<FWorkspaceItem> AppMenuGroup = TabManager->AddLocalWorkspaceMenuCategory(LOCTEXT("UnrealPakViewerMenuGroupName", "UnrealPak Viewer"));
+
+	TabManager->RegisterTabSpawner(TreeViewTabId, FOnSpawnTab::CreateRaw(this, &SUnrealPakViewerMainWindow::OnSpawnTab, TreeViewTabId))
+		.SetDisplayName(LOCTEXT("TreeViewTabTitle", "Tree View"))
+		.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "UnrealPakViewer.Tabs.Tools"))
+		.SetGroup(AppMenuGroup);
+
+	TabManager->RegisterTabSpawner(FileViewTabId, FOnSpawnTab::CreateRaw(this, &SUnrealPakViewerMainWindow::OnSpawnTab, FileViewTabId))
+		.SetDisplayName(LOCTEXT("FileViewTabTitle", "File View"))
+		.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "UnrealPakViewer.Tabs.Tools"))
+		.SetGroup(AppMenuGroup);
+
+	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("UnrealPakViewer_v1.0")
+		->AddArea
+		(
+			FTabManager::NewPrimaryArea()
+			->Split
+			(
+				FTabManager::NewStack()
+				->AddTab(TreeViewTabId, ETabState::OpenedTab)
+				->AddTab(FileViewTabId, ETabState::OpenedTab)
+				->SetForegroundTab(FTabId(TreeViewTabId))
+			)
+		);
 
 	SWindow::Construct(SWindow::FArguments()
 		.Title(LOCTEXT("WindowTitle", "UnrealPak Viewer"))
@@ -25,10 +59,12 @@ void SUnrealPakViewerMainWindow::Construct(const FArguments& Args)
 			+ SVerticalBox::Slot()
 			.FillHeight(1.f)
 			[
-				SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("ToolPanel.GroupBorder"))
+				TabManager->RestoreFrom(Layout, TSharedPtr<SWindow>()).ToSharedRef()
 			]
 		]
 	);
+
+	OnWindowClosed.BindRaw(this, &SUnrealPakViewerMainWindow::OnExit);
 }
 
 TSharedRef<SWidget> SUnrealPakViewerMainWindow::MakeMainMenu()
@@ -69,6 +105,29 @@ void SUnrealPakViewerMainWindow::FillFileMenu(class FMenuBuilder& MenuBuilder)
 }
 
 void SUnrealPakViewerMainWindow::FillOptionsMenu(class FMenuBuilder& MenuBuilder)
+{
+
+}
+
+TSharedRef<SDockTab> SUnrealPakViewerMainWindow::OnSpawnTab(const FSpawnTabArgs& Args, FName TabIdentifier)
+{
+	TSharedPtr<SWidget> TabWidget = SNullWidget::NullWidget;
+
+	TSharedRef<SDockTab> DockTab = SNew(SDockTab).TabRole(ETabRole::PanelTab);
+
+	if (TabIdentifier == TreeViewTabId)
+	{
+	}
+	else if (TabIdentifier == FileViewTabId)
+	{
+
+	}
+
+	DockTab->SetContent(TabWidget.ToSharedRef());
+	return DockTab;
+}
+
+void SUnrealPakViewerMainWindow::OnExit(const TSharedRef<SWindow>& InWindow)
 {
 
 }
