@@ -22,10 +22,10 @@ public class UnrealPakViewer : ModuleRules
                 "Slate",
                 "SlateCore",
                 "StandaloneRenderer",
-                "PakFile",
                 "DesktopPlatform",
                 "Projects",
-				"EditorStyle",
+                "EditorStyle",
+                "PakAnalyzer",
             }
         );
 
