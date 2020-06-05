@@ -1,5 +1,6 @@
-#include "SUnrealPakViewerMainWindow.h"
+#include "SMainWindow.h"
 
+#include "DesktopPlatformModule.h"
 #include "EditorStyleSet.h"
 #include "Framework/Docking/TabManager.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
@@ -7,12 +8,24 @@
 #include "Styling/CoreStyle.h"
 #include "Widgets/Docking/SDockTab.h"
 
-#define LOCTEXT_NAMESPACE "SUnrealPakViewerMainWindow"
+#include "PakAnalyzer.h"
+
+#define LOCTEXT_NAMESPACE "SMainWindow"
 
 static const FName TreeViewTabId("UnrealPakViewerTreeView");
 static const FName FileViewTabId("UnrealPakViewerFileView");
 
-void SUnrealPakViewerMainWindow::Construct(const FArguments& Args)
+SMainWindow::SMainWindow()
+{
+
+}
+
+SMainWindow::~SMainWindow()
+{
+
+}
+
+void SMainWindow::Construct(const FArguments& Args)
 {
 	const float DPIScaleFactor = FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(10.0f, 10.0f);
 
@@ -21,12 +34,12 @@ void SUnrealPakViewerMainWindow::Construct(const FArguments& Args)
 	TabManager = FGlobalTabmanager::Get()->NewTabManager(DockTab);
 	TSharedRef<FWorkspaceItem> AppMenuGroup = TabManager->AddLocalWorkspaceMenuCategory(LOCTEXT("UnrealPakViewerMenuGroupName", "UnrealPak Viewer"));
 
-	TabManager->RegisterTabSpawner(TreeViewTabId, FOnSpawnTab::CreateRaw(this, &SUnrealPakViewerMainWindow::OnSpawnTab, TreeViewTabId))
+	TabManager->RegisterTabSpawner(TreeViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab, TreeViewTabId))
 		.SetDisplayName(LOCTEXT("TreeViewTabTitle", "Tree View"))
 		.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "UnrealPakViewer.Tabs.Tools"))
 		.SetGroup(AppMenuGroup);
 
-	TabManager->RegisterTabSpawner(FileViewTabId, FOnSpawnTab::CreateRaw(this, &SUnrealPakViewerMainWindow::OnSpawnTab, FileViewTabId))
+	TabManager->RegisterTabSpawner(FileViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab, FileViewTabId))
 		.SetDisplayName(LOCTEXT("FileViewTabTitle", "File View"))
 		.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "UnrealPakViewer.Tabs.Tools"))
 		.SetGroup(AppMenuGroup);
@@ -64,23 +77,23 @@ void SUnrealPakViewerMainWindow::Construct(const FArguments& Args)
 		]
 	);
 
-	OnWindowClosed.BindRaw(this, &SUnrealPakViewerMainWindow::OnExit);
+	OnWindowClosed.BindRaw(this, &SMainWindow::OnExit);
 }
 
-TSharedRef<SWidget> SUnrealPakViewerMainWindow::MakeMainMenu()
+TSharedRef<SWidget> SMainWindow::MakeMainMenu()
 {
 	// Create & initialize main menu.
 	FMenuBarBuilder MenuBarBuilder = FMenuBarBuilder(nullptr);
 	MenuBarBuilder.AddPullDownMenu(
 		LOCTEXT("FileMenu", "File"),
 		FText::GetEmpty(),
-		FNewMenuDelegate::CreateRaw(this, &SUnrealPakViewerMainWindow::FillFileMenu)
+		FNewMenuDelegate::CreateRaw(this, &SMainWindow::FillFileMenu)
 	);
 
 	MenuBarBuilder.AddPullDownMenu(
 		LOCTEXT("OptionsMenu", "Options"),
 		FText::GetEmpty(),
-		FNewMenuDelegate::CreateRaw(this, &SUnrealPakViewerMainWindow::FillOptionsMenu)
+		FNewMenuDelegate::CreateRaw(this, &SMainWindow::FillOptionsMenu)
 	);
 
 	// Create the menu bar
@@ -89,14 +102,14 @@ TSharedRef<SWidget> SUnrealPakViewerMainWindow::MakeMainMenu()
 	return MenuBarWidget;
 }
 
-void SUnrealPakViewerMainWindow::FillFileMenu(class FMenuBuilder& MenuBuilder)
+void SMainWindow::FillFileMenu(class FMenuBuilder& MenuBuilder)
 {
 	MenuBuilder.AddMenuEntry(
 		LOCTEXT("Open", "Open pak..."),
-		LOCTEXT("Open_ToolTip", "Open an unreal pak file"),
+		LOCTEXT("Open_ToolTip", "Open an unreal pak file."),
 		FSlateIcon(),
 		FUIAction(
-			FExecuteAction::CreateSP(this, &SUnrealPakViewerMainWindow::OnOpenPakFile),
+			FExecuteAction::CreateSP(this, &SMainWindow::OnLoadPakFile),
 			FCanExecuteAction()
 		),
 		NAME_None,
@@ -104,12 +117,12 @@ void SUnrealPakViewerMainWindow::FillFileMenu(class FMenuBuilder& MenuBuilder)
 	);
 }
 
-void SUnrealPakViewerMainWindow::FillOptionsMenu(class FMenuBuilder& MenuBuilder)
+void SMainWindow::FillOptionsMenu(class FMenuBuilder& MenuBuilder)
 {
 
 }
 
-TSharedRef<SDockTab> SUnrealPakViewerMainWindow::OnSpawnTab(const FSpawnTabArgs& Args, FName TabIdentifier)
+TSharedRef<SDockTab> SMainWindow::OnSpawnTab(const FSpawnTabArgs& Args, FName TabIdentifier)
 {
 	TSharedPtr<SWidget> TabWidget = SNullWidget::NullWidget;
 
@@ -127,14 +140,37 @@ TSharedRef<SDockTab> SUnrealPakViewerMainWindow::OnSpawnTab(const FSpawnTabArgs&
 	return DockTab;
 }
 
-void SUnrealPakViewerMainWindow::OnExit(const TSharedRef<SWindow>& InWindow)
+void SMainWindow::OnExit(const TSharedRef<SWindow>& InWindow)
 {
 
 }
 
-void SUnrealPakViewerMainWindow::OnOpenPakFile()
+void SMainWindow::OnLoadPakFile()
 {
+	TArray<FString> OutFiles;
+	bool bOpened = false;
 
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (DesktopPlatform)
+	{
+		FSlateApplication::Get().CloseToolTip();
+
+		bOpened = DesktopPlatform->OpenFileDialog
+		(
+			FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr),
+			LOCTEXT("LoadPak_FileDesc", "Open pak file...").ToString(),
+			TEXT(""),
+			TEXT(""),
+			LOCTEXT("LoadPak_FileFilter", "Pak files (*.pak)|*.pak|All files (*.*)|*.*").ToString(),
+			EFileDialogFlags::None,
+			OutFiles
+		);
+	}
+
+	if (bOpened && OutFiles.Num() > 0)
+	{
+		FPakAnalyzer::Get()->LoadPakFile(OutFiles[0]);
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -13,6 +13,7 @@ public class PakAnalyzer : ModuleRules
             {
                 "Core",
                 "PakFile",
+                "PakFileUtilities",
             }
         );
     }

@@ -11,7 +11,7 @@
 #include "Stats/Stats2.h"
 #include "Styling/CoreStyle.h"
 
-#include "Widgets/SUnrealPakViewerMainWindow.h"
+#include "Widgets/SMainWindow.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -71,7 +71,7 @@ void FUnrealPakViewerApplication::InitializeApplication()
 	// Menu anims aren't supported. See Runtime\Slate\Private\Framework\Application\MenuStack.cpp.
 	FSlateApplication::Get().EnableMenuAnimations(false);
 
-	FSlateApplication::Get().AddWindow(SNew(SUnrealPakViewerMainWindow));
+	FSlateApplication::Get().AddWindow(SNew(SMainWindow));
 }
 
 void FUnrealPakViewerApplication::ShutdownApplication()

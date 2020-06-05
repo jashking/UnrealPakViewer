@@ -3,15 +3,16 @@
 #include "CoreMinimal.h"
 #include "Widgets/SWindow.h"
 
-class SUnrealPakViewerMainWindow : public SWindow
+class SMainWindow : public SWindow
 {
 public:
-	SLATE_BEGIN_ARGS(SUnrealPakViewerMainWindow)
+	SLATE_BEGIN_ARGS(SMainWindow)
 	{
 	}
 	SLATE_END_ARGS()
 
-	SUnrealPakViewerMainWindow() {}
+	SMainWindow();
+	virtual	~SMainWindow();
 
 	/** Widget constructor */
 	void Construct(const FArguments& Args);
@@ -23,7 +24,7 @@ protected:
 	TSharedRef<class SDockTab> OnSpawnTab(const FSpawnTabArgs& Args, FName TabIdentifier);
 
 	void OnExit(const TSharedRef<SWindow>& InWindow);
-	void OnOpenPakFile();
+	void OnLoadPakFile();
 
 protected:
 	static const int32 WINDOW_WIDTH = 1200;
