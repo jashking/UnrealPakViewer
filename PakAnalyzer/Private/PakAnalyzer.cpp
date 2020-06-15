@@ -7,8 +7,6 @@
 
 #include "LogDefines.h"
 
-TSharedPtr<FPakAnalyzer> FPakAnalyzer::Instance = nullptr;
-
 FPakAnalyzer::FPakAnalyzer()
 {
 
@@ -17,24 +15,6 @@ FPakAnalyzer::FPakAnalyzer()
 FPakAnalyzer::~FPakAnalyzer()
 {
 
-}
-
-TSharedPtr<FPakAnalyzer> FPakAnalyzer::Get()
-{
-	return FPakAnalyzer::Instance;
-}
-
-void FPakAnalyzer::Initialize()
-{
-	if (!FPakAnalyzer::Instance.IsValid())
-	{
-		FPakAnalyzer::Instance = MakeShared<FPakAnalyzer>();
-	}
-}
-
-void FPakAnalyzer::Shutdown()
-{
-	FPakAnalyzer::Instance.Reset();
 }
 
 bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)

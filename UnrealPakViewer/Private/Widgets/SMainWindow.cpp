@@ -8,7 +8,7 @@
 #include "Styling/CoreStyle.h"
 #include "Widgets/Docking/SDockTab.h"
 
-#include "PakAnalyzer.h"
+#include "PakAnalyzerModule.h"
 #include "SPakInfoWindow.h"
 
 #define LOCTEXT_NAMESPACE "SMainWindow"
@@ -84,8 +84,6 @@ void SMainWindow::Construct(const FArguments& Args)
 	);
 
 	OnWindowClosed.BindRaw(this, &SMainWindow::OnExit);
-
-	FPakAnalyzer::Initialize();
 }
 
 TSharedRef<SWidget> SMainWindow::MakeMainMenu()
@@ -173,7 +171,6 @@ TSharedRef<SDockTab> SMainWindow::OnSpawnTab(const FSpawnTabArgs& Args, FName Ta
 
 void SMainWindow::OnExit(const TSharedRef<SWindow>& InWindow)
 {
-	FPakAnalyzer::Get()->Shutdown();
 }
 
 void SMainWindow::OnLoadPakFile()
@@ -200,7 +197,7 @@ void SMainWindow::OnLoadPakFile()
 
 	if (bOpened && OutFiles.Num() > 0)
 	{
-		FPakAnalyzer::Get()->LoadPakFile(OutFiles[0]);
+		IPakAnalyzerModule::Get().GetPakAnalyzer()->LoadPakFile(OutFiles[0]);
 	}
 }
 
@@ -218,7 +215,7 @@ FReply SMainWindow::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& Dr
 				const FString DraggedFileExtension = FPaths::GetExtension(Files[0], true);
 				if (DraggedFileExtension == TEXT(".pak"))
 				{
-					FPakAnalyzer::Get()->LoadPakFile(Files[0]);
+					IPakAnalyzerModule::Get().GetPakAnalyzer()->LoadPakFile(Files[0]);
 					return FReply::Handled();
 				}
 			}
