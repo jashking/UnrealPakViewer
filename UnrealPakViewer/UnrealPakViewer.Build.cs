@@ -43,7 +43,7 @@ public class UnrealPakViewer : ModuleRules
         if (!CurrentModuleDirectory.IsUnderDirectory(EngineSourceProgramsDirectory))
         {
             string ProjectName = Target.ProjectFile.GetFileNameWithoutExtension();
-            Log.TraceInformation("MyBlankProgram is outside engine source directory, parent project is: {0}", ProjectName);
+            Log.TraceInformation("UnrealPakViewer is outside engine source directory, parent project is: {0}", ProjectName);
 
             PrivateDefinitions.Add(string.Format("ParentProjectName=TEXT(\"{0}\")", ProjectName));
         }
