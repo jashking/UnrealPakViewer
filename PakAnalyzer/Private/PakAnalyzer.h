@@ -6,6 +6,8 @@
 
 #include "IPakAnalyzer.h"
 
+struct FPakEntry;
+
 class FPakAnalyzer : public IPakAnalyzer, public TSharedFromThis<FPakAnalyzer>
 {
 public:
@@ -13,7 +15,14 @@ public:
 	virtual ~FPakAnalyzer();
 
 	virtual bool LoadPakFile(const FString& InPakPath) override;
+	virtual int32 GetFileCount() const override;
+	virtual const TArray<TSharedPtr<FPakFileEntry>>& GetFiles() const override;
 
 protected:
+	void Reset();
+
+protected:
+	TArray<TSharedPtr<FPakFileEntry>> Files;
+
 	TSharedPtr<class FPakFile> PakFile;
 };

@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 
+#include "PakFileEntry.h"
+
 class IPakAnalyzer
 {
 public:
@@ -11,4 +13,6 @@ public:
 	virtual ~IPakAnalyzer() {}
 
 	virtual bool LoadPakFile(const FString& InPakPath) = 0;
+	virtual int32 GetFileCount() const = 0;
+	virtual const TArray<TSharedPtr<FPakFileEntry>>& GetFiles() const = 0;
 };

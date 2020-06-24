@@ -16,18 +16,17 @@
 // SPakFileRow
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-class SPakFileRow : public SMultiColumnTableRow<TSharedPtr<FPakFileRef>>
+class SPakFileRow : public SMultiColumnTableRow<SPakFileView::FPakFileItem>
 {
 	SLATE_BEGIN_ARGS(SPakFileRow) {}
 	SLATE_END_ARGS()
 
 public:
-	void Construct(const FArguments& InArgs, TSharedPtr<FPakFileRef> InPakFileRef, TSharedPtr<SPakFileView> InParentWidget, const TSharedRef<STableViewBase>& InOwnerTableView)
+	void Construct(const FArguments& InArgs, SPakFileView::FPakFileItem InPakFileItem, const TSharedRef<STableViewBase>& InOwnerTableView)
 	{
-		WeakPakFileRef = MoveTemp(InPakFileRef);
-		WeakParentWidget = InParentWidget;
+		WeakPakFileItem = MoveTemp(InPakFileItem);
 
-		SMultiColumnTableRow<TSharedPtr<FPakFileRef>>::Construct(FSuperRowType::FArguments(), InOwnerTableView);
+		SMultiColumnTableRow<SPakFileView::FPakFileItem>::Construct(FSuperRowType::FArguments(), InOwnerTableView);
 
 		TSharedRef<SWidget> Row = ChildSlot.GetChildAt(0);
 
@@ -50,8 +49,7 @@ public:
 protected:
 	FSlateColor GetBackgroundColor() const
 	{
-		TSharedPtr<SPakFileView> ParentWidgetPin = WeakParentWidget.Pin();
-		TSharedPtr<FPakFileRef> PakFileRefPin = WeakPakFileRef.Pin();
+		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
 		//if (ParentWidgetPin.IsValid() && PakFileRefPin.IsValid())
 		//{
 		//	TSharedPtr<FLogMessage> SelectedLogMessage = ParentWidgetPin->GetSelectedLogMessage();
@@ -79,8 +77,7 @@ protected:
 	}
 
 protected:
-	TWeakPtr<FPakFileRef> WeakPakFileRef;
-	TWeakPtr<SPakFileView> WeakParentWidget;
+	TWeakPtr<FPakFileEntry> WeakPakFileItem;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,7 +96,7 @@ SPakFileView::~SPakFileView()
 
 void SPakFileView::Construct(const FArguments& InArgs)
 {
-	SAssignNew(ExternalScrollbar, SScrollBar);
+	SAssignNew(ExternalScrollbar, SScrollBar).AlwaysShowScrollbar(true);
 
 	ChildSlot
 	[
@@ -137,13 +134,13 @@ void SPakFileView::Construct(const FArguments& InArgs)
 					[
 						SNew(SBorder).BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder")).Padding(0.f)
 						[
-							SAssignNew(FileListView, SListView<TSharedPtr<FPakFileRef>>)
+							SAssignNew(FileListView, SListView<FPakFileItem>)
 							.ExternalScrollbar(ExternalScrollbar)
 							.ItemHeight(20.f)
 							.SelectionMode(ESelectionMode::Single)
 							//.OnMouseButtonClick()
 							//.OnSelectiongChanged()
-							.ListItemsSource(&PakFiles)
+							.ListItemsSource(&FileCache)
 							.OnGenerateRow(this, &SPakFileView::OnGenerateFileRow)
 							.ConsumeMouseWheel(EConsumeMouseWheel::Always)
 							//.OnContextMenuOpening()
@@ -189,9 +186,9 @@ void SPakFileView::OnSearchBoxTextChanged(const FText& inFilterText)
 	
 }
 
-TSharedRef<ITableRow> SPakFileView::OnGenerateFileRow(TSharedPtr<FPakFileRef> InPakFileRef, const TSharedRef<STableViewBase>& OwnerTable)
+TSharedRef<ITableRow> SPakFileView::OnGenerateFileRow(FPakFileItem InPakFileItem, const TSharedRef<STableViewBase>& OwnerTable)
 {
-	return SNew(SPakFileRow, InPakFileRef, SharedThis(this), OwnerTable);
+	return SNew(SPakFileRow, InPakFileItem, OwnerTable);
 }
 
 #undef LOCTEXT_NAMESPACE

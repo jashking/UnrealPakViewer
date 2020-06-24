@@ -4,7 +4,7 @@
 #include "Widgets/SCompoundWidget.h"
 #include "Widgets/Views/SListView.h"
 
-#include "ViewModels/PakFile.h"
+#include "PakFileEntry.h"
 
 namespace PakFileViewColumns
 {
@@ -25,6 +25,8 @@ namespace PakFileViewColumns
 class SPakFileView : public SCompoundWidget
 {
 public:
+	typedef TSharedPtr<FPakFileEntry> FPakFileItem;
+
 	/** Default constructor. */
 	SPakFileView();
 
@@ -42,7 +44,7 @@ protected:
 	void OnSearchBoxTextChanged(const FText& inFilterText);
 
 	/** Generate a new list view row. */
-	TSharedRef<ITableRow> OnGenerateFileRow(TSharedPtr<FPakFileRef> InPakFileRef, const TSharedRef<class STableViewBase>& OwnerTable);
+	TSharedRef<ITableRow> OnGenerateFileRow(FPakFileItem InPakFileItem, const TSharedRef<class STableViewBase>& OwnerTable);
 
 protected:
 	/** External scrollbar used to synchronize file view position. */
@@ -52,8 +54,8 @@ protected:
 	TSharedPtr<class SSearchBox> SearchBox;
 
 	/** The list view widget. */
-	TSharedPtr<SListView<TSharedPtr<FPakFileRef>>> FileListView;
+	TSharedPtr<SListView<FPakFileItem>> FileListView;
 
 	/** List of files to show in list view (i.e. filtered). */
-	TArray<TSharedPtr<FPakFileRef>> PakFiles;
+	TArray<FPakFileItem> FileCache;
 };
