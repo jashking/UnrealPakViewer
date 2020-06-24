@@ -5,6 +5,13 @@
 
 #define LOCTEXT_NAMESPACE "SPakInfoView"
 
+// TODO: CompressionMethod
+// TODO: MountPoint
+// TODO: FileCount
+// TODO: TotalSize
+// TODO: IndexSize
+// TODO: PakHeaderSize
+
 SPakInfoView::SPakInfoView()
 {
 

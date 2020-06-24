@@ -1,6 +1,8 @@
 #include "SPakFileView.h"
 
 #include "EditorStyle.h"
+#include "IPlatformFilePak.h"
+#include "Misc/Paths.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
@@ -9,6 +11,8 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Views/STableRow.h"
 #include "Widgets/Views/STableViewBase.h"
+
+#include "PakAnalyzerModule.h"
 
 #define LOCTEXT_NAMESPACE "SPakFileView"
 
@@ -34,7 +38,7 @@ public:
 		[
 			SNew(SBorder)
 			.BorderImage(new FSlateColorBrush(FLinearColor::White))
-			.BorderBackgroundColor(this, &SPakFileRow::GetBackgroundColor)
+			.BorderBackgroundColor(FSlateColor(FLinearColor(0.0f, 0.0f, 0.0f, 0.0f)))
 			[
 				Row
 			]
@@ -43,37 +47,201 @@ public:
 
 	virtual TSharedRef<SWidget> GenerateWidgetForColumn(const FName& ColumnName) override
 	{
-		return SNullWidget::NullWidget;
+		if (ColumnName == PakFileViewColumns::NameColumnName)
+		{
+			return
+				SNew(SBox).Padding(FMargin(4.0, 0.0))
+				[
+					SNew(STextBlock).Text(this, &SPakFileRow::GetName)
+				];
+		}
+		else if (ColumnName == PakFileViewColumns::PathColumnName)
+		{
+			return
+				SNew(SBox).Padding(FMargin(4.0, 0.0))
+				[
+					SNew(STextBlock).Text(this, &SPakFileRow::GetPath)
+				];
+		}
+		else if (ColumnName == PakFileViewColumns::OffsetColumnName)
+		{
+			return
+				SNew(SBox).Padding(FMargin(4.0, 0.0))
+				[
+					SNew(STextBlock).Text(this, &SPakFileRow::GetOffset)
+				];
+		}
+		else if (ColumnName == PakFileViewColumns::SizeColumnName)
+		{
+			return
+				SNew(SBox).Padding(FMargin(4.0, 0.0))
+				[
+					SNew(STextBlock).Text(this, &SPakFileRow::GetSize)
+				];
+		}
+		else if (ColumnName == PakFileViewColumns::CompressedSizeColumnName)
+		{
+			return
+				SNew(SBox).Padding(FMargin(4.0, 0.0))
+				[
+					SNew(STextBlock).Text(this, &SPakFileRow::GetCompressedSize)
+				];
+		}
+		else if (ColumnName == PakFileViewColumns::CompressionBlockCountColumnName)
+		{
+			return
+				SNew(SBox).Padding(FMargin(4.0, 0.0))
+				[
+					SNew(STextBlock).Text(this, &SPakFileRow::GetCompressionBlockCount)
+				];
+		}
+		else if (ColumnName == PakFileViewColumns::CompressionBlockSizeColumnName)
+		{
+			return
+				SNew(SBox).Padding(FMargin(4.0, 0.0))
+				[
+					SNew(STextBlock).Text(this, &SPakFileRow::GetCompressionBlockSize)
+				];
+		}
+		else if (ColumnName == PakFileViewColumns::SHA1ColumnName)
+		{
+			return
+				SNew(SBox).Padding(FMargin(4.0, 0.0))
+				[
+					SNew(STextBlock).Text(this, &SPakFileRow::GetSHA1)
+				];
+		}
+		else if (ColumnName == PakFileViewColumns::IsEncryptedColumnName)
+		{
+			return
+				SNew(SBox).Padding(FMargin(4.0, 0.0))
+				[
+					SNew(STextBlock).Text(this, &SPakFileRow::GetIsEncrypted)
+				];
+		}
+		else
+		{
+			return SNew(STextBlock).Text(LOCTEXT("UnknownColumn", "Unknown Column"));
+		}
 	}
 
 protected:
-	FSlateColor GetBackgroundColor() const
+
+	FText GetName() const
 	{
 		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
-		//if (ParentWidgetPin.IsValid() && PakFileRefPin.IsValid())
-		//{
-		//	TSharedPtr<FLogMessage> SelectedLogMessage = ParentWidgetPin->GetSelectedLogMessage();
-		//	if (!SelectedLogMessage || SelectedLogMessage->GetIndex() != LogMessagePin->GetIndex()) // if row is not selected
-		//	{
-		//		FLogMessageRecord& CacheEntry = ParentWidgetPin->GetCache().Get(LogMessagePin->GetIndex());
-		//		const double Time = CacheEntry.Time;
+		if (PakFileItemPin.IsValid())
+		{
+			return FText::FromString(FPaths::GetCleanFilename(PakFileItemPin->Filename));
+		}
+		else
+		{
+			return FText();
+		}
+	}
 
-		//		TSharedPtr<STimingProfilerWindow> Window = FTimingProfilerManager::Get()->GetProfilerWindow();
-		//		if (Window)
-		//		{
-		//			TSharedPtr<STimingView> TimingView = Window->GetTimingView();
-		//			if (TimingView)
-		//			{
-		//				if (TimingView->IsTimeSelectedInclusive(Time))
-		//				{
-		//					return FSlateColor(FLinearColor(0.25f, 0.5f, 1.0f, 0.25f));
-		//				}
-		//			}
-		//		}
-		//	}
-		//}
+	FText GetPath() const
+	{
+		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid())
+		{
+			return FText::FromString(PakFileItemPin->Filename);
+		}
+		else
+		{
+			return FText();
+		}
+	}
 
-		return FSlateColor(FLinearColor(0.0f, 0.0f, 0.0f, 0.0f));
+	FText GetOffset() const
+	{
+		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		{
+			return FText::AsNumber(PakFileItemPin->PakEntry->Offset);
+		}
+		else
+		{
+			return FText();
+		}
+	}
+
+	FText GetSize() const
+	{
+		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		{
+			return FText::AsMemory(PakFileItemPin->PakEntry->UncompressedSize, EMemoryUnitStandard::IEC);
+		}
+		else
+		{
+			return FText();
+		}
+	}
+
+	FText GetCompressedSize() const
+	{
+		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		{
+			return FText::AsMemory(PakFileItemPin->PakEntry->Size, EMemoryUnitStandard::IEC);
+		}
+		else
+		{
+			return FText();
+		}
+	}
+
+	FText GetCompressionBlockCount() const
+	{
+		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		{
+			return FText::AsNumber(PakFileItemPin->PakEntry->CompressionBlocks.Num());
+		}
+		else
+		{
+			return FText();
+		}
+	}
+
+	FText GetCompressionBlockSize() const
+	{
+		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		{
+			return FText::AsMemory(PakFileItemPin->PakEntry->CompressionBlockSize);
+		}
+		else
+		{
+			return FText();
+		}
+	}
+
+	FText GetSHA1() const
+	{
+		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		{
+			return FText::FromString(BytesToHex(PakFileItemPin->PakEntry->Hash, sizeof(PakFileItemPin->PakEntry->Hash)));
+		}
+		else
+		{
+			return FText();
+		}
+	}
+
+	FText GetIsEncrypted() const
+	{
+		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		{
+			return FText::FromString(PakFileItemPin->PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False"));
+		}
+		else
+		{
+			return FText();
+		}
 	}
 
 protected:
@@ -148,17 +316,15 @@ void SPakFileView::Construct(const FArguments& InArgs)
 							(
 								SNew(SHeaderRow)
 
-								+ SHeaderRow::Column(PakFileViewColumns::IndexColumnName).ManualWidth(30.f).DefaultLabel(LOCTEXT("IndexColumn", "Index"))
-								+ SHeaderRow::Column(PakFileViewColumns::NameColumnName).ManualWidth(90.f).DefaultLabel(LOCTEXT("NameColumn", "Name"))
-								+ SHeaderRow::Column(PakFileViewColumns::PathColumnName).ManualWidth(270.f).DefaultLabel(LOCTEXT("PathColumn", "Path"))
-								+ SHeaderRow::Column(PakFileViewColumns::OffsetColumnName).ManualWidth(60.f).DefaultLabel(LOCTEXT("OffsetColumn", "Offset"))
-								+ SHeaderRow::Column(PakFileViewColumns::SizeColumnName).ManualWidth(60.f).DefaultLabel(LOCTEXT("SizeColumn", "Size"))
-								+ SHeaderRow::Column(PakFileViewColumns::CompressedSizeColumnName).ManualWidth(60.f).DefaultLabel(LOCTEXT("CompressedSizeColumn", "CompressedSize"))
-								+ SHeaderRow::Column(PakFileViewColumns::CompressionMethodColumnName).ManualWidth(60.f).DefaultLabel(LOCTEXT("CompressionMethodColumn", "CompressionMethod"))
-								+ SHeaderRow::Column(PakFileViewColumns::CompressionBlockCountColumnName).ManualWidth(30.f).DefaultLabel(LOCTEXT("CompressionBlockCountColumn", "CompressionBlockCount"))
-								+ SHeaderRow::Column(PakFileViewColumns::CompressionBlockSizeColumnName).ManualWidth(60.f).DefaultLabel(LOCTEXT("CompressionBlockSizeColumn", "CompressionBlockSize"))
-								+ SHeaderRow::Column(PakFileViewColumns::SHA1ColumnName).ManualWidth(120.f).DefaultLabel(LOCTEXT("SHA1Column", "SHA1"))
-								+ SHeaderRow::Column(PakFileViewColumns::IsEncryptedColumnName).ManualWidth(30.f).DefaultLabel(LOCTEXT("IsEncryptedColumn", "IsEncrypted"))
+								+ SHeaderRow::Column(PakFileViewColumns::NameColumnName).ManualWidth(270.f).DefaultLabel(LOCTEXT("NameColumn", "Name"))
+								+ SHeaderRow::Column(PakFileViewColumns::PathColumnName).ManualWidth(600.f).DefaultLabel(LOCTEXT("PathColumn", "Path"))
+								+ SHeaderRow::Column(PakFileViewColumns::OffsetColumnName).ManualWidth(110.f).DefaultLabel(LOCTEXT("OffsetColumn", "Offset"))
+								+ SHeaderRow::Column(PakFileViewColumns::SizeColumnName).ManualWidth(110.f).DefaultLabel(LOCTEXT("SizeColumn", "Size"))
+								+ SHeaderRow::Column(PakFileViewColumns::CompressedSizeColumnName).ManualWidth(110.f).DefaultLabel(LOCTEXT("CompressedSizeColumn", "Compressed Size"))
+								+ SHeaderRow::Column(PakFileViewColumns::CompressionBlockCountColumnName).ManualWidth(155.f).DefaultLabel(LOCTEXT("CompressionBlockCountColumn", "Compression Block Count"))
+								+ SHeaderRow::Column(PakFileViewColumns::CompressionBlockSizeColumnName).ManualWidth(155.f).DefaultLabel(LOCTEXT("CompressionBlockSizeColumn", "Compression Block Size"))
+								+ SHeaderRow::Column(PakFileViewColumns::SHA1ColumnName).ManualWidth(315.f).DefaultLabel(LOCTEXT("SHA1Column", "SHA1"))
+								+ SHeaderRow::Column(PakFileViewColumns::IsEncryptedColumnName).ManualWidth(70.f).DefaultLabel(LOCTEXT("IsEncryptedColumn", "IsEncrypted"))
 							)
 						]
 					]
@@ -174,6 +340,21 @@ void SPakFileView::Construct(const FArguments& InArgs)
 			]
 		]
 	];
+}
+
+void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
+{
+	if (FileCache.Num() <= 0)
+	{
+		const TArray<TSharedPtr<FPakFileEntry>>& AllFiles = IPakAnalyzerModule::Get().GetPakAnalyzer()->GetFiles();
+		for (int32 Index = 0; Index < AllFiles.Num(); ++Index)
+		{
+			FileCache.Add(AllFiles[Index]);
+			FileListView->RebuildList();
+		}
+	}
+
+	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 }
 
 bool SPakFileView::SearchBoxIsEnabled() const

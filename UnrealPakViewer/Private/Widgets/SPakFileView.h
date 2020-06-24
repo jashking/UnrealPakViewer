@@ -8,13 +8,11 @@
 
 namespace PakFileViewColumns
 {
-	static const FName IndexColumnName(TEXT("Index"));
 	static const FName NameColumnName(TEXT("Name"));
 	static const FName PathColumnName(TEXT("Path"));
 	static const FName OffsetColumnName(TEXT("Offset"));
 	static const FName SizeColumnName(TEXT("Size"));
 	static const FName CompressedSizeColumnName(TEXT("CompressedSize"));
-	static const FName CompressionMethodColumnName(TEXT("CompressionMethod"));
 	static const FName CompressionBlockCountColumnName(TEXT("CompressionBlockCount"));
 	static const FName CompressionBlockSizeColumnName(TEXT("CompressionBlockSize"));
 	static const FName SHA1ColumnName(TEXT("SHA1"));
@@ -38,6 +36,15 @@ public:
 
 	/** Constructs this widget. */
 	void Construct(const FArguments& InArgs);
+
+	/**
+	 * Ticks this widget. Override in derived classes, but always call the parent implementation.
+	 *
+	 * @param AllottedGeometry - The space allotted for this widget
+	 * @param InCurrentTime - Current absolute real time
+	 * @param InDeltaTime - Real time passed since last tick
+	 */
+	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
 protected:
 	bool SearchBoxIsEnabled() const;

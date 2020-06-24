@@ -12,8 +12,14 @@ public class PakAnalyzer : ModuleRules
             new string[]
             {
                 "Core",
-                "PakFile",
                 "PakFileUtilities",
+            }
+        );
+
+        PublicDependencyModuleNames.AddRange(
+            new string[]
+            {
+                "PakFile",
             }
         );
     }
