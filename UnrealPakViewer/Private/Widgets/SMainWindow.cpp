@@ -9,7 +9,9 @@
 #include "Widgets/Docking/SDockTab.h"
 
 #include "PakAnalyzerModule.h"
-#include "SPakInfoWindow.h"
+#include "SPakFileView.h"
+#include "SPakInfoView.h"
+#include "SPakTreeView.h"
 
 #define LOCTEXT_NAMESPACE "SMainWindow"
 
@@ -72,7 +74,7 @@ void SMainWindow::Construct(const FArguments& Args)
 			+ SVerticalBox::Slot()
 			.AutoHeight()
 			[
-				SNew(SPakInfoWindow)
+				SNew(SPakInfoView)
 			]
 			// Content Area
 			+ SVerticalBox::Slot()
@@ -159,10 +161,11 @@ TSharedRef<SDockTab> SMainWindow::OnSpawnTab(const FSpawnTabArgs& Args, FName Ta
 
 	if (TabIdentifier == TreeViewTabId)
 	{
+		SAssignNew(TabWidget, SPakTreeView);
 	}
 	else if (TabIdentifier == FileViewTabId)
 	{
-
+		SAssignNew(TabWidget, SPakFileView);
 	}
 
 	DockTab->SetContent(TabWidget.ToSharedRef());

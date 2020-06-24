@@ -1,21 +1,21 @@
-#include "SPakInfoWindow.h"
+#include "SPakInfoView.h"
 
 #include "EditorStyle.h"
 #include "Styling/CoreStyle.h"
 
-#define LOCTEXT_NAMESPACE "SPakInfoWindow"
+#define LOCTEXT_NAMESPACE "SPakInfoView"
 
-SPakInfoWindow::SPakInfoWindow()
+SPakInfoView::SPakInfoView()
 {
 
 }
 
-SPakInfoWindow::~SPakInfoWindow()
+SPakInfoView::~SPakInfoView()
 {
 
 }
 
-void SPakInfoWindow::Construct(const FArguments& InArgs)
+void SPakInfoView::Construct(const FArguments& InArgs)
 {
 	ChildSlot
 	[
