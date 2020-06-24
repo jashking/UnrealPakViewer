@@ -52,7 +52,7 @@ public:
 			return
 				SNew(SBox).Padding(FMargin(4.0, 0.0))
 				[
-					SNew(STextBlock).Text(this, &SPakFileRow::GetName)
+					SNew(STextBlock).Text(this, &SPakFileRow::GetName).ToolTipText(this, &SPakFileRow::GetName)
 				];
 		}
 		else if (ColumnName == PakFileViewColumns::PathColumnName)
@@ -60,7 +60,7 @@ public:
 			return
 				SNew(SBox).Padding(FMargin(4.0, 0.0))
 				[
-					SNew(STextBlock).Text(this, &SPakFileRow::GetPath)
+					SNew(STextBlock).Text(this, &SPakFileRow::GetPath).ToolTipText(this, &SPakFileRow::GetPath)
 				];
 		}
 		else if (ColumnName == PakFileViewColumns::OffsetColumnName)
@@ -76,7 +76,7 @@ public:
 			return
 				SNew(SBox).Padding(FMargin(4.0, 0.0))
 				[
-					SNew(STextBlock).Text(this, &SPakFileRow::GetSize)
+					SNew(STextBlock).Text(this, &SPakFileRow::GetSize).ToolTipText(this, &SPakFileRow::GetSizeToolTip)
 				];
 		}
 		else if (ColumnName == PakFileViewColumns::CompressedSizeColumnName)
@@ -84,7 +84,7 @@ public:
 			return
 				SNew(SBox).Padding(FMargin(4.0, 0.0))
 				[
-					SNew(STextBlock).Text(this, &SPakFileRow::GetCompressedSize)
+					SNew(STextBlock).Text(this, &SPakFileRow::GetCompressedSize).ToolTipText(this, &SPakFileRow::GetCompressedSizeToolTip)
 				];
 		}
 		else if (ColumnName == PakFileViewColumns::CompressionBlockCountColumnName)
@@ -100,7 +100,7 @@ public:
 			return
 				SNew(SBox).Padding(FMargin(4.0, 0.0))
 				[
-					SNew(STextBlock).Text(this, &SPakFileRow::GetCompressionBlockSize)
+					SNew(STextBlock).Text(this, &SPakFileRow::GetCompressionBlockSize).ToolTipText(this, &SPakFileRow::GetCompressionBlockSizeToolTip)
 				];
 		}
 		else if (ColumnName == PakFileViewColumns::SHA1ColumnName)
@@ -179,12 +179,38 @@ protected:
 		}
 	}
 
+	FText GetSizeToolTip() const
+	{
+		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		{
+			return FText::AsNumber(PakFileItemPin->PakEntry->UncompressedSize);
+		}
+		else
+		{
+			return FText();
+		}
+	}
+
 	FText GetCompressedSize() const
 	{
 		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
 		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
 		{
 			return FText::AsMemory(PakFileItemPin->PakEntry->Size, EMemoryUnitStandard::IEC);
+		}
+		else
+		{
+			return FText();
+		}
+	}
+
+	FText GetCompressedSizeToolTip() const
+	{
+		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		{
+			return FText::AsNumber(PakFileItemPin->PakEntry->Size);
 		}
 		else
 		{
@@ -210,7 +236,20 @@ protected:
 		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
 		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
 		{
-			return FText::AsMemory(PakFileItemPin->PakEntry->CompressionBlockSize);
+			return FText::AsMemory(PakFileItemPin->PakEntry->CompressionBlockSize, EMemoryUnitStandard::IEC);
+		}
+		else
+		{
+			return FText();
+		}
+	}
+
+	FText GetCompressionBlockSizeToolTip() const
+	{
+		SPakFileView::FPakFileItem PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		{
+			return FText::AsNumber(PakFileItemPin->PakEntry->CompressionBlockSize);
 		}
 		else
 		{
