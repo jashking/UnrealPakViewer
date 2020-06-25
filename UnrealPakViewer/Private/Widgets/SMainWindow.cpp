@@ -9,12 +9,13 @@
 #include "Widgets/Docking/SDockTab.h"
 
 #include "PakAnalyzerModule.h"
+#include "SPakDetailView.h"
 #include "SPakFileView.h"
-#include "SPakInfoView.h"
 #include "SPakTreeView.h"
 
 #define LOCTEXT_NAMESPACE "SMainWindow"
 
+static const FName DetailViewTabId("UnrealPakViewerDetailView");
 static const FName TreeViewTabId("UnrealPakViewerTreeView");
 static const FName FileViewTabId("UnrealPakViewerFileView");
 
@@ -37,12 +38,17 @@ void SMainWindow::Construct(const FArguments& Args)
 	TabManager = FGlobalTabmanager::Get()->NewTabManager(DockTab);
 	TSharedRef<FWorkspaceItem> AppMenuGroup = TabManager->AddLocalWorkspaceMenuCategory(LOCTEXT("UnrealPakViewerMenuGroupName", "UnrealPak Viewer"));
 
-	TabManager->RegisterTabSpawner(TreeViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab, TreeViewTabId))
+	TabManager->RegisterTabSpawner(DetailViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab_DetailView))
+		.SetDisplayName(LOCTEXT("DetailViewTabTitle", "Detail View"))
+		.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "UnrealPakViewer.Tabs.Tools"))
+		.SetGroup(AppMenuGroup);
+
+	TabManager->RegisterTabSpawner(TreeViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab_TreeView))
 		.SetDisplayName(LOCTEXT("TreeViewTabTitle", "Tree View"))
 		.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "UnrealPakViewer.Tabs.Tools"))
 		.SetGroup(AppMenuGroup);
 
-	TabManager->RegisterTabSpawner(FileViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab, FileViewTabId))
+	TabManager->RegisterTabSpawner(FileViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab_FileView))
 		.SetDisplayName(LOCTEXT("FileViewTabTitle", "File View"))
 		.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "UnrealPakViewer.Tabs.Tools"))
 		.SetGroup(AppMenuGroup);
@@ -51,6 +57,13 @@ void SMainWindow::Construct(const FArguments& Args)
 		->AddArea
 		(
 			FTabManager::NewPrimaryArea()
+			->SetOrientation(Orient_Vertical)
+			->Split
+			(
+				FTabManager::NewStack()
+				->AddTab(DetailViewTabId, ETabState::OpenedTab)
+				->SetHideTabWell(true)
+			)
 			->Split
 			(
 				FTabManager::NewStack()
@@ -71,16 +84,15 @@ void SMainWindow::Construct(const FArguments& Args)
 			[
 				MakeMainMenu()
 			]
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			[
-				SNew(SPakInfoView)
-			]
 			// Content Area
 			+ SVerticalBox::Slot()
 			.FillHeight(1.f)
 			[
-				TabManager->RestoreFrom(Layout, TSharedPtr<SWindow>()).ToSharedRef()
+				SNew(SBorder)
+				.BorderImage(FEditorStyle::GetBrush("NotificationList.ItemBackground"))
+				[
+					TabManager->RestoreFrom(Layout, TSharedPtr<SWindow>()).ToSharedRef()
+				]
 			]
 		]
 	);
@@ -153,22 +165,39 @@ void SMainWindow::FillOptionsMenu(class FMenuBuilder& MenuBuilder)
 
 }
 
-TSharedRef<SDockTab> SMainWindow::OnSpawnTab(const FSpawnTabArgs& Args, FName TabIdentifier)
+TSharedRef<class SDockTab> SMainWindow::OnSpawnTab_DetailView(const FSpawnTabArgs& Args)
 {
-	TSharedPtr<SWidget> TabWidget = SNullWidget::NullWidget;
+	const TSharedRef<SDockTab> DockTab = SNew(SDockTab)
+		.ShouldAutosize(true)
+		.TabRole(ETabRole::PanelTab)
+		[
+			SNew(SPakDetailView)
+		];
 
-	TSharedRef<SDockTab> DockTab = SNew(SDockTab).TabRole(ETabRole::PanelTab);
+	return DockTab;
+}
 
-	if (TabIdentifier == TreeViewTabId)
-	{
-		SAssignNew(TabWidget, SPakTreeView);
-	}
-	else if (TabIdentifier == FileViewTabId)
-	{
-		SAssignNew(TabWidget, SPakFileView);
-	}
+TSharedRef<class SDockTab> SMainWindow::OnSpawnTab_TreeView(const FSpawnTabArgs& Args)
+{
+	const TSharedRef<SDockTab> DockTab = SNew(SDockTab)
+		.ShouldAutosize(false)
+		.TabRole(ETabRole::PanelTab)
+		[
+			SNew(SPakTreeView)
+		];
 
-	DockTab->SetContent(TabWidget.ToSharedRef());
+	return DockTab;
+}
+
+TSharedRef<class SDockTab> SMainWindow::OnSpawnTab_FileView(const FSpawnTabArgs& Args)
+{
+	const TSharedRef<SDockTab> DockTab = SNew(SDockTab)
+		.ShouldAutosize(false)
+		.TabRole(ETabRole::PanelTab)
+		[
+			SNew(SPakFileView)
+		];
+
 	return DockTab;
 }
 

@@ -22,7 +22,10 @@ protected:
 	void FillFileMenu(class FMenuBuilder& MenuBuilder);
 	void FillViewsMenu(class FMenuBuilder& MenuBuilder);
 	void FillOptionsMenu(class FMenuBuilder& MenuBuilder);
-	TSharedRef<class SDockTab> OnSpawnTab(const FSpawnTabArgs& Args, FName TabIdentifier);
+
+	TSharedRef<class SDockTab> OnSpawnTab_DetailView(const FSpawnTabArgs& Args);
+	TSharedRef<class SDockTab> OnSpawnTab_TreeView(const FSpawnTabArgs& Args);
+	TSharedRef<class SDockTab> OnSpawnTab_FileView(const FSpawnTabArgs& Args);
 
 	void OnExit(const TSharedRef<SWindow>& InWindow);
 	void OnLoadPakFile();

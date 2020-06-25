@@ -19,6 +19,16 @@ namespace PakFileViewColumns
 	static const FName IsEncryptedColumnName(TEXT("IsEncrypted"));
 }
 
+enum class EFileColumnFlags : uint32
+{
+	None = 0,
+
+	ShouldBeVisible = (1 << 0),
+	CanBeHidden = (1 << 1),
+	CanBeFiltered = (1 << 2),
+};
+ENUM_CLASS_FLAGS(EFileColumnFlags);
+
 /** Implements the Pak Info window. */
 class SPakFileView : public SCompoundWidget
 {
@@ -47,11 +57,95 @@ public:
 	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
 protected:
+	class FFileColumn
+	{
+	public:
+		FFileColumn() = delete;
+		FFileColumn(int32 InIndex, const FName InId, const FText& InTitleName, const FText& InDescription, float InInitialWidth, const EFileColumnFlags& InFlags)
+			: Index(InIndex)
+			, Id(InId)
+			, TitleName(InTitleName)
+			, Description(InDescription)
+			, InitialWidth(InInitialWidth)
+			, Flags(InFlags)
+			, bIsVisible(EnumHasAnyFlags(Flags, EFileColumnFlags::ShouldBeVisible))
+		{
+		}
+
+		int32 GetIndex() const { return Index; }
+		const FName& GetId() const { return Id; }
+		const FText& GetTitleName() const { return TitleName; }
+		const FText& GetDescription() const { return Description; }
+
+		bool IsVisible() const { return bIsVisible; }
+		void Show() { bIsVisible = true; }
+		void Hide() { bIsVisible = false; }
+		void ToggleVisibility() { bIsVisible = !bIsVisible; }
+		void SetVisibilityFlag(bool bOnOff) { bIsVisible = bOnOff; }
+
+		float GetInitialWidth() const { return InitialWidth; }
+
+		/** Whether this column should be initially visible. */
+		bool ShouldBeVisible() const { return EnumHasAnyFlags(Flags, EFileColumnFlags::ShouldBeVisible); }
+
+		/** Whether this column can be hidden. */
+		bool CanBeHidden() const { return EnumHasAnyFlags(Flags, EFileColumnFlags::CanBeHidden); }
+
+		/** Whether this column can be used for filtering displayed results. */
+		bool CanBeFiltered() const { return EnumHasAnyFlags(Flags, EFileColumnFlags::CanBeFiltered); }
+
+	protected:
+		int32 Index;
+		FName Id;
+		FText TitleName;
+		FText Description;
+		float InitialWidth;
+		EFileColumnFlags Flags;
+
+		bool bIsVisible;
+
+	};
+
+protected:
 	bool SearchBoxIsEnabled() const;
 	void OnSearchBoxTextChanged(const FText& inFilterText);
 
 	/** Generate a new list view row. */
 	TSharedRef<ITableRow> OnGenerateFileRow(FPakFileItem InPakFileItem, const TSharedRef<class STableViewBase>& OwnerTable);
+	
+	/** Generate a right-click context menu. */
+	TSharedPtr<SWidget> OnGenerateContextMenu();
+	void OnBuildSortByMenu(FMenuBuilder& MenuBuilder);
+	void OnBuildCopyColumnMenu(FMenuBuilder& MenuBuilder);
+	void OnBuildViewColumnMenu(FMenuBuilder& MenuBuilder);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// File List View - Columns
+	void InitializeAndShowHeaderColumns();
+	FFileColumn* FindCoulum(const FName ColumnId);
+	EColumnSortMode::Type GetSortModeForColumn(const FName ColumnId) const;
+	void OnSortModeChanged(const EColumnSortPriority::Type SortPriority, const FName& ColumnId, const EColumnSortMode::Type SortMode);
+
+	// ShowColumn
+	bool CanShowColumn(const FName ColumnId) const;
+	void ShowColumn(const FName ColumnId);
+
+	// HideColumn
+	bool CanHideColumn(const FName ColumnId);
+	void HideColumn(const FName ColumnId);
+
+	// ToggleColumnVisibility
+	bool IsColumnVisible(const FName ColumnId);
+	bool CanToggleColumnVisibility(const FName ColumnId);
+	void ToggleColumnVisibility(const FName ColumnId);
+
+	// ShowAllColumns (ContextMenu)
+	bool OnShowAllColumnsCanExecute() const;
+	void OnShowAllColumnsExecute();
+
+	// CopyAllColumns (ContextMenu)
+	bool OnCopyColumnsCanExecute() const;
+	void OnCopyAllColumnsExecute();
 
 protected:
 	/** External scrollbar used to synchronize file view position. */
@@ -63,6 +157,12 @@ protected:
 	/** The list view widget. */
 	TSharedPtr<SListView<FPakFileItem>> FileListView;
 
+	/** Holds the list view header row widget which display all columns in the list view. */
+	TSharedPtr<class SHeaderRow> FileListHeaderRow;
+
 	/** List of files to show in list view (i.e. filtered). */
 	TArray<FPakFileItem> FileCache;
+
+	/** Manage show, hide and sort. */
+	TMap<FName, FFileColumn> FileColumns;
 };

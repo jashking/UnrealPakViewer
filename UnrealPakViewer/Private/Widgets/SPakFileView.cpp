@@ -352,20 +352,10 @@ void SPakFileView::Construct(const FArguments& InArgs)
 							.ListItemsSource(&FileCache)
 							.OnGenerateRow(this, &SPakFileView::OnGenerateFileRow)
 							.ConsumeMouseWheel(EConsumeMouseWheel::Always)
-							//.OnContextMenuOpening()
+							.OnContextMenuOpening(this, &SPakFileView::OnGenerateContextMenu)
 							.HeaderRow
 							(
-								SNew(SHeaderRow)
-
-								+ SHeaderRow::Column(PakFileViewColumns::NameColumnName).ManualWidth(270.f).DefaultLabel(LOCTEXT("NameColumn", "Name"))
-								+ SHeaderRow::Column(PakFileViewColumns::PathColumnName).ManualWidth(600.f).DefaultLabel(LOCTEXT("PathColumn", "Path"))
-								+ SHeaderRow::Column(PakFileViewColumns::OffsetColumnName).ManualWidth(110.f).DefaultLabel(LOCTEXT("OffsetColumn", "Offset"))
-								+ SHeaderRow::Column(PakFileViewColumns::SizeColumnName).ManualWidth(110.f).DefaultLabel(LOCTEXT("SizeColumn", "Size"))
-								+ SHeaderRow::Column(PakFileViewColumns::CompressedSizeColumnName).ManualWidth(110.f).DefaultLabel(LOCTEXT("CompressedSizeColumn", "Compressed Size"))
-								+ SHeaderRow::Column(PakFileViewColumns::CompressionBlockCountColumnName).ManualWidth(155.f).DefaultLabel(LOCTEXT("CompressionBlockCountColumn", "Compression Block Count"))
-								+ SHeaderRow::Column(PakFileViewColumns::CompressionBlockSizeColumnName).ManualWidth(155.f).DefaultLabel(LOCTEXT("CompressionBlockSizeColumn", "Compression Block Size"))
-								+ SHeaderRow::Column(PakFileViewColumns::SHA1ColumnName).ManualWidth(315.f).DefaultLabel(LOCTEXT("SHA1Column", "SHA1"))
-								+ SHeaderRow::Column(PakFileViewColumns::IsEncryptedColumnName).ManualWidth(70.f).DefaultLabel(LOCTEXT("IsEncryptedColumn", "IsEncrypted"))
+								SAssignNew(FileListHeaderRow, SHeaderRow).Visibility(EVisibility::Visible)
 							)
 						]
 					]
@@ -381,6 +371,8 @@ void SPakFileView::Construct(const FArguments& InArgs)
 			]
 		]
 	];
+
+	InitializeAndShowHeaderColumns();
 }
 
 void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
@@ -411,6 +403,295 @@ void SPakFileView::OnSearchBoxTextChanged(const FText& inFilterText)
 TSharedRef<ITableRow> SPakFileView::OnGenerateFileRow(FPakFileItem InPakFileItem, const TSharedRef<STableViewBase>& OwnerTable)
 {
 	return SNew(SPakFileRow, InPakFileItem, OwnerTable);
+}
+
+TSharedPtr<SWidget> SPakFileView::OnGenerateContextMenu()
+{
+	FMenuBuilder MenuBuilder(true, nullptr);
+
+	// Selection menu
+	MenuBuilder.BeginSection("Operation", LOCTEXT("ContextMenu_Header_Operation", "Operation"));
+	{
+		MenuBuilder.AddSubMenu
+		(
+			LOCTEXT("ContextMenu_Header_Columns_Copy", "Copy Column"),
+			LOCTEXT("ContextMenu_Header_Columns_Copy_Desc", "Copy value of column(s)"),
+			FNewMenuDelegate::CreateSP(this, &SPakFileView::OnBuildCopyColumnMenu),
+			false,
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.CopyColumn")
+		);
+	}
+	MenuBuilder.EndSection();
+
+	// Columns menu
+	MenuBuilder.BeginSection("Columns", LOCTEXT("ContextMenu_Header_Columns", "Columns"));
+	{
+		MenuBuilder.AddSubMenu
+		(
+			LOCTEXT("ContextMenu_Header_Columns_View", "View Column"),
+			LOCTEXT("ContextMenu_Header_Columns_View_Desc", "Hides or shows columns"),
+			FNewMenuDelegate::CreateSP(this, &SPakFileView::OnBuildViewColumnMenu),
+			false,
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ViewColumn")
+		);
+
+		FUIAction Action_ShowAllColumns
+		(
+			FExecuteAction::CreateSP(this, &SPakFileView::OnShowAllColumnsExecute),
+			FCanExecuteAction::CreateSP(this, &SPakFileView::OnShowAllColumnsCanExecute)
+		);
+		MenuBuilder.AddMenuEntry
+		(
+			LOCTEXT("ContextMenu_Header_Columns_ShowAllColumns", "Show All Columns"),
+			LOCTEXT("ContextMenu_Header_Columns_ShowAllColumns_Desc", "Resets tree view to show all columns"),
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_ShowAllColumns, NAME_None, EUserInterfaceActionType::Button
+		);
+	}
+	MenuBuilder.EndSection();
+
+	return MenuBuilder.MakeWidget();
+}
+
+void SPakFileView::OnBuildSortByMenu(FMenuBuilder& MenuBuilder)
+{
+
+}
+
+void SPakFileView::OnBuildCopyColumnMenu(FMenuBuilder& MenuBuilder)
+{
+	MenuBuilder.BeginSection("CopyColumn", LOCTEXT("ContextMenu_Header_Columns_Copy", "Copy Column"));
+
+	FUIAction Action_CopyAllColumns
+	(
+		FExecuteAction::CreateSP(this, &SPakFileView::OnCopyAllColumnsExecute),
+		FCanExecuteAction::CreateSP(this, &SPakFileView::OnCopyColumnsCanExecute)
+	);
+	MenuBuilder.AddMenuEntry
+	(
+		LOCTEXT("ContextMenu_Header_Columns_CopyAllColumns", "Copy All Value"),
+		LOCTEXT("ContextMenu_Header_Columns_CopyAllColumns_Desc", "Copy All Values Of Current Selected Row"),
+		FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_CopyAllColumns, NAME_None, EUserInterfaceActionType::Button
+	);
+
+	//for (const auto& ColumnPair : FileColumns)
+	//{
+	//	const FFileColumn& Column = ColumnPair.Value;
+
+	//	FUIAction Action_ToggleColumn
+	//	(
+	//		FExecuteAction::CreateSP(this, &SPakFileView::ToggleColumnVisibility, Column.GetId()),
+	//		FCanExecuteAction::CreateSP(this, &SPakFileView::CanToggleColumnVisibility, Column.GetId()),
+	//		FIsActionChecked::CreateSP(this, &SPakFileView::IsColumnVisible, Column.GetId())
+	//	);
+	//	MenuBuilder.AddMenuEntry
+	//	(
+	//		Column.GetTitleName(),
+	//		Column.GetDescription(),
+	//		FSlateIcon(), Action_ToggleColumn, NAME_None, EUserInterfaceActionType::ToggleButton
+	//	);
+	//}
+
+	MenuBuilder.EndSection();
+}
+
+void SPakFileView::OnBuildViewColumnMenu(FMenuBuilder& MenuBuilder)
+{
+	MenuBuilder.BeginSection("ViewColumn", LOCTEXT("ContextMenu_Header_Columns_View", "View Column"));
+
+	for (const auto& ColumnPair : FileColumns)
+	{
+		const FFileColumn& Column = ColumnPair.Value;
+
+		FUIAction Action_ToggleColumn
+		(
+			FExecuteAction::CreateSP(this, &SPakFileView::ToggleColumnVisibility, Column.GetId()),
+			FCanExecuteAction::CreateSP(this, &SPakFileView::CanToggleColumnVisibility, Column.GetId()),
+			FIsActionChecked::CreateSP(this, &SPakFileView::IsColumnVisible, Column.GetId())
+		);
+		MenuBuilder.AddMenuEntry
+		(
+			Column.GetTitleName(),
+			Column.GetDescription(),
+			FSlateIcon(), Action_ToggleColumn, NAME_None, EUserInterfaceActionType::ToggleButton
+		);
+	}
+
+	MenuBuilder.EndSection();
+}
+
+void SPakFileView::InitializeAndShowHeaderColumns()
+{
+	FileColumns.Empty();
+	FileColumns.Emplace(PakFileViewColumns::NameColumnName, FFileColumn(0, PakFileViewColumns::NameColumnName, LOCTEXT("NameColumn", "Name"), LOCTEXT("NameColumnTip", "File name"), 270.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered));
+	FileColumns.Emplace(PakFileViewColumns::PathColumnName, FFileColumn(1, PakFileViewColumns::PathColumnName, LOCTEXT("PathColumn", "Path"), LOCTEXT("PathColumnTip", "File path in pak"), 600.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(PakFileViewColumns::OffsetColumnName, FFileColumn(2, PakFileViewColumns::OffsetColumnName, LOCTEXT("OffsetColumn", "Offset"), LOCTEXT("OffsetColumnTip", "File offset in pak"), 110.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(PakFileViewColumns::SizeColumnName, FFileColumn(3, PakFileViewColumns::SizeColumnName, LOCTEXT("SizeColumn", "Size"), LOCTEXT("SizeColumnTip", "File original size"), 110.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(PakFileViewColumns::CompressedSizeColumnName, FFileColumn(4, PakFileViewColumns::CompressedSizeColumnName, LOCTEXT("CompressedSizeColumn", "Compressed Size"), LOCTEXT("CompressedSizeColumnTip", "File compressed size"), 110.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(PakFileViewColumns::CompressionBlockCountColumnName, FFileColumn(5, PakFileViewColumns::CompressionBlockCountColumnName, LOCTEXT("CompressionBlockCountColumn", "Compression Block Count"), LOCTEXT("CompressionBlockCountColumnTip", "File compression block count"), 155.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(PakFileViewColumns::CompressionBlockSizeColumnName, FFileColumn(6, PakFileViewColumns::CompressionBlockSizeColumnName, LOCTEXT("CompressionBlockSizeColumn", "Compression Block Size"), LOCTEXT("CompressionBlockSizeColumnTip", "File compression block size"), 155.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(PakFileViewColumns::SHA1ColumnName, FFileColumn(7, PakFileViewColumns::SHA1ColumnName, LOCTEXT("SHA1Column", "SHA1"), LOCTEXT("SHA1ColumnTip", "File sha1"), 315.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(PakFileViewColumns::IsEncryptedColumnName, FFileColumn(8, PakFileViewColumns::IsEncryptedColumnName, LOCTEXT("IsEncryptedColumn", "IsEncrypted"), LOCTEXT("IsEncryptedColumnTip", "Is file encrypted in pak?"), 70.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+
+	// Show columns.
+	for (const auto& ColumnPair : FileColumns)
+	{
+		if (ColumnPair.Value.ShouldBeVisible())
+		{
+			ShowColumn(ColumnPair.Key);
+		}
+	}
+}
+
+SPakFileView::FFileColumn* SPakFileView::FindCoulum(const FName ColumnId)
+{
+	return FileColumns.Find(ColumnId);
+}
+
+EColumnSortMode::Type SPakFileView::GetSortModeForColumn(const FName ColumnId) const
+{
+	return EColumnSortMode::None;
+}
+
+void SPakFileView::OnSortModeChanged(const EColumnSortPriority::Type SortPriority, const FName& ColumnId, const EColumnSortMode::Type SortMode)
+{
+
+}
+
+bool SPakFileView::CanShowColumn(const FName ColumnId) const
+{
+	return true;
+}
+
+void SPakFileView::ShowColumn(const FName ColumnId)
+{
+	FFileColumn* Column = FindCoulum(ColumnId);
+	if (!Column)
+	{
+		return;
+	}
+
+	Column->Show();
+
+	SHeaderRow::FColumn::FArguments ColumnArgs;
+	ColumnArgs
+		.ColumnId(Column->GetId())
+		.DefaultLabel(Column->GetTitleName())
+		.HAlignHeader(HAlign_Fill)
+		.VAlignHeader(VAlign_Fill)
+		.HeaderContentPadding(FMargin(2.f))
+		.HAlignCell(HAlign_Fill)
+		.VAlignCell(VAlign_Fill)
+		.SortMode(this, &SPakFileView::GetSortModeForColumn, Column->GetId())
+		.OnSort(this, &SPakFileView::OnSortModeChanged)
+		.ManualWidth(Column->GetInitialWidth())
+		.HeaderContent()
+		[
+			SNew(SBox)
+			.ToolTipText(Column->GetDescription())
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Center)
+			[
+				SNew(STextBlock).Text(Column->GetTitleName())
+			]
+		];
+
+	int32 ColumnIndex = 0;
+	const int32 TargetColumnIndex = Column->GetIndex();
+	const TIndirectArray<SHeaderRow::FColumn>& Columns = FileListHeaderRow->GetColumns();
+	const int32 CurrentColumnCount = Columns.Num();
+	for (; ColumnIndex < CurrentColumnCount; ++ColumnIndex)
+	{
+		const SHeaderRow::FColumn& CurrentColumn = Columns[ColumnIndex];
+		FFileColumn* FileColumn = FindCoulum(CurrentColumn.ColumnId);
+		if (TargetColumnIndex < FileColumn->GetIndex())
+		{
+			break;
+		}
+	}
+
+	FileListHeaderRow->InsertColumn(ColumnArgs, ColumnIndex);
+}
+
+bool SPakFileView::CanHideColumn(const FName ColumnId)
+{
+	FFileColumn* Column = FindCoulum(ColumnId);
+
+	return Column ? Column->CanBeHidden() : false;
+}
+
+void SPakFileView::HideColumn(const FName ColumnId)
+{
+	FFileColumn* Column = FindCoulum(ColumnId);
+	if (Column)
+	{
+		Column->Hide();
+		FileListHeaderRow->RemoveColumn(ColumnId);
+	}
+}
+
+bool SPakFileView::IsColumnVisible(const FName ColumnId)
+{
+	const FFileColumn* Column = FindCoulum(ColumnId);
+
+	return Column ? Column->IsVisible() : false;
+}
+
+bool SPakFileView::CanToggleColumnVisibility(const FName ColumnId)
+{
+	FFileColumn* Column = FindCoulum(ColumnId);
+
+	return Column ? !Column->IsVisible() || Column->CanBeHidden() : false;
+}
+
+void SPakFileView::ToggleColumnVisibility(const FName ColumnId)
+{
+	FFileColumn* Column = FindCoulum(ColumnId);
+	if (!Column)
+	{
+		return;
+	}
+
+	if (Column->IsVisible())
+	{
+		HideColumn(ColumnId);
+	}
+	else
+	{
+		ShowColumn(ColumnId);
+	}
+}
+
+bool SPakFileView::OnShowAllColumnsCanExecute() const
+{
+	return true;
+}
+
+void SPakFileView::OnShowAllColumnsExecute()
+{
+	// Show columns.
+	for (const auto& ColumnPair : FileColumns)
+	{
+		if (!ColumnPair.Value.IsVisible())
+		{
+			ShowColumn(ColumnPair.Key);
+		}
+	}
+}
+
+bool SPakFileView::OnCopyColumnsCanExecute() const
+{
+	TArray<FPakFileItem> SelectedItems = FileListView->GetSelectedItems();
+
+	return SelectedItems.Num() > 0;
+}
+
+void SPakFileView::OnCopyAllColumnsExecute()
+{
+	TArray<FPakFileItem> SelectedItems = FileListView->GetSelectedItems();
+	if (SelectedItems.Num() > 0)
+	{
+
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

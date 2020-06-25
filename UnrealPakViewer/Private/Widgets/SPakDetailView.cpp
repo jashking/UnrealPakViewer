@@ -1,4 +1,4 @@
-#include "SPakInfoView.h"
+#include "SPakDetailView.h"
 
 #include "EditorStyle.h"
 #include "Styling/CoreStyle.h"
@@ -11,24 +11,26 @@
 // TODO: TotalSize
 // TODO: IndexSize
 // TODO: PakHeaderSize
+// TODO: Version
+// TODO: Compression Array
 
-SPakInfoView::SPakInfoView()
+SPakDetailView::SPakDetailView()
 {
 
 }
 
-SPakInfoView::~SPakInfoView()
+SPakDetailView::~SPakDetailView()
 {
 
 }
 
-void SPakInfoView::Construct(const FArguments& InArgs)
+void SPakDetailView::Construct(const FArguments& InArgs)
 {
 	ChildSlot
 	[
 		SNew(SBorder)
 		.BorderImage(FEditorStyle::GetBrush("NotificationList.ItemBackground"))
-		.Padding(8.0f)
+		.Padding(4.0f)
 		.HAlign(HAlign_Fill)
 		[
 			SNew(SVerticalBox)
