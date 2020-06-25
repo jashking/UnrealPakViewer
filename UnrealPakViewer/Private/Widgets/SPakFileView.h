@@ -144,8 +144,11 @@ protected:
 	void OnShowAllColumnsExecute();
 
 	// CopyAllColumns (ContextMenu)
-	bool OnCopyColumnsCanExecute() const;
+	bool HasFileSelected() const;
 	void OnCopyAllColumnsExecute();
+	void OnCopyColumnExecute(const FName ColumnId);
+
+	void OnJumpToTreeViewExecute();
 
 protected:
 	/** External scrollbar used to synchronize file view position. */

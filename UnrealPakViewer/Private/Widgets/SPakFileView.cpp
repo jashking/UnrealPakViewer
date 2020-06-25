@@ -1,6 +1,7 @@
 #include "SPakFileView.h"
 
 #include "EditorStyle.h"
+#include "HAL/PlatformApplicationMisc.h"
 #include "IPlatformFilePak.h"
 #include "Misc/Paths.h"
 #include "Styling/CoreStyle.h"
@@ -412,9 +413,21 @@ TSharedPtr<SWidget> SPakFileView::OnGenerateContextMenu()
 	// Selection menu
 	MenuBuilder.BeginSection("Operation", LOCTEXT("ContextMenu_Header_Operation", "Operation"));
 	{
+		FUIAction Action_JumpToTreeView
+		(
+			FExecuteAction::CreateSP(this, &SPakFileView::OnJumpToTreeViewExecute),
+			FCanExecuteAction::CreateSP(this, &SPakFileView::HasFileSelected)
+		);
+		MenuBuilder.AddMenuEntry
+		(
+			LOCTEXT("ContextMenu_Columns_JumpToTreeView", "Jump To Tree View"),
+			LOCTEXT("ContextMenu_Columns_JumpToTreeView_Desc", "Show Current Selected File In Tree View"),
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_JumpToTreeView, NAME_None, EUserInterfaceActionType::Button
+		);
+
 		MenuBuilder.AddSubMenu
 		(
-			LOCTEXT("ContextMenu_Header_Columns_Copy", "Copy Column"),
+			LOCTEXT("ContextMenu_Header_Columns_Copy", "Copy Column(s)"),
 			LOCTEXT("ContextMenu_Header_Columns_Copy_Desc", "Copy value of column(s)"),
 			FNewMenuDelegate::CreateSP(this, &SPakFileView::OnBuildCopyColumnMenu),
 			false,
@@ -459,38 +472,45 @@ void SPakFileView::OnBuildSortByMenu(FMenuBuilder& MenuBuilder)
 
 void SPakFileView::OnBuildCopyColumnMenu(FMenuBuilder& MenuBuilder)
 {
-	MenuBuilder.BeginSection("CopyColumn", LOCTEXT("ContextMenu_Header_Columns_Copy", "Copy Column"));
+	MenuBuilder.BeginSection("CopyAllColumns", LOCTEXT("ContextMenu_Header_Columns_CopyAllColumns", "Copy All Columns"));
+	{
+		FUIAction Action_CopyAllColumns
+		(
+			FExecuteAction::CreateSP(this, &SPakFileView::OnCopyAllColumnsExecute),
+			FCanExecuteAction::CreateSP(this, &SPakFileView::HasFileSelected)
+		);
+		MenuBuilder.AddMenuEntry
+		(
+			LOCTEXT("ContextMenu_Columns_CopyAllColumns", "Copy All Columns"),
+			LOCTEXT("ContextMenu_Columns_CopyAllColumns_Desc", "Copy All Columns Of Current Selected File To Clipboard"),
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_CopyAllColumns, NAME_None, EUserInterfaceActionType::Button
+		);
+	}
+	MenuBuilder.EndSection();
 
-	FUIAction Action_CopyAllColumns
-	(
-		FExecuteAction::CreateSP(this, &SPakFileView::OnCopyAllColumnsExecute),
-		FCanExecuteAction::CreateSP(this, &SPakFileView::OnCopyColumnsCanExecute)
-	);
-	MenuBuilder.AddMenuEntry
-	(
-		LOCTEXT("ContextMenu_Header_Columns_CopyAllColumns", "Copy All Value"),
-		LOCTEXT("ContextMenu_Header_Columns_CopyAllColumns_Desc", "Copy All Values Of Current Selected Row"),
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_CopyAllColumns, NAME_None, EUserInterfaceActionType::Button
-	);
+	MenuBuilder.BeginSection("CopyColumn", LOCTEXT("ContextMenu_Header_Columns_CopySingleColumn", "Copy Column"));
+	{
+		for (const auto& ColumnPair : FileColumns)
+		{
+			const FFileColumn& Column = ColumnPair.Value;
 
-	//for (const auto& ColumnPair : FileColumns)
-	//{
-	//	const FFileColumn& Column = ColumnPair.Value;
+			if (Column.IsVisible())
+			{
+				FUIAction Action_CopyColumn
+				(
+					FExecuteAction::CreateSP(this, &SPakFileView::OnCopyColumnExecute, Column.GetId()),
+					FCanExecuteAction::CreateSP(this, &SPakFileView::HasFileSelected)
+				);
 
-	//	FUIAction Action_ToggleColumn
-	//	(
-	//		FExecuteAction::CreateSP(this, &SPakFileView::ToggleColumnVisibility, Column.GetId()),
-	//		FCanExecuteAction::CreateSP(this, &SPakFileView::CanToggleColumnVisibility, Column.GetId()),
-	//		FIsActionChecked::CreateSP(this, &SPakFileView::IsColumnVisible, Column.GetId())
-	//	);
-	//	MenuBuilder.AddMenuEntry
-	//	(
-	//		Column.GetTitleName(),
-	//		Column.GetDescription(),
-	//		FSlateIcon(), Action_ToggleColumn, NAME_None, EUserInterfaceActionType::ToggleButton
-	//	);
-	//}
-
+				MenuBuilder.AddMenuEntry
+				(
+					FText::Format(LOCTEXT("ContextMenu_Columns_CopySingleColumn", "Copy {0}"), Column.GetTitleName()),
+					FText::Format(LOCTEXT("ContextMenu_Columns_CopySingleColumn_Desc", "Copy {0} Of Current Selected File To Clipboard"), Column.GetTitleName()),
+					FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_CopyColumn, NAME_None, EUserInterfaceActionType::Button
+				);
+			}
+		}
+	}
 	MenuBuilder.EndSection();
 }
 
@@ -678,7 +698,7 @@ void SPakFileView::OnShowAllColumnsExecute()
 	}
 }
 
-bool SPakFileView::OnCopyColumnsCanExecute() const
+bool SPakFileView::HasFileSelected() const
 {
 	TArray<FPakFileItem> SelectedItems = FileListView->GetSelectedItems();
 
@@ -690,8 +710,79 @@ void SPakFileView::OnCopyAllColumnsExecute()
 	TArray<FPakFileItem> SelectedItems = FileListView->GetSelectedItems();
 	if (SelectedItems.Num() > 0)
 	{
+		FPakFileItem PakFileItem = SelectedItems[0];
+		if (PakFileItem.IsValid() && PakFileItem->PakEntry)
+		{
+			FString Value;
+			Value = FString::Printf(TEXT("Filename: %s\n"), *FPaths::GetCleanFilename(PakFileItem->Filename));
+			Value += FString::Printf(TEXT("Path: %s\n"), *PakFileItem->Filename);
+			Value += FString::Printf(TEXT("Offset: %lld\n"), PakFileItem->PakEntry->Offset);
+			Value += FString::Printf(TEXT("Size: %lld\n"), PakFileItem->PakEntry->UncompressedSize);
+			Value += FString::Printf(TEXT("Compressed Size: %lld\n"), PakFileItem->PakEntry->Size);
+			Value += FString::Printf(TEXT("Compression Block Count: %d\n"), PakFileItem->PakEntry->CompressionBlocks.Num());
+			Value += FString::Printf(TEXT("Compression Block Size: %u\n"), PakFileItem->PakEntry->CompressionBlockSize);
+			Value += FString::Printf(TEXT("SHA1: %s\n"), *BytesToHex(PakFileItem->PakEntry->Hash, sizeof(PakFileItem->PakEntry->Hash)));
+			Value += FString::Printf(TEXT("Compressed Size: %s\n"), PakFileItem->PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False"));
 
+			FPlatformApplicationMisc::ClipboardCopy(*Value);
+		}
 	}
+}
+
+void SPakFileView::OnCopyColumnExecute(const FName ColumnId)
+{
+	TArray<FPakFileItem> SelectedItems = FileListView->GetSelectedItems();
+	if (SelectedItems.Num() > 0)
+	{
+		FPakFileItem PakFileItem = SelectedItems[0];
+		if (PakFileItem.IsValid() && PakFileItem->PakEntry)
+		{
+			FString Value;
+			if (ColumnId == PakFileViewColumns::NameColumnName)
+			{
+				Value = FString::Printf(TEXT("Filename: %s"), *FPaths::GetCleanFilename(PakFileItem->Filename));
+			}
+			else if (ColumnId == PakFileViewColumns::PathColumnName)
+			{
+				Value = FString::Printf(TEXT("Path: %s"), *PakFileItem->Filename);
+			}
+			else if (ColumnId == PakFileViewColumns::OffsetColumnName)
+			{
+				Value = FString::Printf(TEXT("Offset: %lld"), PakFileItem->PakEntry->Offset);
+			}
+			else if (ColumnId == PakFileViewColumns::SizeColumnName)
+			{
+				Value = FString::Printf(TEXT("Size: %lld"), PakFileItem->PakEntry->UncompressedSize);
+			}
+			else if (ColumnId == PakFileViewColumns::CompressedSizeColumnName)
+			{
+				Value = FString::Printf(TEXT("Compressed Size: %lld"), PakFileItem->PakEntry->Size);
+			}
+			else if (ColumnId == PakFileViewColumns::CompressionBlockCountColumnName)
+			{
+				Value = FString::Printf(TEXT("Compression Block Count: %d"), PakFileItem->PakEntry->CompressionBlocks.Num());
+			}
+			else if (ColumnId == PakFileViewColumns::CompressionBlockSizeColumnName)
+			{
+				Value = FString::Printf(TEXT("Compression Block Size: %u"), PakFileItem->PakEntry->CompressionBlockSize);
+			}
+			else if (ColumnId == PakFileViewColumns::SHA1ColumnName)
+			{
+				Value = FString::Printf(TEXT("SHA1: %s"), *BytesToHex(PakFileItem->PakEntry->Hash, sizeof(PakFileItem->PakEntry->Hash)));
+			}
+			else if (ColumnId == PakFileViewColumns::IsEncryptedColumnName)
+			{
+				Value = FString::Printf(TEXT("Compressed Size: %s"), PakFileItem->PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False"));
+			}
+
+			FPlatformApplicationMisc::ClipboardCopy(*Value);
+		}
+	}
+}
+
+void SPakFileView::OnJumpToTreeViewExecute()
+{
+
 }
 
 #undef LOCTEXT_NAMESPACE
