@@ -3,6 +3,7 @@
 #include "PakAnalyzer.h"
 
 #include "HAL/PlatformFile.h"
+#include "Misc/Paths.h"
 #include "IPlatformFilePak.h"
 
 #include "LogDefines.h"
@@ -70,7 +71,8 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 		TSharedPtr<FPakFileEntry> PakFileEntry = MakeShared<FPakFileEntry>();
 
 		PakFileEntry->PakEntry = &It.Info();
-		PakFileEntry->Filename = It.Filename();
+		PakFileEntry->Filename = FPaths::GetCleanFilename(It.Filename());
+		PakFileEntry->Path = It.Filename();
 
 		Files.Add(PakFileEntry);
 	}

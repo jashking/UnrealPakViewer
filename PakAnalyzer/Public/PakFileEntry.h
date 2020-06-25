@@ -6,4 +6,5 @@ struct FPakFileEntry
 {
 	const FPakEntry* PakEntry = nullptr;
 	FString Filename;
+	FString Path;
 };

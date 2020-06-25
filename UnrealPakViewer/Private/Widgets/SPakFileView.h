@@ -34,6 +34,7 @@ class SPakFileView : public SCompoundWidget
 {
 public:
 	typedef TSharedPtr<FPakFileEntry> FPakFileItem;
+	typedef TFunction<bool(const FPakFileItem& A, const FPakFileItem& B)> FFileCompareFunc;
 
 	/** Default constructor. */
 	SPakFileView();
@@ -61,13 +62,15 @@ protected:
 	{
 	public:
 		FFileColumn() = delete;
-		FFileColumn(int32 InIndex, const FName InId, const FText& InTitleName, const FText& InDescription, float InInitialWidth, const EFileColumnFlags& InFlags)
+		FFileColumn(int32 InIndex, const FName InId, const FText& InTitleName, const FText& InDescription, float InInitialWidth, const EFileColumnFlags& InFlags, FFileCompareFunc InAscendingCompareDelegate = nullptr, FFileCompareFunc InDescendingCompareDelegate = nullptr)
 			: Index(InIndex)
 			, Id(InId)
 			, TitleName(InTitleName)
 			, Description(InDescription)
 			, InitialWidth(InInitialWidth)
 			, Flags(InFlags)
+			, AscendingCompareDelegate(InAscendingCompareDelegate)
+			, DescendingCompareDelegate(InDescendingCompareDelegate)
 			, bIsVisible(EnumHasAnyFlags(Flags, EFileColumnFlags::ShouldBeVisible))
 		{
 		}
@@ -94,13 +97,24 @@ protected:
 		/** Whether this column can be used for filtering displayed results. */
 		bool CanBeFiltered() const { return EnumHasAnyFlags(Flags, EFileColumnFlags::CanBeFiltered); }
 
-	protected:
+		/** Whether this column can be used for sort displayed results. */
+		bool CanBeSorted() const { return AscendingCompareDelegate && DescendingCompareDelegate; }
+
+		void SetAscendingCompareDelegate(FFileCompareFunc InCompareDelegate) { AscendingCompareDelegate = InCompareDelegate; }
+		void SetDescendingCompareDelegate(FFileCompareFunc InCompareDelegate) { DescendingCompareDelegate = InCompareDelegate; }
+
+		FFileCompareFunc GetAscendingCompareDelegate() const { return AscendingCompareDelegate; }
+		FFileCompareFunc GetDescendingCompareDelegate() const { return DescendingCompareDelegate; }
+
+protected:
 		int32 Index;
 		FName Id;
 		FText TitleName;
 		FText Description;
 		float InitialWidth;
 		EFileColumnFlags Flags;
+		FFileCompareFunc AscendingCompareDelegate;
+		FFileCompareFunc DescendingCompareDelegate;
 
 		bool bIsVisible;
 
@@ -123,8 +137,10 @@ protected:
 	// File List View - Columns
 	void InitializeAndShowHeaderColumns();
 	FFileColumn* FindCoulum(const FName ColumnId);
+
 	EColumnSortMode::Type GetSortModeForColumn(const FName ColumnId) const;
 	void OnSortModeChanged(const EColumnSortPriority::Type SortPriority, const FName& ColumnId, const EColumnSortMode::Type SortMode);
+	void SortByColumn(const FName& ColumnId, const EColumnSortMode::Type SortMode);
 
 	// ShowColumn
 	bool CanShowColumn(const FName ColumnId) const;
@@ -168,4 +184,7 @@ protected:
 
 	/** Manage show, hide and sort. */
 	TMap<FName, FFileColumn> FileColumns;
+
+	FName CurrentSortedColumn = PakFileViewColumns::OffsetColumnName;
+	EColumnSortMode::Type CurrentSortMode = EColumnSortMode::Ascending;
 };
