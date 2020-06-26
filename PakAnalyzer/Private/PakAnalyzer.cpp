@@ -4,6 +4,7 @@
 
 #include "HAL/PlatformFile.h"
 #include "Misc/Paths.h"
+#include "Misc/ScopeLock.h"
 #include "IPlatformFilePak.h"
 
 #include "LogDefines.h"
@@ -68,15 +69,19 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 	};
 	Records.Sort(FOffsetSort());
 
-	for (auto It : Records)
 	{
-		FPakFileEntryPtr PakFileEntry = MakeShared<FPakFileEntry>();
+		FScopeLock Lock(&CriticalSection);
 
-		PakFileEntry->PakEntry = &It.Info();
-		PakFileEntry->Filename = FPaths::GetCleanFilename(It.Filename());
-		PakFileEntry->Path = It.Filename();
+		for (auto It : Records)
+		{
+			FPakFileEntryPtr PakFileEntry = MakeShared<FPakFileEntry>();
 
-		Files.Add(PakFileEntry);
+			PakFileEntry->PakEntry = &It.Info();
+			PakFileEntry->Filename = FPaths::GetCleanFilename(It.Filename());
+			PakFileEntry->Path = It.Filename();
+
+			Files.Add(PakFileEntry);
+		}
 	}
 
 	return true;
@@ -84,11 +89,15 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 
 int32 FPakAnalyzer::GetFileCount() const
 {
+	FScopeLock Lock(const_cast<FCriticalSection*>(&CriticalSection));
+
 	return Files.Num();
 }
 
 const TArray<FPakFileEntryPtr >& FPakAnalyzer::GetFiles() const
 {
+	FScopeLock Lock(const_cast<FCriticalSection*>(&CriticalSection));
+
 	return Files;
 }
 
@@ -104,7 +113,11 @@ bool FPakAnalyzer::IsLoadDirty(const FString& InGuid) const
 
 void FPakAnalyzer::Reset()
 {
-	Files.Empty();
+	{
+		FScopeLock Lock(&CriticalSection);
+		Files.Empty();
+	}
+	
 	PakFile.Reset();
 	LoadGuid.Invalidate();
 }

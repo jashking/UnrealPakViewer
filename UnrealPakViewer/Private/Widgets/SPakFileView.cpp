@@ -33,9 +33,10 @@ class SPakFileRow : public SMultiColumnTableRow<FPakFileEntryPtr>
 	SLATE_END_ARGS()
 
 public:
-	void Construct(const FArguments& InArgs, FPakFileEntryPtr InPakFileItem, const TSharedRef<STableViewBase>& InOwnerTableView)
+	void Construct(const FArguments& InArgs, FPakFileEntryPtr InPakFileItem, TSharedRef<SPakFileView> InParentWidget, const TSharedRef<STableViewBase>& InOwnerTableView)
 	{
 		WeakPakFileItem = MoveTemp(InPakFileItem);
+		WeakPakFileView = InParentWidget;
 
 		SMultiColumnTableRow<FPakFileEntryPtr>::Construct(FSuperRowType::FArguments(), InOwnerTableView);
 
@@ -59,7 +60,7 @@ public:
 			return
 				SNew(SBox).Padding(FMargin(4.0, 0.0))
 				[
-					SNew(STextBlock).Text(this, &SPakFileRow::GetName).ToolTipText(this, &SPakFileRow::GetName)
+					SNew(STextBlock).Text(this, &SPakFileRow::GetName).ToolTipText(this, &SPakFileRow::GetName).HighlightText(this, &SPakFileRow::GetSearchHighlightText)
 				];
 		}
 		else if (ColumnName == FFileColumn::PathColumnName)
@@ -67,7 +68,7 @@ public:
 			return
 				SNew(SBox).Padding(FMargin(4.0, 0.0))
 				[
-					SNew(STextBlock).Text(this, &SPakFileRow::GetPath).ToolTipText(this, &SPakFileRow::GetPath)
+					SNew(STextBlock).Text(this, &SPakFileRow::GetPath).ToolTipText(this, &SPakFileRow::GetPath).HighlightText(this, &SPakFileRow::GetSearchHighlightText)
 				];
 		}
 		else if (ColumnName == FFileColumn::OffsetColumnName)
@@ -133,6 +134,13 @@ public:
 	}
 
 protected:
+
+	FText GetSearchHighlightText() const
+	{
+		TSharedPtr<SPakFileView> ParentWidgetPin = WeakPakFileView.Pin();
+		
+		return ParentWidgetPin.IsValid() ? ParentWidgetPin->GetSearchText() : FText();
+	}
 
 	FText GetName() const
 	{
@@ -292,6 +300,7 @@ protected:
 
 protected:
 	TWeakPtr<FPakFileEntry> WeakPakFileItem;
+	TWeakPtr<SPakFileView> WeakPakFileView;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -397,7 +406,7 @@ void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 		{
 			LastLoadGuid = IPakAnalyzerModule::Get().GetPakAnalyzer()->GetLastLoadGuid();
 
-			SortAndFilterTask->GetTask().SetSortInfo(CurrentSortedColumn, CurrentSortMode);
+			SortAndFilterTask->GetTask().SetWorkInfo(CurrentSortedColumn, CurrentSortMode, CurrentSearchText);
 			SortAndFilterTask->StartBackgroundTask();
 		}
 	}
@@ -410,14 +419,20 @@ bool SPakFileView::SearchBoxIsEnabled() const
 	return true;
 }
 
-void SPakFileView::OnSearchBoxTextChanged(const FText& inFilterText)
+void SPakFileView::OnSearchBoxTextChanged(const FText& InFilterText)
 {
-	
+	if (CurrentSearchText.Equals(InFilterText.ToString(), ESearchCase::IgnoreCase))
+	{
+		return;
+	}
+
+	CurrentSearchText = InFilterText.ToString();
+	MarkDirty(true);
 }
 
 TSharedRef<ITableRow> SPakFileView::OnGenerateFileRow(FPakFileEntryPtr InPakFileItem, const TSharedRef<STableViewBase>& OwnerTable)
 {
-	return SNew(SPakFileRow, InPakFileItem, OwnerTable);
+	return SNew(SPakFileRow, InPakFileItem, SharedThis(this), OwnerTable);
 }
 
 TSharedPtr<SWidget> SPakFileView::OnGenerateContextMenu()
@@ -697,6 +712,11 @@ void SPakFileView::RefreshFileCache(TArray<FPakFileEntryPtr>& InFileCache)
 		},
 		TStatId(), nullptr, ENamedThreads::GameThread
 	);
+}
+
+FText SPakFileView::GetSearchText() const
+{
+	return SearchBox.IsValid() ? SearchBox->GetText() : FText();
 }
 
 EColumnSortMode::Type SPakFileView::GetSortModeForColumn(const FName ColumnId) const

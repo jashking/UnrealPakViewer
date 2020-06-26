@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 
+#include "HAL/CriticalSection.h"
 #include "Misc/Guid.h"
 
 #include "IPakAnalyzer.h"
@@ -26,6 +27,7 @@ protected:
 	void Reset();
 
 protected:
+	FCriticalSection CriticalSection;
 	TArray<FPakFileEntryPtr> Files;
 
 	TSharedPtr<class FPakFile> PakFile;

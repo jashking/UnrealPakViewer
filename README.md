@@ -7,3 +7,4 @@
 * 树视图，icon图标，占比进度条
 * 文件视图，占比进度条
 * CPU Usage Optimize
+* Pak compare visiualize

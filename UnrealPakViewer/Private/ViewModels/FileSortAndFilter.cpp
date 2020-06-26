@@ -17,7 +17,12 @@ void FFileSortAndFilterTask::DoWork()
 	const TArray<FPakFileEntryPtr>& AllFiles = IPakAnalyzerModule::Get().GetPakAnalyzer()->GetFiles();
 	for (int32 Index = 0; Index < AllFiles.Num(); ++Index)
 	{
-		FileCache.Add(AllFiles[Index]);
+		FPakFileEntryPtr File = AllFiles[Index];
+
+		if (CurrentSearchText.IsEmpty() || File->Filename.Contains(CurrentSearchText) || File->Path.Contains(CurrentSearchText))
+		{
+			FileCache.Add(File);
+		}
 	}
 
 	const FFileColumn* Column = PakFileViewPin->FindCoulum(CurrentSortedColumn);
@@ -43,9 +48,9 @@ void FFileSortAndFilterTask::DoWork()
 	PakFileViewPin->RefreshFileCache(FileCache);
 }
 
-void FFileSortAndFilterTask::SetSortInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode)
+void FFileSortAndFilterTask::SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText)
 {
 	CurrentSortedColumn = InSortedColumn;
 	CurrentSortMode = InSortMode;
+	CurrentSearchText = InSearchText;
 }
-

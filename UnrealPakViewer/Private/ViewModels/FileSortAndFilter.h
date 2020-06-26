@@ -20,7 +20,7 @@ public:
 	}
 
 	void DoWork();
-	void SetSortInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode);
+	void SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText);
 
 	FORCEINLINE TStatId GetStatId() const
 	{
@@ -30,6 +30,7 @@ public:
 protected:
 	FName CurrentSortedColumn;
 	EColumnSortMode::Type CurrentSortMode;
+	FString CurrentSearchText;
 
 	/** Shared pointer to parent PakFileView widget. Used for accesing the cache and to check if cancel is requested. */
 	TWeakPtr<SPakFileView> WeakPakFileView;

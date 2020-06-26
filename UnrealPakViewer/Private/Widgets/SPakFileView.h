@@ -38,9 +38,11 @@ public:
 
 	void RefreshFileCache(TArray<FPakFileEntryPtr>& InFileCache);
 
+	FText GetSearchText() const;
+
 protected:
 	bool SearchBoxIsEnabled() const;
-	void OnSearchBoxTextChanged(const FText& inFilterText);
+	void OnSearchBoxTextChanged(const FText& InFilterText);
 
 	/** Generate a new list view row. */
 	TSharedRef<ITableRow> OnGenerateFileRow(FPakFileEntryPtr InPakFileItem, const TSharedRef<class STableViewBase>& OwnerTable);
@@ -108,6 +110,7 @@ protected:
 
 	FName CurrentSortedColumn = FFileColumn::OffsetColumnName;
 	EColumnSortMode::Type CurrentSortMode = EColumnSortMode::Ascending;
+	FString CurrentSearchText;
 
 	bool bIsDirty = false;
 	FCriticalSection CriticalSection;
