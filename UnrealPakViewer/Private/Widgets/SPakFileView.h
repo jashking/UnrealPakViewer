@@ -36,8 +36,6 @@ public:
 	const FFileColumn* FindCoulum(const FName ColumnId) const;
 	FFileColumn* FindCoulum(const FName ColumnId);
 
-	void RefreshFileCache(TArray<FPakFileEntryPtr>& InFileCache);
-
 	FText GetSearchText() const;
 
 protected:
@@ -85,6 +83,7 @@ protected:
 	void OnJumpToTreeViewExecute();
 
 	void MarkDirty(bool bInIsDirty);
+	void OnSortAndFilterFinihed(TArray<FPakFileEntryPtr>& Results, const FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid);
 
 protected:
 	/** External scrollbar used to synchronize file view position. */

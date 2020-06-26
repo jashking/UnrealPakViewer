@@ -45,12 +45,13 @@ void FFileSortAndFilterTask::DoWork()
 		FileCache.Sort(Column->GetDescendingCompareDelegate());
 	}
 
-	PakFileViewPin->RefreshFileCache(FileCache);
+	OnWorkFinished.ExecuteIfBound(FileCache, CurrentSortedColumn, CurrentSortMode, CurrentSearchText, CurrentLoadGuid);
 }
 
-void FFileSortAndFilterTask::SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText)
+void FFileSortAndFilterTask::SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid)
 {
 	CurrentSortedColumn = InSortedColumn;
 	CurrentSortMode = InSortMode;
 	CurrentSearchText = InSearchText;
+	CurrentLoadGuid = InLoadGuid;
 }

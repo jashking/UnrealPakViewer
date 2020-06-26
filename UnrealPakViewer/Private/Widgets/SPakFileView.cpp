@@ -22,6 +22,7 @@
 #define LOCTEXT_NAMESPACE "SPakFileView"
 
 // TODO: Compression Method, use index and find in array
+// TODO: Export files in current view
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // SPakFileRow
@@ -394,6 +395,7 @@ void SPakFileView::Construct(const FArguments& InArgs)
 
 	SortAndFilterTask = MakeUnique<FAsyncTask<FFileSortAndFilterTask>>(CurrentSortedColumn, CurrentSortMode, SharedThis(this));
 	check(SortAndFilterTask.IsValid());
+	SortAndFilterTask->GetTask().GetOnSortAndFilterFinishedDelegate().BindRaw(this, &SPakFileView::OnSortAndFilterFinihed);
 
 	LastLoadGuid = LexToString(FGuid());
 }
@@ -406,7 +408,7 @@ void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 		{
 			LastLoadGuid = IPakAnalyzerModule::Get().GetPakAnalyzer()->GetLastLoadGuid();
 
-			SortAndFilterTask->GetTask().SetWorkInfo(CurrentSortedColumn, CurrentSortMode, CurrentSearchText);
+			SortAndFilterTask->GetTask().SetWorkInfo(CurrentSortedColumn, CurrentSortMode, CurrentSearchText, LastLoadGuid);
 			SortAndFilterTask->StartBackgroundTask();
 		}
 	}
@@ -686,34 +688,6 @@ FFileColumn* SPakFileView::FindCoulum(const FName ColumnId)
 	return FileColumns.Find(ColumnId);
 }
 
-void SPakFileView::RefreshFileCache(TArray<FPakFileEntryPtr>& InFileCache)
-{
-	{
-		FScopeLock Lock(&CriticalSection);
-
-		FileCache = MoveTemp(InFileCache);
-	}
-
-	FFunctionGraphTask::CreateAndDispatchWhenReady([this]()
-		{
-			FScopeLock Lock(&CriticalSection);
-
-			FileListView->RebuildList();
-
-			if (IPakAnalyzerModule::Get().GetPakAnalyzer()->IsLoadDirty(LastLoadGuid))
-			{
-				// Load another pak during sort or filter
-				MarkDirty(true);
-			}
-			else
-			{
-				MarkDirty(false);
-			}
-		},
-		TStatId(), nullptr, ENamedThreads::GameThread
-	);
-}
-
 FText SPakFileView::GetSearchText() const
 {
 	return SearchBox.IsValid() ? SearchBox->GetText() : FText();
@@ -958,6 +932,34 @@ void SPakFileView::OnJumpToTreeViewExecute()
 void SPakFileView::MarkDirty(bool bInIsDirty)
 {
 	bIsDirty = bInIsDirty;
+}
+
+void SPakFileView::OnSortAndFilterFinihed(TArray<FPakFileEntryPtr>& Results, const FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid)
+{
+	{
+		FScopeLock Lock(&CriticalSection);
+
+		FileCache = MoveTemp(Results);
+	}
+
+	FFunctionGraphTask::CreateAndDispatchWhenReady([this, InLoadGuid, InSearchText]()
+		{
+			FScopeLock Lock(&CriticalSection);
+
+			FileListView->RebuildList();
+
+			if (IPakAnalyzerModule::Get().GetPakAnalyzer()->IsLoadDirty(InLoadGuid) || !InSearchText.Equals(CurrentSearchText, ESearchCase::IgnoreCase))
+			{
+				// Load another pak during sort or filter
+				// Search text changed during sort or filter
+				MarkDirty(true);
+			}
+			else
+			{
+				MarkDirty(false);
+			}
+		},
+		TStatId(), nullptr, ENamedThreads::GameThread);
 }
 
 #undef LOCTEXT_NAMESPACE
