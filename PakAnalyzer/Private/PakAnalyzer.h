@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 
+#include "Misc/Guid.h"
+
 #include "IPakAnalyzer.h"
 
 struct FPakEntry;
@@ -16,13 +18,17 @@ public:
 
 	virtual bool LoadPakFile(const FString& InPakPath) override;
 	virtual int32 GetFileCount() const override;
-	virtual const TArray<TSharedPtr<FPakFileEntry>>& GetFiles() const override;
+	virtual const TArray<FPakFileEntryPtr>& GetFiles() const override;
+	virtual FString GetLastLoadGuid() const override;
+	virtual bool IsLoadDirty(const FString& InGuid) const override;
 
 protected:
 	void Reset();
 
 protected:
-	TArray<TSharedPtr<FPakFileEntry>> Files;
+	TArray<FPakFileEntryPtr> Files;
 
 	TSharedPtr<class FPakFile> PakFile;
+
+	FGuid LoadGuid;
 };

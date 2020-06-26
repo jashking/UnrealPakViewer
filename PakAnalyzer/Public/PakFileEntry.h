@@ -1,5 +1,7 @@
 #pragma once
 
+#include "CoreMinimal.h"
+
 struct FPakEntry;
 
 struct FPakFileEntry
@@ -8,3 +10,5 @@ struct FPakFileEntry
 	FString Filename;
 	FString Path;
 };
+
+typedef TSharedPtr<FPakFileEntry> FPakFileEntryPtr;

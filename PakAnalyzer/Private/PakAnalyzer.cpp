@@ -51,6 +51,8 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 		return false;
 	}
 
+	LoadGuid = FGuid::NewGuid();
+
 	TArray<FPakFile::FFileIterator> Records;
 	for (FPakFile::FFileIterator It(*PakFile, true); It; ++It)
 	{
@@ -68,7 +70,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 
 	for (auto It : Records)
 	{
-		TSharedPtr<FPakFileEntry> PakFileEntry = MakeShared<FPakFileEntry>();
+		FPakFileEntryPtr PakFileEntry = MakeShared<FPakFileEntry>();
 
 		PakFileEntry->PakEntry = &It.Info();
 		PakFileEntry->Filename = FPaths::GetCleanFilename(It.Filename());
@@ -85,13 +87,24 @@ int32 FPakAnalyzer::GetFileCount() const
 	return Files.Num();
 }
 
-const TArray<TSharedPtr<FPakFileEntry>>& FPakAnalyzer::GetFiles() const
+const TArray<FPakFileEntryPtr >& FPakAnalyzer::GetFiles() const
 {
 	return Files;
+}
+
+FString FPakAnalyzer::GetLastLoadGuid() const
+{
+	return LoadGuid.ToString();
+}
+
+bool FPakAnalyzer::IsLoadDirty(const FString& InGuid) const
+{
+	return !InGuid.Equals(LoadGuid.ToString(), ESearchCase::IgnoreCase);
 }
 
 void FPakAnalyzer::Reset()
 {
 	Files.Empty();
 	PakFile.Reset();
+	LoadGuid.Invalidate();
 }
