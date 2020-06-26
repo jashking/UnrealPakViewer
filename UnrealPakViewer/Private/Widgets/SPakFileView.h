@@ -50,6 +50,7 @@ protected:
 	void OnBuildSortByMenu(FMenuBuilder& MenuBuilder);
 	void OnBuildCopyColumnMenu(FMenuBuilder& MenuBuilder);
 	void OnBuildViewColumnMenu(FMenuBuilder& MenuBuilder);
+	void OnBuildExportMenu(FMenuBuilder& MenuBuilder);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// File List View - Columns
@@ -86,6 +87,13 @@ protected:
 	void OnSortAndFilterFinihed(TArray<FPakFileEntryPtr>& Results, const FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid);
 
 	FText GetFileCount() const;
+
+	// Export
+	bool IsFileListEmpty() const;
+	void OnExportAllFilesToJson();
+	void OnExportSelectedFileToJson();
+	void OnExportAllFilesToCsv();
+	void OnExportSelectedFileToCsv();
 
 protected:
 	/** External scrollbar used to synchronize file view position. */
