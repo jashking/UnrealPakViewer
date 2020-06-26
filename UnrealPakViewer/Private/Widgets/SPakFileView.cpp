@@ -338,11 +338,21 @@ void SPakFileView::Construct(const FArguments& InArgs)
 
 				+ SVerticalBox::Slot().VAlign(VAlign_Center).Padding(2.0f).AutoHeight()
 				[
-					SAssignNew(SearchBox, SSearchBox)
-					.HintText(LOCTEXT("SearchBoxHint", "Search files"))
-					.OnTextChanged(this, &SPakFileView::OnSearchBoxTextChanged)
-					.IsEnabled(this, &SPakFileView::SearchBoxIsEnabled)
-					.ToolTipText(LOCTEXT("FilterSearchHint", "Type here to search files"))
+					SNew(SHorizontalBox)
+
+					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f)
+					[
+						SAssignNew(SearchBox, SSearchBox)
+						.HintText(LOCTEXT("SearchBoxHint", "Search files"))
+						.OnTextChanged(this, &SPakFileView::OnSearchBoxTextChanged)
+						.IsEnabled(this, &SPakFileView::SearchBoxIsEnabled)
+						.ToolTipText(LOCTEXT("FilterSearchHint", "Type here to search files"))
+					]
+
+					+ SHorizontalBox::Slot().AutoWidth().Padding(4.f, 0.f, 0.f, 0.f).VAlign(VAlign_Center)
+					[
+						SNew(STextBlock).Text(this, &SPakFileView::GetFileCount)
+					]
 				]
 			]
 
@@ -960,6 +970,19 @@ void SPakFileView::OnSortAndFilterFinihed(TArray<FPakFileEntryPtr>& Results, con
 			}
 		},
 		TStatId(), nullptr, ENamedThreads::GameThread);
+}
+
+FText SPakFileView::GetFileCount() const
+{
+	int32 CurrentFileCount = 0;
+
+	{
+		FScopeLock Lock(const_cast<FCriticalSection*>(&CriticalSection));
+
+		CurrentFileCount = FileCache.Num();
+	}
+
+	return FText::Format(FTextFormat::FromString(TEXT("{0} / {1} files")), FText::AsNumber(CurrentFileCount), FText::AsNumber(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetFileCount()));
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -85,6 +85,8 @@ protected:
 	void MarkDirty(bool bInIsDirty);
 	void OnSortAndFilterFinihed(TArray<FPakFileEntryPtr>& Results, const FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid);
 
+	FText GetFileCount() const;
+
 protected:
 	/** External scrollbar used to synchronize file view position. */
 	TSharedPtr<class SScrollBar> ExternalScrollbar;
