@@ -34,15 +34,18 @@ int32 UnrealPakViewerMain(const TCHAR* CommandLine)
 	FUnrealPakViewerApplication::Exec();
 
 	// Shut down.
-	//im: ??? FCoreDelegates::OnExit.Broadcast();
-	FModuleManager::Get().UnloadModulesAtShutdown();
 	FEngineLoop::AppPreExit(); //im: ???
+
+	FModuleManager::Get().UnloadModulesAtShutdown();
+	
 
 #if STATS
 	FThreadStats::StopThread();
 #endif
 
 	FTaskGraphInterface::Shutdown(); //im: ???
+
+	FEngineLoop::AppExit();
 
 	return 0;
 }
