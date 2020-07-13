@@ -3,8 +3,9 @@
 #include "CoreMinimal.h"
 
 struct FPakEntry;
+struct FPakInfo;
 
-struct FPakFileEntry
+struct FPakFileEntry : TSharedFromThis<FPakFileEntry>
 {
 	const FPakEntry* PakEntry = nullptr;
 	FString Filename;
@@ -12,3 +13,17 @@ struct FPakFileEntry
 };
 
 typedef TSharedPtr<FPakFileEntry> FPakFileEntryPtr;
+
+struct FPakTreeEntry : public FPakFileEntry
+{
+	bool bIsDirectory;
+	TArray<TSharedPtr<FPakTreeEntry>> Children;
+};
+
+typedef TSharedPtr<FPakTreeEntry> FPakTreeEntryPtr;
+
+struct FPakFileSumary
+{
+	const FPakInfo* PakInfo = nullptr;
+	FString MountPoint;
+};

@@ -412,11 +412,13 @@ void SPakFileView::Construct(const FArguments& InArgs)
 
 void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 {
-	if (bIsDirty || IPakAnalyzerModule::Get().GetPakAnalyzer()->IsLoadDirty(LastLoadGuid))
+	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+
+	if (bIsDirty || PakAnalyzer->IsLoadDirty(LastLoadGuid))
 	{
 		if (SortAndFilterTask->IsDone())
 		{
-			LastLoadGuid = IPakAnalyzerModule::Get().GetPakAnalyzer()->GetLastLoadGuid();
+			LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
 
 			SortAndFilterTask->GetTask().SetWorkInfo(CurrentSortedColumn, CurrentSortMode, CurrentSearchText, LastLoadGuid);
 			SortAndFilterTask->StartBackgroundTask();

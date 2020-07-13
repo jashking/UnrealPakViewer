@@ -22,6 +22,9 @@ public:
 	virtual const TArray<FPakFileEntryPtr>& GetFiles() const override;
 	virtual FString GetLastLoadGuid() const override;
 	virtual bool IsLoadDirty(const FString& InGuid) const override;
+	virtual const FPakFileSumary& GetPakFileSumary() const override;
+	virtual FString GetPakFilePath() const override;
+	virtual bool GetPakFilesInDirectory(const FString& InDirectory, bool bIncludeFiles, bool bIncludeDirectories, bool bRecursive, TArray<FPakTreeEntryPtr>& OutFiles) const override;
 
 protected:
 	void Reset();
@@ -33,4 +36,8 @@ protected:
 	TSharedPtr<class FPakFile> PakFile;
 
 	FGuid LoadGuid;
+
+	FPakFileSumary PakFileSumary;
+
+	FString PakFilePath;
 };

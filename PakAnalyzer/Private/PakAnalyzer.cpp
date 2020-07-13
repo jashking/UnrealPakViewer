@@ -84,6 +84,11 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 		}
 	}
 
+	PakFileSumary.MountPoint = PakFile->GetMountPoint();
+	PakFileSumary.PakInfo = &PakFile->GetInfo();
+
+	PakFilePath = InPakPath;
+
 	return true;
 }
 
@@ -111,6 +116,62 @@ bool FPakAnalyzer::IsLoadDirty(const FString& InGuid) const
 	return !InGuid.Equals(LoadGuid.ToString(), ESearchCase::IgnoreCase);
 }
 
+const FPakFileSumary& FPakAnalyzer::GetPakFileSumary() const
+{
+	return PakFileSumary;
+}
+
+FString FPakAnalyzer::GetPakFilePath() const
+{
+	return PakFilePath;
+}
+
+bool FPakAnalyzer::GetPakFilesInDirectory(const FString& InDirectory, bool bIncludeFiles, bool bIncludeDirectories, bool bRecursive, TArray<FPakTreeEntryPtr>& OutFiles) const
+{
+	OutFiles.Empty();
+
+	if (PakFile.IsValid())
+	{
+		TArray<FString> PakFiles;
+		PakFile->FindFilesAtPath(PakFiles, *InDirectory, bIncludeFiles, bIncludeDirectories, bRecursive);
+		if (PakFiles.Num() > 0)
+		{
+			for (const FString& File : PakFiles)
+			{
+				FPakTreeEntryPtr PakFileEntry = MakeShared<FPakTreeEntry>();
+				if (File.EndsWith(TEXT("/")) || File.EndsWith(TEXT("\\")))
+				{
+					PakFileEntry->Filename = FPaths::GetPathLeaf(File);
+					PakFileEntry->bIsDirectory = true;
+				}
+				else
+				{
+					PakFileEntry->Filename = FPaths::GetCleanFilename(File);
+					PakFileEntry->bIsDirectory = false;
+				}
+
+				PakFileEntry->Path = File;
+
+				OutFiles.Add(PakFileEntry);
+			}
+
+			OutFiles.Sort([](const FPakTreeEntryPtr& A, const FPakTreeEntryPtr& B) -> bool
+				{
+					if (A->bIsDirectory == B->bIsDirectory)
+					{
+						return A->Filename < B->Filename;
+					}
+
+					return (int32)A->bIsDirectory > (int32)B->bIsDirectory;
+				});
+
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void FPakAnalyzer::Reset()
 {
 	{
@@ -120,4 +181,9 @@ void FPakAnalyzer::Reset()
 	
 	PakFile.Reset();
 	LoadGuid.Invalidate();
+
+	PakFileSumary.MountPoint = TEXT("");
+	PakFileSumary.PakInfo = nullptr;
+
+	PakFilePath = TEXT("");
 }

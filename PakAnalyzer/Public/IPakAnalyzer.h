@@ -17,4 +17,7 @@ public:
 	virtual const TArray<FPakFileEntryPtr>& GetFiles() const = 0;
 	virtual FString GetLastLoadGuid() const = 0;
 	virtual bool IsLoadDirty(const FString& InGuid) const = 0;
+	virtual const FPakFileSumary& GetPakFileSumary() const = 0;
+	virtual FString GetPakFilePath() const  = 0;
+	virtual bool GetPakFilesInDirectory(const FString& InDirectory, bool bIncludeFiles, bool bIncludeDirectories, bool bRecursive, TArray<FPakTreeEntryPtr>& OutFiles) const = 0;
 };
