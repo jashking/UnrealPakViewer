@@ -22,16 +22,14 @@ SPakTreeView::~SPakTreeView()
 
 void SPakTreeView::Construct(const FArguments& InArgs)
 {
-	//SAssignNew(ExternalScrollbar, SScrollBar).AlwaysShowScrollbar(true);
-
 	ChildSlot
 	[
 		SNew(SHorizontalBox)
 
 		+ SHorizontalBox::Slot()
 		.FillWidth(1.f)
-		.HAlign(HAlign_Left)
-		.Padding(0.0f, 2.0f)
+		//.HAlign(HAlign_Left)
+		.Padding(2.0f)
 		[
 			SAssignNew(TreeView, STreeView<FPakTreeEntryPtr>)
 			.SelectionMode(ESelectionMode::Single)
@@ -39,6 +37,7 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 			.TreeItemsSource(&TreeNodes)
 			.OnGetChildren(this, &SPakTreeView::OnGetTreeNodeChildren)
 			.OnGenerateRow(this, &SPakTreeView::OnGenerateTreeRow)
+			.OnSelectionChanged(this, &SPakTreeView::OnSelectionChanged)
 			//.OnContextMenuOpening(this, &SUnrealPakViewer::OnContextMenuOpening)
 			//.ClearSelectionOnClick(false)
 			//.OnMouseButtonDoubleClick(this, &SUnrealPakViewer::OnTreeItemDoubleClicked)
@@ -77,10 +76,12 @@ void SPakTreeView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 
 TSharedRef<ITableRow> SPakTreeView::OnGenerateTreeRow(FPakTreeEntryPtr TreeNode, const TSharedRef<STableViewBase>& OwnerTable)
 {
+	const FLinearColor FileColor = (TreeNode == CurrentSelectedItem ? FLinearColor::White : FLinearColor::Gray);
+
 	TSharedRef<ITableRow> TableRow =
 		SNew(STableRow<TSharedPtr<FPakTreeEntryPtr>>, OwnerTable)
 		[
-			SNew(STextBlock).Text(FText::FromString(TreeNode->Filename)).ColorAndOpacity(FLinearColor::Green)
+			SNew(STextBlock).Text(FText::FromString(TreeNode->Filename)).ColorAndOpacity(TreeNode->bIsDirectory ? FLinearColor::Green : FileColor)
 		];
 
 	return TableRow;
@@ -102,6 +103,11 @@ void SPakTreeView::OnGetTreeNodeChildren(FPakTreeEntryPtr InParent, TArray<FPakT
 		OutChildren.Empty();
 		OutChildren.Append(InParent->Children);
 	}
+}
+
+void SPakTreeView::OnSelectionChanged(FPakTreeEntryPtr SelectedItem, ESelectInfo::Type SelectInfo)
+{
+	CurrentSelectedItem = SelectedItem;
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -37,12 +37,13 @@ protected:
 	/** Called by STreeView to generate a table row for the specified item. */
 	TSharedRef<ITableRow> OnGenerateTreeRow(FPakTreeEntryPtr TreeNode, const TSharedRef<STableViewBase>& OwnerTable);
 	void OnGetTreeNodeChildren(FPakTreeEntryPtr InParent, TArray<FPakTreeEntryPtr>& OutChildren);
+	
+	/** Called by STreeView when selection has changed. */
+	void OnSelectionChanged(FPakTreeEntryPtr SelectedItem, ESelectInfo::Type SelectInfo);
 
 protected:
 	TSharedPtr<STreeView<FPakTreeEntryPtr>> TreeView;
-
-	/** External scrollbar used to synchronize tree view position. */
-	TSharedPtr<class SScrollBar> ExternalScrollbar;
+	FPakTreeEntryPtr CurrentSelectedItem;
 
 	/** The root node(s) of the tree. */
 	TArray<FPakTreeEntryPtr> TreeNodes;
