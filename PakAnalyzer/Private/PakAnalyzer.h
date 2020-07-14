@@ -19,25 +19,27 @@ public:
 
 	virtual bool LoadPakFile(const FString& InPakPath) override;
 	virtual int32 GetFileCount() const override;
-	virtual const TArray<FPakFileEntryPtr>& GetFiles() const override;
+	virtual void GetFiles(const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const override;
 	virtual FString GetLastLoadGuid() const override;
 	virtual bool IsLoadDirty(const FString& InGuid) const override;
 	virtual const FPakFileSumary& GetPakFileSumary() const override;
-	virtual FString GetPakFilePath() const override;
-	virtual bool GetPakFilesInDirectory(const FString& InDirectory, bool bIncludeFiles, bool bIncludeDirectories, bool bRecursive, TArray<FPakTreeEntryPtr>& OutFiles) const override;
+	virtual FPakTreeEntryPtr GetPakTreeRootNode() const override;
 
 protected:
 	void Reset();
 
+	FPakTreeEntryPtr InsertTreeNode(const FString& InFullPath, const FPakEntry* InEntry, bool bIsDirectory);
+	void RefreshTreeNode(FPakTreeEntryPtr InRoot);
+	void RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const;
+
 protected:
 	FCriticalSection CriticalSection;
-	TArray<FPakFileEntryPtr> Files;
+
+	FPakTreeEntryPtr TreeRoot;
 
 	TSharedPtr<class FPakFile> PakFile;
 
 	FGuid LoadGuid;
 
 	FPakFileSumary PakFileSumary;
-
-	FString PakFilePath;
 };

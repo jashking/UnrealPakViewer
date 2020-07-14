@@ -52,8 +52,18 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 		return false;
 	}
 
+	// Generate unique id
 	LoadGuid = FGuid::NewGuid();
 
+	// Save pak sumary
+	PakFileSumary.MountPoint = PakFile->GetMountPoint();
+	PakFileSumary.PakInfo = &PakFile->GetInfo();
+	PakFileSumary.PakFilePath = InPakPath;
+
+	// Make tree root
+	TreeRoot = MakeShared<FPakTreeEntry>(FPaths::GetCleanFilename(InPakPath), PakFileSumary.MountPoint, nullptr, true);
+
+	// Iterate Files
 	TArray<FPakFile::FFileIterator> Records;
 	for (FPakFile::FFileIterator It(*PakFile, true); It; ++It)
 	{
@@ -74,36 +84,25 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 
 		for (auto It : Records)
 		{
-			FPakFileEntryPtr PakFileEntry = MakeShared<FPakFileEntry>();
-
-			PakFileEntry->PakEntry = &It.Info();
-			PakFileEntry->Filename = FPaths::GetCleanFilename(It.Filename());
-			PakFileEntry->Path = It.Filename();
-
-			Files.Add(PakFileEntry);
+			InsertTreeNode(It.Filename(), &It.Info(), false);
 		}
+
+		RefreshTreeNode(TreeRoot);
 	}
-
-	PakFileSumary.MountPoint = PakFile->GetMountPoint();
-	PakFileSumary.PakInfo = &PakFile->GetInfo();
-
-	PakFilePath = InPakPath;
 
 	return true;
 }
 
 int32 FPakAnalyzer::GetFileCount() const
 {
-	FScopeLock Lock(const_cast<FCriticalSection*>(&CriticalSection));
-
-	return Files.Num();
+	return TreeRoot.IsValid() ? TreeRoot->FileCount : 0;
 }
 
-const TArray<FPakFileEntryPtr >& FPakAnalyzer::GetFiles() const
+void FPakAnalyzer::GetFiles(const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const
 {
 	FScopeLock Lock(const_cast<FCriticalSection*>(&CriticalSection));
 
-	return Files;
+	RetriveFiles(TreeRoot, InFilterText, OutFiles);
 }
 
 FString FPakAnalyzer::GetLastLoadGuid() const
@@ -121,69 +120,90 @@ const FPakFileSumary& FPakAnalyzer::GetPakFileSumary() const
 	return PakFileSumary;
 }
 
-FString FPakAnalyzer::GetPakFilePath() const
+FPakTreeEntryPtr FPakAnalyzer::GetPakTreeRootNode() const
 {
-	return PakFilePath;
-}
-
-bool FPakAnalyzer::GetPakFilesInDirectory(const FString& InDirectory, bool bIncludeFiles, bool bIncludeDirectories, bool bRecursive, TArray<FPakTreeEntryPtr>& OutFiles) const
-{
-	OutFiles.Empty();
-
-	if (PakFile.IsValid())
-	{
-		TArray<FString> PakFiles;
-		PakFile->FindFilesAtPath(PakFiles, *InDirectory, bIncludeFiles, bIncludeDirectories, bRecursive);
-		if (PakFiles.Num() > 0)
-		{
-			for (const FString& File : PakFiles)
-			{
-				FPakTreeEntryPtr PakFileEntry = MakeShared<FPakTreeEntry>();
-				if (File.EndsWith(TEXT("/")) || File.EndsWith(TEXT("\\")))
-				{
-					PakFileEntry->Filename = FPaths::GetPathLeaf(File);
-					PakFileEntry->bIsDirectory = true;
-				}
-				else
-				{
-					PakFileEntry->Filename = FPaths::GetCleanFilename(File);
-					PakFileEntry->bIsDirectory = false;
-				}
-
-				PakFileEntry->Path = File;
-
-				OutFiles.Add(PakFileEntry);
-			}
-
-			OutFiles.Sort([](const FPakTreeEntryPtr& A, const FPakTreeEntryPtr& B) -> bool
-				{
-					if (A->bIsDirectory == B->bIsDirectory)
-					{
-						return A->Filename < B->Filename;
-					}
-
-					return (int32)A->bIsDirectory > (int32)B->bIsDirectory;
-				});
-
-			return true;
-		}
-	}
-
-	return false;
+	return TreeRoot;
 }
 
 void FPakAnalyzer::Reset()
 {
-	{
-		FScopeLock Lock(&CriticalSection);
-		Files.Empty();
-	}
-	
 	PakFile.Reset();
 	LoadGuid.Invalidate();
 
 	PakFileSumary.MountPoint = TEXT("");
 	PakFileSumary.PakInfo = nullptr;
+	PakFileSumary.PakFilePath = TEXT("");
 
-	PakFilePath = TEXT("");
+	TreeRoot.Reset();
+}
+
+FPakTreeEntryPtr FPakAnalyzer::InsertTreeNode(const FString& InFullPath, const FPakEntry* InEntry, bool bIsDirectory)
+{
+	const FString BasePath = FPaths::GetPath(InFullPath);
+	const FString LeafName = FPaths::GetPathLeaf(InFullPath);
+
+	FPakTreeEntryPtr Parent = BasePath.IsEmpty() ? TreeRoot : InsertTreeNode(BasePath, nullptr, true);
+
+	for (FPakTreeEntryPtr Child : Parent->Children)
+	{
+		if (Child->Filename.Equals(LeafName, ESearchCase::IgnoreCase))
+		{
+			return Child;
+		}
+	}
+
+	FPakTreeEntryPtr NewChild = MakeShared<FPakTreeEntry>(LeafName, InFullPath, InEntry, bIsDirectory);
+	Parent->Children.Add(NewChild);
+
+	return NewChild;
+}
+
+void FPakAnalyzer::RefreshTreeNode(FPakTreeEntryPtr InRoot)
+{
+	for (FPakTreeEntryPtr Child : InRoot->Children)
+	{
+		if (Child->bIsDirectory)
+		{
+			RefreshTreeNode(Child);
+		}
+		else
+		{
+			Child->FileCount = 1;
+			Child->Size = Child->PakEntry->UncompressedSize;
+			Child->CompressedSize = Child->PakEntry->Size;
+		}
+
+		InRoot->FileCount += Child->FileCount;
+		InRoot->Size += Child->Size;
+		InRoot->CompressedSize += Child->CompressedSize;
+	}
+
+	InRoot->Children.Sort([](const FPakTreeEntryPtr& A, const FPakTreeEntryPtr& B) -> bool
+		{
+			if (A->bIsDirectory == B->bIsDirectory)
+			{
+				return A->Filename < B->Filename;
+			}
+
+			return (int32)A->bIsDirectory > (int32)B->bIsDirectory;
+		});
+}
+
+void FPakAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const
+{
+	for (FPakTreeEntryPtr Child : InRoot->Children)
+	{
+		if (Child->bIsDirectory)
+		{
+			RetriveFiles(Child, InFilterText, OutFiles);
+		}
+		else
+		{
+			if (InFilterText.IsEmpty() || Child->Filename.Contains(InFilterText) || Child->Path.Contains(InFilterText))
+			{
+				FPakFileEntryPtr FileEntryPtr = MakeShared<FPakFileEntry>(Child->Filename, Child->Path, Child->PakEntry);
+				OutFiles.Add(FileEntryPtr);
+			}
+		}
+	}
 }

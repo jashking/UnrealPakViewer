@@ -13,17 +13,7 @@ void FFileSortAndFilterTask::DoWork()
 	}
 
 	TArray<FPakFileEntryPtr> FileCache;
-
-	const TArray<FPakFileEntryPtr>& AllFiles = IPakAnalyzerModule::Get().GetPakAnalyzer()->GetFiles();
-	for (int32 Index = 0; Index < AllFiles.Num(); ++Index)
-	{
-		FPakFileEntryPtr File = AllFiles[Index];
-
-		if (CurrentSearchText.IsEmpty() || File->Filename.Contains(CurrentSearchText) || File->Path.Contains(CurrentSearchText))
-		{
-			FileCache.Add(File);
-		}
-	}
+	IPakAnalyzerModule::Get().GetPakAnalyzer()->GetFiles(CurrentSearchText, FileCache);
 
 	const FFileColumn* Column = PakFileViewPin->FindCoulum(CurrentSortedColumn);
 	if (!Column)

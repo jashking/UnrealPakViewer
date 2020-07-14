@@ -5,6 +5,9 @@
 
 #include "PakFileEntry.h"
 
+class SKeyValueRow;
+class SVerticalBox;
+
 /** Implements the Pak Info window. */
 class SPakTreeView : public SCompoundWidget
 {
@@ -41,6 +44,21 @@ protected:
 	/** Called by STreeView when selection has changed. */
 	void OnSelectionChanged(FPakTreeEntryPtr SelectedItem, ESelectInfo::Type SelectInfo);
 
+	// Detail View
+	FORCEINLINE FText GetSelectionName() const;
+	FORCEINLINE FText GetSelectionPath() const;
+	FORCEINLINE FText GetSelectionOffset() const;
+	FORCEINLINE FText GetSelectionSize() const;
+	FORCEINLINE FText GetSelectionSizeToolTip() const;
+	FORCEINLINE FText GetSelectionCompressedSize() const;
+	FORCEINLINE FText GetSelectionCompressedSizeToolTip() const;
+	FORCEINLINE FText GetSelectionCompressionBlockCount() const;
+	FORCEINLINE FText GetSelectionCompressionBlockSize() const;
+	FORCEINLINE FText GetSelectionCompressionBlockSizeToolTip() const;
+	FORCEINLINE FText GetSelectionSHA1() const;
+	FORCEINLINE FText GetSelectionIsEncrypted() const;
+	FORCEINLINE FText GetSelectionFileCount() const;
+
 protected:
 	TSharedPtr<STreeView<FPakTreeEntryPtr>> TreeView;
 	FPakTreeEntryPtr CurrentSelectedItem;
@@ -49,4 +67,13 @@ protected:
 	TArray<FPakTreeEntryPtr> TreeNodes;
 
 	FString LastLoadGuid;
+
+	TSharedPtr<SVerticalBox> KeyValueBox;
+	TSharedPtr<SKeyValueRow> OffsetRow;
+	TSharedPtr<SKeyValueRow> CompressionBlockCountRow;
+	TSharedPtr<SKeyValueRow> CompressionBlockSizeRow;
+	TSharedPtr<SKeyValueRow> SHA1SizeRow;
+	TSharedPtr<SKeyValueRow> IsEncryptedRow;
+
+	TSharedPtr<SKeyValueRow> FileCountRow;
 };

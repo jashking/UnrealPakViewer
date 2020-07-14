@@ -28,7 +28,6 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 
 		+ SHorizontalBox::Slot()
 		.FillWidth(1.f)
-		//.HAlign(HAlign_Left)
 		.Padding(2.0f)
 		[
 			SAssignNew(TreeView, STreeView<FPakTreeEntryPtr>)
@@ -41,6 +40,83 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 			//.OnContextMenuOpening(this, &SUnrealPakViewer::OnContextMenuOpening)
 			//.ClearSelectionOnClick(false)
 			//.OnMouseButtonDoubleClick(this, &SUnrealPakViewer::OnTreeItemDoubleClicked)
+		]
+
+		+ SHorizontalBox::Slot()
+		.FillWidth(1.f)
+		.Padding(2.0f)
+		[
+			SAssignNew(KeyValueBox, SVerticalBox).Visibility(EVisibility::Collapsed)
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f)
+			[
+				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_Name", "Name:")).ValueText(this, &SPakTreeView::GetSelectionName)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f)
+			[
+				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_Path", "Path:")).ValueText(this, &SPakTreeView::GetSelectionPath)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f)
+			[
+				SAssignNew(OffsetRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_Offset", "Offset:")).ValueText(this, &SPakTreeView::GetSelectionOffset)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f)
+			[
+				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_Size", "Size:")).ValueText(this, &SPakTreeView::GetSelectionSize).ValueToolTipText(this, &SPakTreeView::GetSelectionSizeToolTip)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f)
+			[
+				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressedSize", "Compressed Size:")).ValueText(this, &SPakTreeView::GetSelectionCompressedSize).ValueToolTipText(this, &SPakTreeView::GetSelectionCompressedSizeToolTip)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f)
+			[
+				SAssignNew(CompressionBlockCountRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressionBlockCount", "Compression Block Count:")).ValueText(this, &SPakTreeView::GetSelectionCompressionBlockCount)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f)
+			[
+				SAssignNew(CompressionBlockSizeRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressionBlockSize", "Compression Block Size:")).ValueText(this, &SPakTreeView::GetSelectionCompressionBlockSize)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f)
+			[
+				SAssignNew(SHA1SizeRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_SHA1", "SHA1:")).ValueText(this, &SPakTreeView::GetSelectionSHA1)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f)
+			[
+				SAssignNew(IsEncryptedRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_IsEncrypted", "IsEncrypted:")).ValueText(this, &SPakTreeView::GetSelectionIsEncrypted)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f)
+			[
+				SAssignNew(FileCountRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_FileCount", "File Count:")).ValueText(this, &SPakTreeView::GetSelectionFileCount)
+			]
 		]
 	];
 
@@ -55,15 +131,8 @@ void SPakTreeView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 	{
 		LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
 
-		const FPakFileSumary& PakFileSumary = PakAnalyzer->GetPakFileSumary();
-
-		FPakTreeEntryPtr VirtualRoot = MakeShared<FPakTreeEntry>();
-		VirtualRoot->Path = PakFileSumary.MountPoint;
-		VirtualRoot->Filename = FPaths::GetCleanFilename(PakAnalyzer->GetPakFilePath());
-		VirtualRoot->bIsDirectory = true;
-
 		TreeNodes.Empty();
-		TreeNodes.Add(VirtualRoot);
+		TreeNodes.Add(PakAnalyzer->GetPakTreeRootNode());
 
 		if (TreeView.IsValid())
 		{
@@ -76,12 +145,12 @@ void SPakTreeView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 
 TSharedRef<ITableRow> SPakTreeView::OnGenerateTreeRow(FPakTreeEntryPtr TreeNode, const TSharedRef<STableViewBase>& OwnerTable)
 {
-	const FLinearColor FileColor = (TreeNode == CurrentSelectedItem ? FLinearColor::White : FLinearColor::Gray);
+	//const FLinearColor FileColor = (TreeNode == CurrentSelectedItem ? FLinearColor::White : FLinearColor::Gray);
 
 	TSharedRef<ITableRow> TableRow =
 		SNew(STableRow<TSharedPtr<FPakTreeEntryPtr>>, OwnerTable)
 		[
-			SNew(STextBlock).Text(FText::FromString(TreeNode->Filename)).ColorAndOpacity(TreeNode->bIsDirectory ? FLinearColor::Green : FileColor)
+			SNew(STextBlock).Text(FText::FromString(TreeNode->Filename)).ColorAndOpacity(TreeNode->bIsDirectory ? FLinearColor::Green : FLinearColor::White)
 		];
 
 	return TableRow;
@@ -91,15 +160,6 @@ void SPakTreeView::OnGetTreeNodeChildren(FPakTreeEntryPtr InParent, TArray<FPakT
 {
 	if (InParent.IsValid() && InParent->bIsDirectory)
 	{
-		if (InParent->Children.Num() <= 0)
-		{
-			TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-			if (PakAnalyzer.IsValid())
-			{
-				PakAnalyzer->GetPakFilesInDirectory(InParent->Path, true, true, false, InParent->Children);
-			}
-		}
-
 		OutChildren.Empty();
 		OutChildren.Append(InParent->Children);
 	}
@@ -108,6 +168,84 @@ void SPakTreeView::OnGetTreeNodeChildren(FPakTreeEntryPtr InParent, TArray<FPakT
 void SPakTreeView::OnSelectionChanged(FPakTreeEntryPtr SelectedItem, ESelectInfo::Type SelectInfo)
 {
 	CurrentSelectedItem = SelectedItem;
+
+	KeyValueBox->SetVisibility(CurrentSelectedItem.IsValid() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+
+	const bool bIsSelectionFile = CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory;
+	const bool bIsSelectionDirectory = CurrentSelectedItem.IsValid() && CurrentSelectedItem->bIsDirectory;
+
+	OffsetRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+	CompressionBlockCountRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+	CompressionBlockSizeRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+	SHA1SizeRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+	IsEncryptedRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+
+	FileCountRow->SetVisibility(bIsSelectionDirectory ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionName() const
+{
+	return CurrentSelectedItem.IsValid() ? FText::FromString(CurrentSelectedItem->Filename) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionPath() const
+{
+	return CurrentSelectedItem.IsValid() ? FText::FromString(CurrentSelectedItem->Path) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionOffset() const
+{
+	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::AsNumber(CurrentSelectedItem->PakEntry->Offset) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionSize() const
+{
+	return CurrentSelectedItem.IsValid() ? FText::AsMemory(CurrentSelectedItem->Size, EMemoryUnitStandard::IEC) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionSizeToolTip() const
+{
+	return CurrentSelectedItem.IsValid() ? FText::AsNumber(CurrentSelectedItem->Size) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionCompressedSize() const
+{
+	return CurrentSelectedItem.IsValid() ? FText::AsMemory(CurrentSelectedItem->CompressedSize, EMemoryUnitStandard::IEC) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionCompressedSizeToolTip() const
+{
+	return CurrentSelectedItem.IsValid() ? FText::AsNumber(CurrentSelectedItem->CompressedSize) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionCompressionBlockCount() const
+{
+	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::AsNumber(CurrentSelectedItem->PakEntry->CompressionBlocks.Num()) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionCompressionBlockSize() const
+{
+	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::AsMemory(CurrentSelectedItem->PakEntry->CompressionBlockSize, EMemoryUnitStandard::IEC) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionCompressionBlockSizeToolTip() const
+{
+	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::AsNumber(CurrentSelectedItem->PakEntry->CompressionBlockSize) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionSHA1() const
+{
+	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::FromString(BytesToHex(CurrentSelectedItem->PakEntry->Hash, sizeof(CurrentSelectedItem->PakEntry->Hash))) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionIsEncrypted() const
+{
+	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::FromString(CurrentSelectedItem->PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False")) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionFileCount() const
+{
+	return CurrentSelectedItem.IsValid() && CurrentSelectedItem->bIsDirectory ? FText::AsNumber(CurrentSelectedItem->FileCount) : FText();
 }
 
 #undef LOCTEXT_NAMESPACE

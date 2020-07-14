@@ -14,10 +14,9 @@ public:
 
 	virtual bool LoadPakFile(const FString& InPakPath) = 0;
 	virtual int32 GetFileCount() const = 0;
-	virtual const TArray<FPakFileEntryPtr>& GetFiles() const = 0;
+	virtual void GetFiles(const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const = 0;
 	virtual FString GetLastLoadGuid() const = 0;
 	virtual bool IsLoadDirty(const FString& InGuid) const = 0;
 	virtual const FPakFileSumary& GetPakFileSumary() const = 0;
-	virtual FString GetPakFilePath() const  = 0;
-	virtual bool GetPakFilesInDirectory(const FString& InDirectory, bool bIncludeFiles, bool bIncludeDirectories, bool bRecursive, TArray<FPakTreeEntryPtr>& OutFiles) const = 0;
+	virtual FPakTreeEntryPtr GetPakTreeRootNode() const = 0;
 };
