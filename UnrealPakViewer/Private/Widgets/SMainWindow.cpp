@@ -5,9 +5,11 @@
 #include "Framework/Docking/TabManager.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "HAL/PlatformApplicationMisc.h"
+#include "Misc/MessageDialog.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Docking/SDockTab.h"
 
+#include "CommonDefines.h"
 #include "PakAnalyzerModule.h"
 #include "SPakDetailView.h"
 #include "SPakFileView.h"
@@ -98,6 +100,9 @@ void SMainWindow::Construct(const FArguments& Args)
 	);
 
 	OnWindowClosed.BindRaw(this, &SMainWindow::OnExit);
+
+	FPakAnalyzerDelegates::OnGetAESKey.BindRaw(this, &SMainWindow::OnGetAESKey);
+	FPakAnalyzerDelegates::OnLoadPakFailed.BindRaw(this, &SMainWindow::OnLoadPakFailed);
 }
 
 TSharedRef<SWidget> SMainWindow::MakeMainMenu()
@@ -231,6 +236,16 @@ void SMainWindow::OnLoadPakFile()
 	{
 		IPakAnalyzerModule::Get().GetPakAnalyzer()->LoadPakFile(OutFiles[0]);
 	}
+}
+
+void SMainWindow::OnLoadPakFailed(const FString& InReason)
+{
+	FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(InReason));
+}
+
+FString SMainWindow::OnGetAESKey()
+{
+	return TEXT("");
 }
 
 FReply SMainWindow::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)

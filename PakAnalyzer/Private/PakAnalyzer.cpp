@@ -2,12 +2,14 @@
 
 #include "PakAnalyzer.h"
 
+#include "HAL/FileManager.h"
 #include "HAL/PlatformFile.h"
 #include "Misc/Paths.h"
 #include "Misc/ScopeLock.h"
 #include "IPlatformFilePak.h"
+#include "Serialization/Archive.h"
 
-#include "LogDefines.h"
+#include "CommonDefines.h"
 
 FPakAnalyzer::FPakAnalyzer()
 {
@@ -30,15 +32,23 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 	IPlatformFile& PlatformFile = IPlatformFile::GetPlatformPhysical();
 	if (!PlatformFile.FileExists(*InPakPath))
 	{
+		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Load pak file failed! Pak file not exists! Path: %s."), *InPakPath));
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Pak file not exists! Path: %s."), *InPakPath);
 		return false;
 	}
 
 	Reset();
 
+	if (!PreLoadPak(InPakPath))
+	{
+		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Pre load pak file failed! Path: %s."), *InPakPath);
+		return false;
+	}
+
 	PakFile = MakeShared<FPakFile>(*InPakPath, false);
 	if (!PakFile.IsValid())
 	{
+		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Load pak file failed! Create PakFile failed! Path: %s."), *InPakPath));
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Create PakFile failed! Path: %s."), *InPakPath);
 
 		return false;
@@ -46,7 +56,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 
 	if (!PakFile->IsValid())
 	{
-		// TODO: Check encryption key
+		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Load pak file failed! Unable to open pak file! Path: %s."), *InPakPath));
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Unable to open pak file! Path: %s."), *InPakPath);
 
 		return false;
@@ -138,6 +148,8 @@ void FPakAnalyzer::Reset()
 	PakFileSumary.PakFileSize = 0;
 
 	TreeRoot.Reset();
+
+	CachedAESKey = TEXT("");
 }
 
 FPakTreeEntryPtr FPakAnalyzer::InsertTreeNode(const FString& InFullPath, const FPakEntry* InEntry, bool bIsDirectory)
@@ -223,4 +235,78 @@ void FPakAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilter
 			}
 		}
 	}
+}
+
+bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
+{
+	FArchive* Reader = IFileManager::Get().CreateFileReader(*InPakPath);
+	if (!Reader)
+	{
+		return false;
+	}
+
+	FPakInfo Info;
+	const int64 CachedTotalSize = Reader->TotalSize();
+	bool bShouldLoad = false;
+	int32 CompatibleVersion = FPakInfo::PakFile_Version_Latest;
+
+	// Serialize trailer and check if everything is as expected.
+	// start up one to offset the -- below
+	CompatibleVersion++;
+	int64 FileInfoPos = -1;
+	do
+	{
+		// try the next version down
+		CompatibleVersion--;
+
+		FileInfoPos = CachedTotalSize - Info.GetSerializedSize(CompatibleVersion);
+		if (FileInfoPos >= 0)
+		{
+			Reader->Seek(FileInfoPos);
+
+			// Serialize trailer and check if everything is as expected.
+			Info.Serialize(*Reader, CompatibleVersion);
+			if (Info.Magic == FPakInfo::PakFile_Magic)
+			{
+				bShouldLoad = true;
+			}
+		}
+	} while (!bShouldLoad && CompatibleVersion >= FPakInfo::PakFile_Version_Initial);
+
+	if (Info.bEncryptedIndex)
+	{
+		const FString AESKey = FPakAnalyzerDelegates::OnGetAESKey.IsBound() ? FPakAnalyzerDelegates::OnGetAESKey.Execute() : TEXT("");
+		const uint32 RequiredKeyLength = 32;
+
+		// Error checking
+		if (AESKey.Len() != RequiredKeyLength)
+		{
+			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key[%s] must be 32 characters long!"), *AESKey);
+			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(TEXT("AES encryption key must be 32 characters long!"));
+			bShouldLoad = false;
+		}
+
+		if (!FCString::IsPureAnsi(*AESKey))
+		{
+			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key[%s] must be a pure ANSI string!"), *AESKey);
+			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(TEXT("AES encryption key must be a pure ANSI string!"));
+			bShouldLoad = false;
+		}
+
+		if (bShouldLoad)
+		{
+			CachedAESKey = AESKey;
+			UE_LOG(LogPakAnalyzer, Log, TEXT("Use AES encryption key[%s] for %s."), *AESKey, *InPakPath);
+			FCoreDelegates::GetPakEncryptionKeyDelegate().BindLambda(
+				[AESKey](uint8 OutKey[32])
+				{
+					FMemory::Memcpy(OutKey, TCHAR_TO_ANSI(*AESKey), 32);
+				});
+		}
+	}
+
+	Reader->Close();
+	delete Reader;
+
+	return bShouldLoad;
 }

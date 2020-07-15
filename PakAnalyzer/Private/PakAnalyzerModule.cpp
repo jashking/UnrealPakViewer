@@ -3,10 +3,13 @@
 #include "PakAnalyzerModule.h"
 #include "Modules/ModuleManager.h"
 
-#include "LogDefines.h"
+#include "CommonDefines.h"
 #include "PakAnalyzer.h"
 
 DEFINE_LOG_CATEGORY(LogPakAnalyzer);
+
+FOnGetAESKey FPakAnalyzerDelegates::OnGetAESKey;
+FOnLoadPakFailed FPakAnalyzerDelegates::OnLoadPakFailed;
 
 class FPakAnalyzerModule : public IPakAnalyzerModule
 {

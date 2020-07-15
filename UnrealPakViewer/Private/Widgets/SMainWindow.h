@@ -29,6 +29,8 @@ protected:
 
 	void OnExit(const TSharedRef<SWindow>& InWindow);
 	void OnLoadPakFile();
+	void OnLoadPakFailed(const FString& InReason);
+	FString OnGetAESKey();
 
 	/**
 	 * Called when the user is dropping something onto a widget; terminates drag and drop.

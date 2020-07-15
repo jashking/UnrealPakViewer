@@ -33,6 +33,8 @@ protected:
 	void RefreshTreeNodeSizePercent(FPakTreeEntryPtr InRoot);
 	void RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const;
 
+	bool PreLoadPak(const FString& InPakPath);
+
 protected:
 	FCriticalSection CriticalSection;
 
@@ -43,4 +45,6 @@ protected:
 	FGuid LoadGuid;
 
 	FPakFileSumary PakFileSumary;
+
+	FString CachedAESKey;
 };
