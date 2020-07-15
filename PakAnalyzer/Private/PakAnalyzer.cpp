@@ -11,7 +11,7 @@
 
 FPakAnalyzer::FPakAnalyzer()
 {
-
+	Reset();
 }
 
 FPakAnalyzer::~FPakAnalyzer()
@@ -59,6 +59,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 	PakFileSumary.MountPoint = PakFile->GetMountPoint();
 	PakFileSumary.PakInfo = &PakFile->GetInfo();
 	PakFileSumary.PakFilePath = InPakPath;
+	PakFileSumary.PakFileSize = PakFile->TotalSize();
 
 	// Make tree root
 	TreeRoot = MakeShared<FPakTreeEntry>(FPaths::GetCleanFilename(InPakPath), PakFileSumary.MountPoint, nullptr, true);
@@ -133,6 +134,7 @@ void FPakAnalyzer::Reset()
 	PakFileSumary.MountPoint = TEXT("");
 	PakFileSumary.PakInfo = nullptr;
 	PakFileSumary.PakFilePath = TEXT("");
+	PakFileSumary.PakFileSize = 0;
 
 	TreeRoot.Reset();
 }

@@ -1,12 +1,14 @@
 #include "SPakTreeView.h"
 
 #include "EditorStyle.h"
+#include "IPlatformFilePak.h"
 #include "Misc/Guid.h"
 #include "Misc/Paths.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Layout/SScrollBar.h"
 
 #include "PakAnalyzerModule.h"
+#include "SKeyValueRow.h"
 
 #define LOCTEXT_NAMESPACE "SPakTreeView"
 

@@ -57,4 +57,5 @@ struct FPakFileSumary
 	const FPakInfo* PakInfo = nullptr;
 	FString MountPoint;
 	FString PakFilePath;
+	int64 PakFileSize;
 };
