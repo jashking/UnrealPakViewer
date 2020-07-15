@@ -35,6 +35,8 @@ struct FPakTreeEntry : public FPakFileEntry
 	int32 FileCount;
 	int64 Size;
 	int64 CompressedSize;
+	float CompressedSizePercentOfTotal;
+	float CompressedSizePercentOfParent;
 
 	bool bIsDirectory;
 	TArray<TSharedPtr<FPakTreeEntry>> Children;
@@ -44,6 +46,8 @@ struct FPakTreeEntry : public FPakFileEntry
 		, FileCount(0)
 		, Size(0)
 		, CompressedSize(0)
+		, CompressedSizePercentOfTotal(1.f)
+		, CompressedSizePercentOfParent(1.f)
 		, bIsDirectory(bInIsDirectory)
 	{
 

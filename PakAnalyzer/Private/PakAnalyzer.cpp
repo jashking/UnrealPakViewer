@@ -89,6 +89,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 		}
 
 		RefreshTreeNode(TreeRoot);
+		RefreshTreeNodeSizePercent(TreeRoot);
 	}
 
 	return true;
@@ -189,6 +190,20 @@ void FPakAnalyzer::RefreshTreeNode(FPakTreeEntryPtr InRoot)
 
 			return (int32)A->bIsDirectory > (int32)B->bIsDirectory;
 		});
+}
+
+void FPakAnalyzer::RefreshTreeNodeSizePercent(FPakTreeEntryPtr InRoot)
+{
+	for (FPakTreeEntryPtr Child : InRoot->Children)
+	{
+		Child->CompressedSizePercentOfTotal = (float)Child->CompressedSize / TreeRoot->CompressedSize;
+		Child->CompressedSizePercentOfParent = (float)Child->CompressedSize / InRoot->CompressedSize;
+
+		if (Child->bIsDirectory)
+		{
+			RefreshTreeNodeSizePercent(Child);
+		}
+	}
 }
 
 void FPakAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const

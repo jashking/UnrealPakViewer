@@ -52,6 +52,8 @@ protected:
 	FORCEINLINE FText GetSelectionSizeToolTip() const;
 	FORCEINLINE FText GetSelectionCompressedSize() const;
 	FORCEINLINE FText GetSelectionCompressedSizeToolTip() const;
+	FORCEINLINE FText GetSelectionCompressedSizePercentOfTotal() const;
+	FORCEINLINE FText GetSelectionCompressedSizePercentOfParent() const;
 	FORCEINLINE FText GetSelectionCompressionBlockCount() const;
 	FORCEINLINE FText GetSelectionCompressionBlockSize() const;
 	FORCEINLINE FText GetSelectionCompressionBlockSizeToolTip() const;

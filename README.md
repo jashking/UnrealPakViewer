@@ -11,3 +11,4 @@
 * file group by class or extension
 * resource load heat map
 * 文件列表视图里增加文件夹列表(通过选项开关，只显示文件，只显示文件夹，同时显示文件和文件夹)
+* Load from json or csv

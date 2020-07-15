@@ -5,7 +5,9 @@
 #include "Misc/Guid.h"
 #include "Misc/Paths.h"
 #include "Styling/CoreStyle.h"
-#include "Widgets/Layout/SScrollBar.h"
+#include "Widgets/Layout/SBox.h"
+#include "Widgets/Notifications/SProgressBar.h"
+#include "Widgets/SOverlay.h"
 
 #include "PakAnalyzerModule.h"
 #include "SKeyValueRow.h"
@@ -89,6 +91,20 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 			.AutoHeight()
 			.Padding(0.f, 0.f)
 			[
+				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressedSizeOfTotal", "Compressed Size Of Total:")).ValueText(this, &SPakTreeView::GetSelectionCompressedSizePercentOfTotal)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f)
+			[
+				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressedSizeOfParent", "Compressed Size Of Parent:")).ValueText(this, &SPakTreeView::GetSelectionCompressedSizePercentOfParent)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f)
+			[
 				SAssignNew(CompressionBlockCountRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressionBlockCount", "Compression Block Count:")).ValueText(this, &SPakTreeView::GetSelectionCompressionBlockCount)
 			]
 
@@ -147,15 +163,53 @@ void SPakTreeView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 
 TSharedRef<ITableRow> SPakTreeView::OnGenerateTreeRow(FPakTreeEntryPtr TreeNode, const TSharedRef<STableViewBase>& OwnerTable)
 {
-	//const FLinearColor FileColor = (TreeNode == CurrentSelectedItem ? FLinearColor::White : FLinearColor::Gray);
+	if (TreeNode->bIsDirectory)
+	{
+		return SNew(STableRow<TSharedPtr<FPakTreeEntryPtr>>, OwnerTable)
+			[
+				SNew(SHorizontalBox)
 
-	TSharedRef<ITableRow> TableRow =
-		SNew(STableRow<TSharedPtr<FPakTreeEntryPtr>>, OwnerTable)
-		[
-			SNew(STextBlock).Text(FText::FromString(TreeNode->Filename)).ColorAndOpacity(TreeNode->bIsDirectory ? FLinearColor::Green : FLinearColor::White)
-		];
+				+ SHorizontalBox::Slot()
+				//.AutoWidth()
+				.HAlign(HAlign_Left)
+				[
+					SNew(STextBlock).Text(FText::FromString(TreeNode->Filename)).ColorAndOpacity(FLinearColor::Green)
+				]
 
-	return TableRow;
+				+ SHorizontalBox::Slot()
+				//.MaxWidth(100.f)
+				.HAlign(HAlign_Right)
+				[
+					SNew(SBox)
+					.MinDesiredWidth(150.f)
+					.MaxDesiredWidth(200.f)
+					.ToolTipText(FText::Format(LOCTEXT("Tree_View_CompressedPercent", "{0}'s compressed size percent of total compressed size"), FText::FromString(TreeNode->Filename)))
+					[
+						SNew(SOverlay)
+
+						+ SOverlay::Slot()
+						[
+							SNew(SProgressBar).Percent(TreeNode->CompressedSizePercentOfTotal)
+						]
+
+						+ SOverlay::Slot()
+						.HAlign(HAlign_Center)
+						[
+							SNew(STextBlock)
+							.Text(FText::FromString(FString::Printf(TEXT("%.2f%%"), TreeNode->CompressedSizePercentOfTotal * 100)))
+							.ColorAndOpacity(FLinearColor::Black)
+						]
+					]
+				]
+			];
+	}
+	else
+	{
+		return SNew(STableRow<TSharedPtr<FPakTreeEntryPtr>>, OwnerTable)
+			[
+				SNew(STextBlock).Text(FText::FromString(TreeNode->Filename)).ColorAndOpacity(FLinearColor::White)
+			];
+	}
 }
 
 void SPakTreeView::OnGetTreeNodeChildren(FPakTreeEntryPtr InParent, TArray<FPakTreeEntryPtr>& OutChildren)
@@ -218,6 +272,16 @@ FORCEINLINE FText SPakTreeView::GetSelectionCompressedSize() const
 FORCEINLINE FText SPakTreeView::GetSelectionCompressedSizeToolTip() const
 {
 	return CurrentSelectedItem.IsValid() ? FText::AsNumber(CurrentSelectedItem->CompressedSize) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionCompressedSizePercentOfTotal() const
+{
+	return CurrentSelectedItem.IsValid() ? FText::FromString(FString::Printf(TEXT("%.4f%%"), CurrentSelectedItem->CompressedSizePercentOfTotal * 100)) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionCompressedSizePercentOfParent() const
+{
+	return CurrentSelectedItem.IsValid() ? FText::FromString(FString::Printf(TEXT("%.4f%%"), CurrentSelectedItem->CompressedSizePercentOfParent * 100)) : FText();
 }
 
 FORCEINLINE FText SPakTreeView::GetSelectionCompressionBlockCount() const

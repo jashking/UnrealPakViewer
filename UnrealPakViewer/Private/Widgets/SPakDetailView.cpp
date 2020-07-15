@@ -3,6 +3,7 @@
 #include "EditorStyle.h"
 #include "IPlatformFilePak.h"
 #include "Styling/CoreStyle.h"
+#include "Widgets/Layout/SExpandableArea.h"
 
 #include "PakAnalyzerModule.h"
 #include "SKeyValueRow.h"
@@ -29,97 +30,103 @@ void SPakDetailView::Construct(const FArguments& InArgs)
 {
 	ChildSlot
 	[
-		SNew(SHorizontalBox)
-
-		+ SHorizontalBox::Slot()
-		.FillWidth(1.f)
-		.Padding(2.0f)
+		SNew(SExpandableArea)
+		.InitiallyCollapsed(true)
+		.AreaTitle(LOCTEXT("PakSumary", "Pak Summary"))
+		.BodyContent()
 		[
-			SNew(SVerticalBox)
+			SNew(SHorizontalBox)
 
-			+SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f)
+			+ SHorizontalBox::Slot()
+			.FillWidth(1.f)
+			.Padding(2.0f)
 			[
-				SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_Path", "Pak Path:")).ValueText(this, &SPakDetailView::GetPakPath)
+				SNew(SVerticalBox)
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f)
+				[
+					SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_Path", "Pak Path:")).ValueText(this, &SPakDetailView::GetPakPath)
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f)
+				[
+					SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_MountPoint", "Mount Point:")).ValueText(this, &SPakDetailView::GetPakMountPoint)
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f)
+				[
+					SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_Version", "Pak Version:")).ValueText(this, &SPakDetailView::GetPakVersion)
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f)
+				[
+					SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_FileSize", "Pak File Size:")).ValueText(this, &SPakDetailView::GetPakFileSize).ValueToolTipText(this, &SPakDetailView::GetPakFileSizeToolTip)
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f)
+				[
+					SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_FileCount", "Pak File Count:")).ValueText(this, &SPakDetailView::GetPakFileCount)
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f)
+				[
+					SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_HeaderSize", "Pak Header Size:")).ValueText(this, &SPakDetailView::GetPakHeaderSize).ValueToolTipText(this, &SPakDetailView::GetPakHeaderSizeToolTip)
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f)
+				[
+					SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_IndexSize", "Pak Index Size:")).ValueText(this, &SPakDetailView::GetPakIndexSize).ValueToolTipText(this, &SPakDetailView::GetPakIndexSizeToolTip)
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f)
+				[
+					SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_IndexHash", "Pak Index Hash:")).ValueText(this, &SPakDetailView::GetPakFileIndexHash)
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f)
+				[
+					SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_IndexEncrypted", "Pak Index Is Encrypted:")).ValueText(this, &SPakDetailView::GetPakFileIndexIsEncrypted)
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f)
+				[
+					SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_FileContentSize", "Pak File Content Size:")).ValueText(this, &SPakDetailView::GetPakFileContentSize).ValueToolTipText(this, &SPakDetailView::GetPakFileContentSizeToolTip)
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f)
+				[
+					SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_CompressionMethods", "Pak Compression Methods:")).ValueText(this, &SPakDetailView::GetPakFileEncryptionMethods)
+				]
 			]
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f)
-			[
-				SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_MountPoint", "Mount Point:")).ValueText(this, &SPakDetailView::GetPakMountPoint)
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f)
-			[
-				SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_Version", "Pak Version:")).ValueText(this, &SPakDetailView::GetPakVersion)
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f)
-			[
-				SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_FileSize", "Pak File Size:")).ValueText(this, &SPakDetailView::GetPakFileSize).ValueToolTipText(this, &SPakDetailView::GetPakFileSizeToolTip)
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f)
-			[
-				SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_FileCount", "Pak File Count:")).ValueText(this, &SPakDetailView::GetPakFileCount)
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f)
-			[
-				SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_HeaderSize", "Pak Header Size:")).ValueText(this, &SPakDetailView::GetPakHeaderSize).ValueToolTipText(this, &SPakDetailView::GetPakHeaderSizeToolTip)
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f)
-			[
-				SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_IndexSize", "Pak Index Size:")).ValueText(this, &SPakDetailView::GetPakIndexSize).ValueToolTipText(this, &SPakDetailView::GetPakIndexSizeToolTip)
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f)
-			[
-				SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_IndexHash", "Pak Index Hash:")).ValueText(this, &SPakDetailView::GetPakFileIndexHash)
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f)
-			[
-				SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_IndexEncrypted", "Pak Index Is Encrypted:")).ValueText(this, &SPakDetailView::GetPakFileIndexIsEncrypted)
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f)
-			[
-				SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_FileContentSize", "Pak File Content Size:")).ValueText(this, &SPakDetailView::GetPakFileContentSize).ValueToolTipText(this, &SPakDetailView::GetPakFileContentSizeToolTip)
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f)
-			[
-				SNew(SKeyValueRow).KeyText(LOCTEXT("Detail_View_Pak_CompressionMethods", "Pak Compression Methods:")).ValueText(this, &SPakDetailView::GetPakFileEncryptionMethods)
-			]
+			//+ SHorizontalBox::Slot()
+			//.FillWidth(1.f)
+			//.Padding(2.0f)
+			//[
+			//]
 		]
-
-		//+ SHorizontalBox::Slot()
-		//.FillWidth(1.f)
-		//.Padding(2.0f)
-		//[
-		//]
 	];
 }
 
