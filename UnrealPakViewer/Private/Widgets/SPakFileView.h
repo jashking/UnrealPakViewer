@@ -1,7 +1,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "HAL/CriticalSection.h"
 #include "Widgets/SCompoundWidget.h"
 #include "Widgets/Views/SListView.h"
 
@@ -84,7 +83,7 @@ protected:
 	void OnJumpToTreeViewExecute();
 
 	void MarkDirty(bool bInIsDirty);
-	void OnSortAndFilterFinihed(TArray<FPakFileEntryPtr>& Results, const FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid);
+	void OnSortAndFilterFinihed(const FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid);
 
 	FText GetFileCount() const;
 
@@ -116,13 +115,13 @@ protected:
 
 	/** The async task to sort and filter file on a worker thread */
 	TUniquePtr<FAsyncTask<class FFileSortAndFilterTask>> SortAndFilterTask;
+	FFileSortAndFilterTask* InnderTask;
 
 	FName CurrentSortedColumn = FFileColumn::OffsetColumnName;
 	EColumnSortMode::Type CurrentSortMode = EColumnSortMode::Ascending;
 	FString CurrentSearchText;
 
 	bool bIsDirty = false;
-	FCriticalSection CriticalSection;
 
 	FString LastLoadGuid;
 };

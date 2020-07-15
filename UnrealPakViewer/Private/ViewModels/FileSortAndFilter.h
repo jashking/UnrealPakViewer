@@ -2,11 +2,12 @@
 
 #include "Async/AsyncWork.h"
 #include "CoreMinimal.h"
+#include "HAL/CriticalSection.h"
 #include "Stats/Stats.h"
 
 #include "PakFileEntry.h"
 
-DECLARE_DELEGATE_FiveParams(FOnSortAndFilterFinished, TArray<FPakFileEntryPtr>&, const FName, EColumnSortMode::Type, const FString&, const FString&);
+DECLARE_DELEGATE_FourParams(FOnSortAndFilterFinished, const FName, EColumnSortMode::Type, const FString&, const FString&);
 
 class SPakFileView;
 
@@ -32,6 +33,8 @@ public:
 		RETURN_QUICK_DECLARE_CYCLE_STAT(STAT_FFileSortAndFilterTask, STATGROUP_ThreadPoolAsyncTasks);
 	}
 
+	void RetriveResult(TArray<FPakFileEntryPtr>& OutResult);
+
 protected:
 	FName CurrentSortedColumn;
 	EColumnSortMode::Type CurrentSortMode;
@@ -42,4 +45,7 @@ protected:
 	TWeakPtr<SPakFileView> WeakPakFileView;
 
 	FOnSortAndFilterFinished OnWorkFinished;
+
+	FCriticalSection CriticalSection;
+	TArray<FPakFileEntryPtr> Result;
 };

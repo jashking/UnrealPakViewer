@@ -8,3 +8,5 @@
 * 文件视图，占比进度条
 * CPU Usage Optimize
 * Pak compare visiualize
+* file group by class or extension
+* resource load heat map

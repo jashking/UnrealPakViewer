@@ -6,7 +6,6 @@
 #include "HAL/PlatformApplicationMisc.h"
 #include "IPlatformFilePak.h"
 #include "Misc/Guid.h"
-#include "Misc/ScopeLock.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
@@ -36,6 +35,11 @@ class SPakFileRow : public SMultiColumnTableRow<FPakFileEntryPtr>
 public:
 	void Construct(const FArguments& InArgs, FPakFileEntryPtr InPakFileItem, TSharedRef<SPakFileView> InParentWidget, const TSharedRef<STableViewBase>& InOwnerTableView)
 	{
+		if (!InPakFileItem.IsValid())
+		{
+			return;
+		}
+
 		WeakPakFileItem = MoveTemp(InPakFileItem);
 		WeakPakFileView = InParentWidget;
 
@@ -404,8 +408,12 @@ void SPakFileView::Construct(const FArguments& InArgs)
 	InitializeAndShowHeaderColumns();
 
 	SortAndFilterTask = MakeUnique<FAsyncTask<FFileSortAndFilterTask>>(CurrentSortedColumn, CurrentSortMode, SharedThis(this));
+	InnderTask = SortAndFilterTask.IsValid() ? &SortAndFilterTask->GetTask() : nullptr;
+
 	check(SortAndFilterTask.IsValid());
-	SortAndFilterTask->GetTask().GetOnSortAndFilterFinishedDelegate().BindRaw(this, &SPakFileView::OnSortAndFilterFinihed);
+	check(InnderTask);
+
+	InnderTask->GetOnSortAndFilterFinishedDelegate().BindRaw(this, &SPakFileView::OnSortAndFilterFinihed);
 
 	LastLoadGuid = LexToString(FGuid());
 }
@@ -420,7 +428,7 @@ void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 		{
 			LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
 
-			SortAndFilterTask->GetTask().SetWorkInfo(CurrentSortedColumn, CurrentSortMode, CurrentSearchText, LastLoadGuid);
+			InnderTask->SetWorkInfo(CurrentSortedColumn, CurrentSortMode, CurrentSearchText, LastLoadGuid);
 			SortAndFilterTask->StartBackgroundTask();
 		}
 	}
@@ -1018,18 +1026,11 @@ void SPakFileView::MarkDirty(bool bInIsDirty)
 	bIsDirty = bInIsDirty;
 }
 
-void SPakFileView::OnSortAndFilterFinihed(TArray<FPakFileEntryPtr>& Results, const FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid)
+void SPakFileView::OnSortAndFilterFinihed(const FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid)
 {
-	{
-		FScopeLock Lock(&CriticalSection);
-
-		FileCache = MoveTemp(Results);
-	}
-
 	FFunctionGraphTask::CreateAndDispatchWhenReady([this, InLoadGuid, InSearchText]()
 		{
-			FScopeLock Lock(&CriticalSection);
-
+			InnderTask->RetriveResult(FileCache);
 			FileListView->RebuildList();
 
 			if (IPakAnalyzerModule::Get().GetPakAnalyzer()->IsLoadDirty(InLoadGuid) || !InSearchText.Equals(CurrentSearchText, ESearchCase::IgnoreCase))
@@ -1048,21 +1049,13 @@ void SPakFileView::OnSortAndFilterFinihed(TArray<FPakFileEntryPtr>& Results, con
 
 FText SPakFileView::GetFileCount() const
 {
-	int32 CurrentFileCount = 0;
-
-	{
-		FScopeLock Lock(const_cast<FCriticalSection*>(&CriticalSection));
-
-		CurrentFileCount = FileCache.Num();
-	}
+	const int32 CurrentFileCount = FileCache.Num();
 
 	return FText::Format(FTextFormat::FromString(TEXT("{0} / {1} files")), FText::AsNumber(CurrentFileCount), FText::AsNumber(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetFileCount()));
 }
 
 bool SPakFileView::IsFileListEmpty() const
 {
-	FScopeLock Lock(const_cast<FCriticalSection*>(&CriticalSection));
-
 	return FileCache.Num() > 0;
 }
 

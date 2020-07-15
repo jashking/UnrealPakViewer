@@ -1,5 +1,6 @@
 #include "FileSortAndFilter.h"
 
+#include "Misc/ScopeLock.h"
 #include "PakAnalyzerModule.h"
 #include "ViewModels/FileColumn.h"
 #include "Widgets/SPakFileView.h"
@@ -12,8 +13,8 @@ void FFileSortAndFilterTask::DoWork()
 		return;
 	}
 
-	TArray<FPakFileEntryPtr> FileCache;
-	IPakAnalyzerModule::Get().GetPakAnalyzer()->GetFiles(CurrentSearchText, FileCache);
+	TArray<FPakFileEntryPtr> FilterResult;
+	IPakAnalyzerModule::Get().GetPakAnalyzer()->GetFiles(CurrentSearchText, FilterResult);
 
 	const FFileColumn* Column = PakFileViewPin->FindCoulum(CurrentSortedColumn);
 	if (!Column)
@@ -28,14 +29,19 @@ void FFileSortAndFilterTask::DoWork()
 
 	if (CurrentSortMode == EColumnSortMode::Ascending)
 	{
-		FileCache.Sort(Column->GetAscendingCompareDelegate());
+		FilterResult.Sort(Column->GetAscendingCompareDelegate());
 	}
 	else
 	{
-		FileCache.Sort(Column->GetDescendingCompareDelegate());
+		FilterResult.Sort(Column->GetDescendingCompareDelegate());
 	}
 
-	OnWorkFinished.ExecuteIfBound(FileCache, CurrentSortedColumn, CurrentSortMode, CurrentSearchText, CurrentLoadGuid);
+	{
+		FScopeLock Lock(&CriticalSection);
+		Result = MoveTemp(FilterResult);
+	}
+
+	OnWorkFinished.ExecuteIfBound(CurrentSortedColumn, CurrentSortMode, CurrentSearchText, CurrentLoadGuid);
 }
 
 void FFileSortAndFilterTask::SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid)
@@ -44,4 +50,10 @@ void FFileSortAndFilterTask::SetWorkInfo(FName InSortedColumn, EColumnSortMode::
 	CurrentSortMode = InSortMode;
 	CurrentSearchText = InSearchText;
 	CurrentLoadGuid = InLoadGuid;
+}
+
+void FFileSortAndFilterTask::RetriveResult(TArray<FPakFileEntryPtr>& OutResult)
+{
+	FScopeLock Lock(&CriticalSection);
+	OutResult = MoveTemp(Result);
 }
