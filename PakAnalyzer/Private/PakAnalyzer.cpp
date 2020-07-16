@@ -4,6 +4,7 @@
 
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFile.h"
+#include "Launch/Resources/Version.h"
 #include "Misc/AES.h"
 #include "Misc/Base64.h"
 #include "Misc/Guid.h"
@@ -13,6 +14,12 @@
 #include "Serialization/Archive.h"
 
 #include "CommonDefines.h"
+
+#if ENGINE_MINOR_VERSION >= 26
+typedef FPakFile::FFilenameIterator RecordIterator;
+#else
+typedef FPakFile::FFileIterator RecordIterator;
+#endif
 
 struct FNamedAESKey
 {
@@ -90,15 +97,15 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 	TreeRoot = MakeShared<FPakTreeEntry>(FPaths::GetCleanFilename(InPakPath), PakFileSumary.MountPoint, nullptr, true);
 
 	// Iterate Files
-	TArray<FPakFile::FFileIterator> Records;
-	for (FPakFile::FFileIterator It(*PakFile, true); It; ++It)
+	TArray<RecordIterator> Records;
+	for (RecordIterator It(*PakFile, true); It; ++It)
 	{
 		Records.Add(It);
 	}
 
 	struct FOffsetSort
 	{
-		FORCEINLINE bool operator()(const FPakFile::FFileIterator& A, const FPakFile::FFileIterator& B) const
+		FORCEINLINE bool operator()(const RecordIterator& A, const RecordIterator& B) const
 		{
 			return A.Info().Offset < B.Info().Offset;
 		}
