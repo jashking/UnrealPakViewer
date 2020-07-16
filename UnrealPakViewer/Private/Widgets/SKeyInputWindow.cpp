@@ -40,7 +40,7 @@ void SKeyInputWindow::Construct(const FArguments& Args)
 				.VAlign(EVerticalAlignment::VAlign_Center)
 				.Padding(FMargin(0.f, 0.f, 5.f, 0.f))
 				[
-					SNew(STextBlock).Text(LOCTEXT("KeyText", "Please input encryption key:"))
+					SNew(STextBlock).Text(LOCTEXT("KeyText", "Please input encryption key(Base64):"))
 				]
 
 				+ SHorizontalBox::Slot()

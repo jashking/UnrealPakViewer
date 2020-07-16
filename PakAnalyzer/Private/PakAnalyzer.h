@@ -45,6 +45,4 @@ protected:
 	FGuid LoadGuid;
 
 	FPakFileSumary PakFileSumary;
-
-	FString CachedAESKey;
 };
