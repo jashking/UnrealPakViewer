@@ -11,6 +11,7 @@
 
 #include "CommonDefines.h"
 #include "PakAnalyzerModule.h"
+#include "SKeyInputWindow.h"
 #include "SPakDetailView.h"
 #include "SPakFileView.h"
 #include "SPakTreeView.h"
@@ -245,7 +246,15 @@ void SMainWindow::OnLoadPakFailed(const FString& InReason)
 
 FString SMainWindow::OnGetAESKey()
 {
-	return TEXT("");
+	FString EncryptionKey = TEXT("");
+
+	TSharedPtr<SKeyInputWindow> KeyInputWindow =
+		SNew(SKeyInputWindow)
+		.OnConfirm_Lambda([&EncryptionKey](const FString& InEncryptionKey) { EncryptionKey = InEncryptionKey; });
+
+	FSlateApplication::Get().AddModalWindow(KeyInputWindow.ToSharedRef(), SharedThis(this), false);
+
+	return EncryptionKey;
 }
 
 FReply SMainWindow::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)
