@@ -4,12 +4,26 @@
 
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFile.h"
+#include "Misc/AES.h"
+#include "Misc/Guid.h"
 #include "Misc/Paths.h"
 #include "Misc/ScopeLock.h"
 #include "IPlatformFilePak.h"
 #include "Serialization/Archive.h"
 
 #include "CommonDefines.h"
+
+struct FNamedAESKey
+{
+	FString Name;
+	FGuid Guid;
+	FAES::FAESKey Key;
+
+	bool IsValid() const
+	{
+		return Key.IsValid();
+	}
+};
 
 FPakAnalyzer::FPakAnalyzer()
 {
@@ -275,32 +289,42 @@ bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
 
 	if (Info.bEncryptedIndex)
 	{
-		const FString AESKey = FPakAnalyzerDelegates::OnGetAESKey.IsBound() ? FPakAnalyzerDelegates::OnGetAESKey.Execute() : TEXT("");
-		const uint32 RequiredKeyLength = 32;
+		CachedAESKey = FPakAnalyzerDelegates::OnGetAESKey.IsBound() ? FPakAnalyzerDelegates::OnGetAESKey.Execute() : TEXT("");
+
+		FNamedAESKey NewKey;
+		NewKey.Name = TEXT("Default");
+		NewKey.Guid = FGuid();
+		const uint32 RequiredKeyLength = sizeof(NewKey.Key);
 
 		// Error checking
-		if (AESKey.Len() != RequiredKeyLength)
+		if (bShouldLoad && CachedAESKey.Len() < RequiredKeyLength)
 		{
-			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key[%s] must be 32 characters long!"), *AESKey);
-			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(TEXT("AES encryption key must be 32 characters long!"));
+			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key[%s] must be %d characters long!"), *CachedAESKey, RequiredKeyLength);
+			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key[%s] must be %d characters long!"), *CachedAESKey, RequiredKeyLength));
 			bShouldLoad = false;
 		}
 
-		if (!FCString::IsPureAnsi(*AESKey))
+		if (bShouldLoad && CachedAESKey.Len() > RequiredKeyLength)
 		{
-			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key[%s] must be a pure ANSI string!"), *AESKey);
-			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(TEXT("AES encryption key must be a pure ANSI string!"));
+			UE_LOG(LogPakFile, Warning, TEXT("AES encryption key[%s] is more than %d characters long, so will be truncated!"), *CachedAESKey, RequiredKeyLength);
+			CachedAESKey = CachedAESKey.Left(RequiredKeyLength);
+			bShouldLoad = true;
+		}
+
+		if (bShouldLoad && !FCString::IsPureAnsi(*CachedAESKey))
+		{
+			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key[%s] must be a pure ANSI string!"), *CachedAESKey);
+			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key[%s] must be a pure ANSI string!"), *CachedAESKey));
 			bShouldLoad = false;
 		}
 
 		if (bShouldLoad)
 		{
-			CachedAESKey = AESKey;
-			UE_LOG(LogPakAnalyzer, Log, TEXT("Use AES encryption key[%s] for %s."), *AESKey, *InPakPath);
+			UE_LOG(LogPakAnalyzer, Log, TEXT("Use AES encryption key[%s] for %s."), *CachedAESKey, *InPakPath);
 			FCoreDelegates::GetPakEncryptionKeyDelegate().BindLambda(
-				[AESKey](uint8 OutKey[32])
+				[this](uint8 OutKey[32])
 				{
-					FMemory::Memcpy(OutKey, TCHAR_TO_ANSI(*AESKey), 32);
+					FMemory::Memcpy(OutKey, TCHAR_TO_ANSI(*CachedAESKey), CachedAESKey.Len());
 				});
 		}
 	}
