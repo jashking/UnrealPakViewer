@@ -6,7 +6,9 @@
 
 #include "HAL/CriticalSection.h"
 #include "IPlatformFilePak.h"
+#include "Misc/AES.h"
 #include "Misc/Guid.h"
+#include "Misc/SecureHash.h"
 
 #include "IPakAnalyzer.h"
 
@@ -35,6 +37,7 @@ protected:
 	void RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const;
 
 	bool PreLoadPak(const FString& InPakPath);
+	bool ValidateEncryptionKey(TArray<uint8>& IndexData, const FSHAHash& InExpectedHash, const FAES::FAESKey& InAESKey);
 
 protected:
 	FCriticalSection CriticalSection;

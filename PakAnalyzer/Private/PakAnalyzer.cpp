@@ -5,9 +5,7 @@
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFile.h"
 #include "Launch/Resources/Version.h"
-#include "Misc/AES.h"
 #include "Misc/Base64.h"
-#include "Misc/Guid.h"
 #include "Misc/Paths.h"
 #include "Misc/ScopeLock.h"
 #include "Serialization/Archive.h"
@@ -296,7 +294,14 @@ bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
 		}
 	} while (!bShouldLoad && CompatibleVersion >= FPakInfo::PakFile_Version_Initial);
 
-	if (bShouldLoad && (Info.bEncryptedIndex || Info.EncryptionKeyGuid.IsValid()))
+	if (!bShouldLoad)
+	{
+		Reader->Close();
+		delete Reader;
+		return false;
+	}
+
+	if (Info.EncryptionKeyGuid.IsValid() || Info.bEncryptedIndex)
 	{
 		const FString KeyString = FPakAnalyzerDelegates::OnGetAESKey.IsBound() ? FPakAnalyzerDelegates::OnGetAESKey.Execute() : TEXT("");
 
@@ -318,20 +323,34 @@ bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
 			bShouldLoad = false;
 		}
 
-		FMemory::Memcpy(AESKey.Key, DecodedBuffer.GetData(), FAES::FAESKey::KeySize);
-
 		if (bShouldLoad)
 		{
-			UE_LOG(LogPakAnalyzer, Log, TEXT("Use AES encryption key base64[%s] for %s."), *KeyString, *InPakPath);
-			FCoreDelegates::GetPakEncryptionKeyDelegate().BindLambda(
-				[AESKey](uint8 OutKey[32])
-				{
-					FMemory::Memcpy(OutKey, AESKey.Key, 32);
-				});
+			FMemory::Memcpy(AESKey.Key, DecodedBuffer.GetData(), FAES::FAESKey::KeySize);
 
-			if (Info.EncryptionKeyGuid.IsValid())
+			TArray<uint8> PrimaryIndexData;
+			Reader->Seek(Info.IndexOffset);
+			PrimaryIndexData.SetNum(Info.IndexSize);
+			Reader->Serialize(PrimaryIndexData.GetData(), Info.IndexSize);
+
+			if (!ValidateEncryptionKey(PrimaryIndexData, Info.IndexHash, AESKey))
 			{
-				FCoreDelegates::GetRegisterEncryptionKeyMulticastDelegate().Broadcast(Info.EncryptionKeyGuid, AESKey);
+				UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] is not correct!"), *KeyString);
+				FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key base64[%s] is not correct!"), *KeyString));
+				bShouldLoad = false;
+			}
+			else
+			{
+				UE_LOG(LogPakAnalyzer, Log, TEXT("Use AES encryption key base64[%s] for %s."), *KeyString, *InPakPath);
+				FCoreDelegates::GetPakEncryptionKeyDelegate().BindLambda(
+					[AESKey](uint8 OutKey[32])
+					{
+						FMemory::Memcpy(OutKey, AESKey.Key, 32);
+					});
+
+				if (Info.EncryptionKeyGuid.IsValid())
+				{
+					FCoreDelegates::GetRegisterEncryptionKeyMulticastDelegate().Broadcast(Info.EncryptionKeyGuid, AESKey);
+				}
 			}
 		}
 	}
@@ -340,4 +359,14 @@ bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
 	delete Reader;
 
 	return bShouldLoad;
+}
+
+bool FPakAnalyzer::ValidateEncryptionKey(TArray<uint8>& IndexData, const FSHAHash& InExpectedHash, const FAES::FAESKey& InAESKey)
+{
+	FAES::DecryptData(IndexData.GetData(), IndexData.Num(), InAESKey);
+
+	// Check SHA1 value.
+	FSHAHash ActualHash;
+	FSHA1::HashBuffer(IndexData.GetData(), IndexData.Num(), ActualHash.Hash);
+	return InExpectedHash == ActualHash;
 }
