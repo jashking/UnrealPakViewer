@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "HAL/CriticalSection.h"
+#include "IPlatformFilePak.h"
 #include "Misc/Guid.h"
 
 #include "IPakAnalyzer.h"
@@ -45,4 +46,6 @@ protected:
 	FGuid LoadGuid;
 
 	FPakFileSumary PakFileSumary;
+
+	TArray<FPakEntry> Files;
 };

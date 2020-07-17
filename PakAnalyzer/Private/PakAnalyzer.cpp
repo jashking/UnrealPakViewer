@@ -10,28 +10,15 @@
 #include "Misc/Guid.h"
 #include "Misc/Paths.h"
 #include "Misc/ScopeLock.h"
-#include "IPlatformFilePak.h"
 #include "Serialization/Archive.h"
 
 #include "CommonDefines.h"
 
 #if ENGINE_MINOR_VERSION >= 26
-typedef FPakFile::FFilenameIterator RecordIterator;
+typedef FPakFile::FPakEntryIterator RecordIterator;
 #else
 typedef FPakFile::FFileIterator RecordIterator;
 #endif
-
-struct FNamedAESKey
-{
-	FString Name;
-	FGuid Guid;
-	FAES::FAESKey Key;
-
-	bool IsValid() const
-	{
-		return Key.IsValid();
-	}
-};
 
 FPakAnalyzer::FPakAnalyzer()
 {
@@ -115,9 +102,24 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 	{
 		FScopeLock Lock(&CriticalSection);
 
+		// Allocate enough memory to hold all entries (and not reallocate while they're being added to it).
+		Files.Empty(Records.Num());
+
 		for (auto It : Records)
 		{
-			InsertTreeNode(It.Filename(), &It.Info(), false);
+			const int32 Index = Files.Add(It.Info());
+
+#if ENGINE_MINOR_VERSION >= 26
+			PakFile->ReadHashFromPayload(It.Info(), Files[Index].Hash);
+
+			const FString* Filename = It.TryGetFilename();
+			if (Filename)
+			{
+				InsertTreeNode(*Filename, &Files[Index], false);
+			}
+#else
+			InsertTreeNode(It.Filename(), &Files[Index], false);
+#endif
 		}
 
 		RefreshTreeNode(TreeRoot);
@@ -170,6 +172,7 @@ void FPakAnalyzer::Reset()
 	PakFileSumary.PakFileSize = 0;
 
 	TreeRoot.Reset();
+	Files.Empty();
 }
 
 FPakTreeEntryPtr FPakAnalyzer::InsertTreeNode(const FString& InFullPath, const FPakEntry* InEntry, bool bIsDirectory)
@@ -293,17 +296,14 @@ bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
 		}
 	} while (!bShouldLoad && CompatibleVersion >= FPakInfo::PakFile_Version_Initial);
 
-	if (Info.bEncryptedIndex)
+	if (bShouldLoad && (Info.bEncryptedIndex || Info.EncryptionKeyGuid.IsValid()))
 	{
 		const FString KeyString = FPakAnalyzerDelegates::OnGetAESKey.IsBound() ? FPakAnalyzerDelegates::OnGetAESKey.Execute() : TEXT("");
 
-		FNamedAESKey NewKey;
-		NewKey.Name = TEXT("Default");
-		NewKey.Guid = FGuid();
-		const uint32 RequiredKeyLength = sizeof(NewKey.Key);
+		FAES::FAESKey AESKey;
 
-		TArray<uint8> Key;
-		if (!FBase64::Decode(KeyString, Key))
+		TArray<uint8> DecodedBuffer;
+		if (!FBase64::Decode(KeyString, DecodedBuffer))
 		{
 			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] is not base64 format!"), *KeyString);
 			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key[%s] is not base64 format!"), *KeyString));
@@ -311,21 +311,28 @@ bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
 		}
 
 		// Error checking
-		if (bShouldLoad && Key.Num() != RequiredKeyLength)
+		if (bShouldLoad && DecodedBuffer.Num() != FAES::FAESKey::KeySize)
 		{
-			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] can not decode to %d bytes long!"), *KeyString, RequiredKeyLength);
-			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key base64[%s] can not decode to %d bytes long!"), *KeyString, RequiredKeyLength));
+			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] can not decode to %d bytes long!"), *KeyString, FAES::FAESKey::KeySize);
+			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key base64[%s] can not decode to %d bytes long!"), *KeyString, FAES::FAESKey::KeySize));
 			bShouldLoad = false;
 		}
+
+		FMemory::Memcpy(AESKey.Key, DecodedBuffer.GetData(), FAES::FAESKey::KeySize);
 
 		if (bShouldLoad)
 		{
 			UE_LOG(LogPakAnalyzer, Log, TEXT("Use AES encryption key base64[%s] for %s."), *KeyString, *InPakPath);
 			FCoreDelegates::GetPakEncryptionKeyDelegate().BindLambda(
-				[Key](uint8 OutKey[32])
+				[AESKey](uint8 OutKey[32])
 				{
-					FMemory::Memcpy(OutKey, Key.GetData(), Key.Num());
+					FMemory::Memcpy(OutKey, AESKey.Key, 32);
 				});
+
+			if (Info.EncryptionKeyGuid.IsValid())
+			{
+				FCoreDelegates::GetRegisterEncryptionKeyMulticastDelegate().Broadcast(Info.EncryptionKeyGuid, AESKey);
+			}
 		}
 	}
 
