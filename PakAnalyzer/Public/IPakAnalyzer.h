@@ -19,4 +19,5 @@ public:
 	virtual bool IsLoadDirty(const FString& InGuid) const = 0;
 	virtual const FPakFileSumary& GetPakFileSumary() const = 0;
 	virtual FPakTreeEntryPtr GetPakTreeRootNode() const = 0;
+	virtual FString ResolveCompressionMethod(int32 InMethod) const = 0;
 };

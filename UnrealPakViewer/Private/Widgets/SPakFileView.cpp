@@ -5,6 +5,7 @@
 #include "EditorStyle.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "IPlatformFilePak.h"
+#include "Launch/Resources/Version.h"
 #include "Misc/Guid.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Layout/SBorder.h"
@@ -114,6 +115,14 @@ public:
 				SNew(SBox).Padding(FMargin(4.0, 0.0))
 				[
 					SNew(STextBlock).Text(this, &SPakFileRow::GetCompressionBlockSize).ToolTipText(this, &SPakFileRow::GetCompressionBlockSizeToolTip)
+				];
+		}
+		else if (ColumnName == FFileColumn::CompressionMethodColumnName)
+		{
+			return
+				SNew(SBox).Padding(FMargin(4.0, 0.0))
+				[
+					SNew(STextBlock).Text(this, &SPakFileRow::GetCompressionMethod)
 				];
 		}
 		else if (ColumnName == FFileColumn::SHA1ColumnName)
@@ -277,6 +286,23 @@ protected:
 		}
 	}
 
+	FText GetCompressionMethod() const
+	{
+		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		{
+#if ENGINE_MINOR_VERSION >= 22
+			return FText::FromString(IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(PakFileItemPin->PakEntry->CompressionMethodIndex));
+#else
+			return FText::FromString(IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(PakFileItemPin->PakEntry->CompressionMethod));
+#endif
+		}
+		else
+		{
+			return FText();
+		}
+	}
+
 	FText GetSHA1() const
 	{
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
@@ -379,7 +405,7 @@ void SPakFileView::Construct(const FArguments& InArgs)
 							SAssignNew(FileListView, SListView<FPakFileEntryPtr>)
 							.ExternalScrollbar(ExternalScrollbar)
 							.ItemHeight(20.f)
-							.SelectionMode(ESelectionMode::Single)
+							.SelectionMode(ESelectionMode::Multi)
 							//.OnMouseButtonClick()
 							//.OnSelectiongChanged()
 							.ListItemsSource(&FileCache)
@@ -619,7 +645,7 @@ void SPakFileView::OnBuildExportMenu(FMenuBuilder& MenuBuilder)
 		MenuBuilder.AddMenuEntry
 		(
 			LOCTEXT("ContextMenu_Export_Selected_To_Json", "Export Selected File"),
-			LOCTEXT("ContextMenu_Export_Selected_To_Json_Desc", "Export selected file to json"),
+			LOCTEXT("ContextMenu_Export_Selected_To_Json_Desc", "Export selected file(s) to json"),
 			FSlateIcon(),
 			FUIAction
 			(
@@ -649,7 +675,7 @@ void SPakFileView::OnBuildExportMenu(FMenuBuilder& MenuBuilder)
 		MenuBuilder.AddMenuEntry
 		(
 			LOCTEXT("ContextMenu_Export_Selected_To_Csv", "Export Selected File"),
-			LOCTEXT("ContextMenu_Export_Selected_To_Csv_Desc", "Export selected file to csv"),
+			LOCTEXT("ContextMenu_Export_Selected_To_Csv_Desc", "Export selected file(s) to csv"),
 			FSlateIcon(),
 			FUIAction
 			(
@@ -757,8 +783,9 @@ void SPakFileView::InitializeAndShowHeaderColumns()
 	);
 	
 	FileColumns.Emplace(FFileColumn::CompressionBlockSizeColumnName, FFileColumn(6, FFileColumn::CompressionBlockSizeColumnName, LOCTEXT("CompressionBlockSizeColumn", "Compression Block Size"), LOCTEXT("CompressionBlockSizeColumnTip", "File compression block size"), 155.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
-	FileColumns.Emplace(FFileColumn::SHA1ColumnName, FFileColumn(7, FFileColumn::SHA1ColumnName, LOCTEXT("SHA1Column", "SHA1"), LOCTEXT("SHA1ColumnTip", "File sha1"), 315.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
-	FileColumns.Emplace(FFileColumn::IsEncryptedColumnName, FFileColumn(8, FFileColumn::IsEncryptedColumnName, LOCTEXT("IsEncryptedColumn", "IsEncrypted"), LOCTEXT("IsEncryptedColumnTip", "Is file encrypted in pak?"), 70.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(FFileColumn::CompressionMethodColumnName, FFileColumn(7, FFileColumn::CompressionMethodColumnName, LOCTEXT("CompressionMethod", "Compression Method"), LOCTEXT("CompressionMethodTip", "Compression method name used to compress this file"), 125.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(FFileColumn::SHA1ColumnName, FFileColumn(8, FFileColumn::SHA1ColumnName, LOCTEXT("SHA1Column", "SHA1"), LOCTEXT("SHA1ColumnTip", "File sha1"), 315.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(FFileColumn::IsEncryptedColumnName, FFileColumn(9, FFileColumn::IsEncryptedColumnName, LOCTEXT("IsEncryptedColumn", "IsEncrypted"), LOCTEXT("IsEncryptedColumnTip", "Is file encrypted in pak?"), 70.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
 
 	// Show columns.
 	for (const auto& ColumnPair : FileColumns)
@@ -957,6 +984,7 @@ void SPakFileView::OnCopyAllColumnsExecute()
 			Value += FString::Printf(TEXT("Compressed Size: %lld\n"), PakFileItem->PakEntry->Size);
 			Value += FString::Printf(TEXT("Compression Block Count: %d\n"), PakFileItem->PakEntry->CompressionBlocks.Num());
 			Value += FString::Printf(TEXT("Compression Block Size: %u\n"), PakFileItem->PakEntry->CompressionBlockSize);
+			//Value += FString::Printf(TEXT("Compression Method: %s\n"), *BytesToHex(PakFileItem->PakEntry->Hash, sizeof(PakFileItem->PakEntry->Hash)));
 			Value += FString::Printf(TEXT("SHA1: %s\n"), *BytesToHex(PakFileItem->PakEntry->Hash, sizeof(PakFileItem->PakEntry->Hash)));
 			Value += FString::Printf(TEXT("Compressed Size: %s\n"), PakFileItem->PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False"));
 
@@ -1001,6 +1029,10 @@ void SPakFileView::OnCopyColumnExecute(const FName ColumnId)
 			else if (ColumnId == FFileColumn::CompressionBlockSizeColumnName)
 			{
 				Value = FString::Printf(TEXT("Compression Block Size: %u"), PakFileItem->PakEntry->CompressionBlockSize);
+			}
+			else if (ColumnId == FFileColumn::CompressionMethodColumnName)
+			{
+				//Value = FString::Printf(TEXT("Compression Block Size: %u"), PakFileItem->PakEntry->CompressionBlockSize);
 			}
 			else if (ColumnId == FFileColumn::SHA1ColumnName)
 			{

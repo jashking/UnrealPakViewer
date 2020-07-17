@@ -26,6 +26,7 @@ public:
 	static const FName CompressedSizeColumnName;
 	static const FName CompressionBlockCountColumnName;
 	static const FName CompressionBlockSizeColumnName;
+	static const FName CompressionMethodColumnName;
 	static const FName SHA1ColumnName;
 	static const FName IsEncryptedColumnName;
 

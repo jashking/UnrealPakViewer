@@ -57,6 +57,7 @@ protected:
 	FORCEINLINE FText GetSelectionCompressionBlockCount() const;
 	FORCEINLINE FText GetSelectionCompressionBlockSize() const;
 	FORCEINLINE FText GetSelectionCompressionBlockSizeToolTip() const;
+	FORCEINLINE FText GetCompressionMethod() const;
 	FORCEINLINE FText GetSelectionSHA1() const;
 	FORCEINLINE FText GetSelectionIsEncrypted() const;
 	FORCEINLINE FText GetSelectionFileCount() const;
@@ -74,7 +75,8 @@ protected:
 	TSharedPtr<SKeyValueRow> OffsetRow;
 	TSharedPtr<SKeyValueRow> CompressionBlockCountRow;
 	TSharedPtr<SKeyValueRow> CompressionBlockSizeRow;
-	TSharedPtr<SKeyValueRow> SHA1SizeRow;
+	TSharedPtr<SKeyValueRow> CompressionMethodRow;
+	TSharedPtr<SKeyValueRow> SHA1Row;
 	TSharedPtr<SKeyValueRow> IsEncryptedRow;
 
 	TSharedPtr<SKeyValueRow> FileCountRow;

@@ -119,7 +119,14 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 			.AutoHeight()
 			.Padding(0.f, 0.f)
 			[
-				SAssignNew(SHA1SizeRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_SHA1", "SHA1:")).ValueText(this, &SPakTreeView::GetSelectionSHA1)
+				SAssignNew(CompressionMethodRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressionMethod", "Compression Method:")).ValueText(this, &SPakTreeView::GetCompressionMethod)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f)
+			[
+				SAssignNew(SHA1Row, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_SHA1", "SHA1:")).ValueText(this, &SPakTreeView::GetSelectionSHA1)
 			]
 
 			+ SVerticalBox::Slot()
@@ -233,7 +240,8 @@ void SPakTreeView::OnSelectionChanged(FPakTreeEntryPtr SelectedItem, ESelectInfo
 	OffsetRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 	CompressionBlockCountRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 	CompressionBlockSizeRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
-	SHA1SizeRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+	CompressionMethodRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+	SHA1Row->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 	IsEncryptedRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 
 	FileCountRow->SetVisibility(bIsSelectionDirectory ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
@@ -297,6 +305,15 @@ FORCEINLINE FText SPakTreeView::GetSelectionCompressionBlockSize() const
 FORCEINLINE FText SPakTreeView::GetSelectionCompressionBlockSizeToolTip() const
 {
 	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::AsNumber(CurrentSelectedItem->PakEntry->CompressionBlockSize) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetCompressionMethod() const
+{
+#if ENGINE_MINOR_VERSION >= 22
+	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::FromString(IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(CurrentSelectedItem->PakEntry->CompressionMethodIndex)) : FText();
+#else
+	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::FromString(IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(CurrentSelectedItem->PakEntry->CompressionMethod)) : FText();
+#endif
 }
 
 FORCEINLINE FText SPakTreeView::GetSelectionSHA1() const

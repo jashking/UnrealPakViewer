@@ -159,6 +159,36 @@ FPakTreeEntryPtr FPakAnalyzer::GetPakTreeRootNode() const
 	return TreeRoot;
 }
 
+FString FPakAnalyzer::ResolveCompressionMethod(int32 InMethod) const
+{
+	if (!PakFile.IsValid() || !PakFile->IsValid())
+	{
+		return TEXT("");
+	}
+
+#if ENGINE_MINOR_VERSION >= 22
+	if (InMethod >= 0 && InMethod < PakFileSumary.PakInfo->CompressionMethods.Num())
+	{
+		return PakFileSumary.PakInfo->CompressionMethods[InMethod].ToString();
+	}
+	else
+	{
+		return TEXT("Unknown");
+	}
+#else
+	static const TArray<FString> CompressionMethods({ TEXT("None"), TEXT("Zlib"), TEXT("Gzip"), TEXT("Unknown"), TEXT("Custom") });
+
+	if (InMethod >= 0 && InMethod < CompressionMethods.Num())
+	{
+		return CompressionMethods[InMethod];
+	}
+	else
+	{
+		return TEXT("Unknown");
+	}
+#endif
+}
+
 void FPakAnalyzer::Reset()
 {
 	PakFile.Reset();
