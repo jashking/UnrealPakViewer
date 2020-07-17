@@ -349,7 +349,11 @@ bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
 
 				if (Info.EncryptionKeyGuid.IsValid())
 				{
+#if ENGINE_MINOR_VERSION >= 26
 					FCoreDelegates::GetRegisterEncryptionKeyMulticastDelegate().Broadcast(Info.EncryptionKeyGuid, AESKey);
+#else
+					FCoreDelegates::GetRegisterEncryptionKeyDelegate().ExecuteIfBound(Info.EncryptionKeyGuid, AESKey);
+#endif
 				}
 			}
 		}
