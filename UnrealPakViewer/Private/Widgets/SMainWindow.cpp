@@ -12,13 +12,13 @@
 #include "CommonDefines.h"
 #include "PakAnalyzerModule.h"
 #include "SKeyInputWindow.h"
-#include "SPakDetailView.h"
 #include "SPakFileView.h"
+#include "SPakSummaryView.h"
 #include "SPakTreeView.h"
 
 #define LOCTEXT_NAMESPACE "SMainWindow"
 
-static const FName DetailViewTabId("UnrealPakViewerDetailView");
+static const FName SummaryViewTabId("UnrealPakViewerSummaryView");
 static const FName TreeViewTabId("UnrealPakViewerTreeView");
 static const FName FileViewTabId("UnrealPakViewerFileView");
 
@@ -41,7 +41,7 @@ void SMainWindow::Construct(const FArguments& Args)
 	TabManager = FGlobalTabmanager::Get()->NewTabManager(DockTab);
 	TSharedRef<FWorkspaceItem> AppMenuGroup = TabManager->AddLocalWorkspaceMenuCategory(LOCTEXT("UnrealPakViewerMenuGroupName", "UnrealPak Viewer"));
 
-	TabManager->RegisterTabSpawner(DetailViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab_DetailView))
+	TabManager->RegisterTabSpawner(SummaryViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab_SummaryView))
 		.SetDisplayName(LOCTEXT("DetailViewTabTitle", "Detail View"))
 		.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "UnrealPakViewer.Tabs.Tools"))
 		.SetGroup(AppMenuGroup);
@@ -64,7 +64,7 @@ void SMainWindow::Construct(const FArguments& Args)
 			->Split
 			(
 				FTabManager::NewStack()
-				->AddTab(DetailViewTabId, ETabState::OpenedTab)
+				->AddTab(SummaryViewTabId, ETabState::OpenedTab)
 				->SetHideTabWell(true)
 			)
 			->Split
@@ -171,13 +171,13 @@ void SMainWindow::FillOptionsMenu(class FMenuBuilder& MenuBuilder)
 
 }
 
-TSharedRef<class SDockTab> SMainWindow::OnSpawnTab_DetailView(const FSpawnTabArgs& Args)
+TSharedRef<class SDockTab> SMainWindow::OnSpawnTab_SummaryView(const FSpawnTabArgs& Args)
 {
 	const TSharedRef<SDockTab> DockTab = SNew(SDockTab)
 		.ShouldAutosize(true)
 		.TabRole(ETabRole::PanelTab)
 		[
-			SNew(SPakDetailView)
+			SNew(SPakSummaryView)
 		];
 
 	return DockTab;

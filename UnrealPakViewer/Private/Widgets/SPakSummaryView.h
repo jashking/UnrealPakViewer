@@ -4,16 +4,16 @@
 #include "Widgets/SCompoundWidget.h"
 
 /** Implements the Pak Info window. */
-class SPakDetailView : public SCompoundWidget
+class SPakSummaryView : public SCompoundWidget
 {
 public:
 	/** Default constructor. */
-	SPakDetailView();
+	SPakSummaryView();
 
 	/** Virtual destructor. */
-	virtual ~SPakDetailView();
+	virtual ~SPakSummaryView();
 
-	SLATE_BEGIN_ARGS(SPakDetailView) {}
+	SLATE_BEGIN_ARGS(SPakSummaryView) {}
 	SLATE_END_ARGS()
 
 	/** Constructs this widget. */
