@@ -3,6 +3,7 @@
 #include "Async/AsyncWork.h"
 #include "Async/TaskGraphInterfaces.h"
 #include "EditorStyle.h"
+#include "Json.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "IPlatformFilePak.h"
 #include "Launch/Resources/Version.h"
@@ -18,11 +19,20 @@
 
 #include "PakAnalyzerModule.h"
 #include "ViewModels/FileSortAndFilter.h"
+#include "ViewModels/WidgetDelegates.h"
 
 #define LOCTEXT_NAMESPACE "SPakFileView"
 
-// TODO: Compression Method, use index and find in array
 // TODO: Export files in current view
+
+static FString ResolveCompressionMethod(const FPakEntry* InPakEntry)
+{
+#if ENGINE_MINOR_VERSION >= 22
+	return IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(InPakEntry->CompressionMethodIndex);
+#else
+	return IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(InPakEntry->CompressionMethod);
+#endif
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // SPakFileRow
@@ -291,11 +301,7 @@ protected:
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
 		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
 		{
-#if ENGINE_MINOR_VERSION >= 22
-			return FText::FromString(IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(PakFileItemPin->PakEntry->CompressionMethodIndex));
-#else
-			return FText::FromString(IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(PakFileItemPin->PakEntry->CompressionMethod));
-#endif
+			return FText::FromString(ResolveCompressionMethod(PakFileItemPin->PakEntry));
 		}
 		else
 		{
@@ -493,7 +499,7 @@ TSharedPtr<SWidget> SPakFileView::OnGenerateContextMenu()
 		FUIAction Action_JumpToTreeView
 		(
 			FExecuteAction::CreateSP(this, &SPakFileView::OnJumpToTreeViewExecute),
-			FCanExecuteAction::CreateSP(this, &SPakFileView::HasFileSelected)
+			FCanExecuteAction::CreateSP(this, &SPakFileView::HasOneFileSelected)
 		);
 		MenuBuilder.AddMenuEntry
 		(
@@ -590,8 +596,8 @@ void SPakFileView::OnBuildCopyColumnMenu(FMenuBuilder& MenuBuilder)
 
 				MenuBuilder.AddMenuEntry
 				(
-					FText::Format(LOCTEXT("ContextMenu_Columns_CopySingleColumn", "Copy {0}"), Column.GetTitleName()),
-					FText::Format(LOCTEXT("ContextMenu_Columns_CopySingleColumn_Desc", "Copy {0} of selected file to clipboard"), Column.GetTitleName()),
+					FText::Format(LOCTEXT("ContextMenu_Columns_CopySingleColumn", "Copy {0}(s)"), Column.GetTitleName()),
+					FText::Format(LOCTEXT("ContextMenu_Columns_CopySingleColumn_Desc", "Copy {0}(s) of selected file to clipboard"), Column.GetTitleName()),
 					FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_CopyColumn, NAME_None, EUserInterfaceActionType::Button
 				);
 			}
@@ -644,7 +650,7 @@ void SPakFileView::OnBuildExportMenu(FMenuBuilder& MenuBuilder)
 
 		MenuBuilder.AddMenuEntry
 		(
-			LOCTEXT("ContextMenu_Export_Selected_To_Json", "Export Selected File"),
+			LOCTEXT("ContextMenu_Export_Selected_To_Json", "Export Selected File(s)"),
 			LOCTEXT("ContextMenu_Export_Selected_To_Json_Desc", "Export selected file(s) to json"),
 			FSlateIcon(),
 			FUIAction
@@ -674,7 +680,7 @@ void SPakFileView::OnBuildExportMenu(FMenuBuilder& MenuBuilder)
 
 		MenuBuilder.AddMenuEntry
 		(
-			LOCTEXT("ContextMenu_Export_Selected_To_Csv", "Export Selected File"),
+			LOCTEXT("ContextMenu_Export_Selected_To_Csv", "Export Selected File(s)"),
 			LOCTEXT("ContextMenu_Export_Selected_To_Csv_Desc", "Export selected file(s) to csv"),
 			FSlateIcon(),
 			FUIAction
@@ -961,6 +967,13 @@ void SPakFileView::OnShowAllColumnsExecute()
 	}
 }
 
+bool SPakFileView::HasOneFileSelected() const
+{
+	TArray<FPakFileEntryPtr> SelectedItems = FileListView->GetSelectedItems();
+
+	return SelectedItems.Num() == 1;
+}
+
 bool SPakFileView::HasFileSelected() const
 {
 	TArray<FPakFileEntryPtr> SelectedItems = FileListView->GetSelectedItems();
@@ -970,87 +983,105 @@ bool SPakFileView::HasFileSelected() const
 
 void SPakFileView::OnCopyAllColumnsExecute()
 {
+	FString Value;
+
 	TArray<FPakFileEntryPtr> SelectedItems = FileListView->GetSelectedItems();
 	if (SelectedItems.Num() > 0)
 	{
-		FPakFileEntryPtr PakFileItem = SelectedItems[0];
-		if (PakFileItem.IsValid() && PakFileItem->PakEntry)
-		{
-			FString Value;
-			Value = FString::Printf(TEXT("Filename: %s\n"), *PakFileItem->Filename);
-			Value += FString::Printf(TEXT("Path: %s\n"), *PakFileItem->Path);
-			Value += FString::Printf(TEXT("Offset: %lld\n"), PakFileItem->PakEntry->Offset);
-			Value += FString::Printf(TEXT("Size: %lld\n"), PakFileItem->PakEntry->UncompressedSize);
-			Value += FString::Printf(TEXT("Compressed Size: %lld\n"), PakFileItem->PakEntry->Size);
-			Value += FString::Printf(TEXT("Compression Block Count: %d\n"), PakFileItem->PakEntry->CompressionBlocks.Num());
-			Value += FString::Printf(TEXT("Compression Block Size: %u\n"), PakFileItem->PakEntry->CompressionBlockSize);
-			//Value += FString::Printf(TEXT("Compression Method: %s\n"), *BytesToHex(PakFileItem->PakEntry->Hash, sizeof(PakFileItem->PakEntry->Hash)));
-			Value += FString::Printf(TEXT("SHA1: %s\n"), *BytesToHex(PakFileItem->PakEntry->Hash, sizeof(PakFileItem->PakEntry->Hash)));
-			Value += FString::Printf(TEXT("Compressed Size: %s\n"), PakFileItem->PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False"));
+		TArray<TSharedPtr<FJsonValue>> FileObjects;
 
-			FPlatformApplicationMisc::ClipboardCopy(*Value);
+		for (const FPakFileEntryPtr PakFileItem : SelectedItems)
+		{
+			if (PakFileItem.IsValid() && PakFileItem->PakEntry)
+			{
+				TSharedRef<FJsonObject> FileObject = MakeShareable(new FJsonObject);
+
+				FileObject->SetStringField(TEXT("Name"), PakFileItem->Filename);
+				FileObject->SetStringField(TEXT("Path"), PakFileItem->Path);
+				FileObject->SetNumberField(TEXT("Offset"), PakFileItem->PakEntry->Offset);
+				FileObject->SetNumberField(TEXT("Size"), PakFileItem->PakEntry->UncompressedSize);
+				FileObject->SetNumberField(TEXT("Compressed Size"), PakFileItem->PakEntry->Size);
+				FileObject->SetNumberField(TEXT("Compressed Block Count"), PakFileItem->PakEntry->CompressionBlocks.Num());
+				FileObject->SetNumberField(TEXT("Compressed Block Size"), PakFileItem->PakEntry->CompressionBlockSize);
+				FileObject->SetStringField(TEXT("Compression Method"), ResolveCompressionMethod(PakFileItem->PakEntry));
+				FileObject->SetStringField(TEXT("SHA1"), BytesToHex(PakFileItem->PakEntry->Hash, sizeof(PakFileItem->PakEntry->Hash)));
+				FileObject->SetStringField(TEXT("IsEncrypted"), PakFileItem->PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False"));
+				//FileObject->SetStringField(TEXT("Class"), GetAssetClass(InAssetRegistryState, It.Filename()));
+
+				FileObjects.Add(MakeShareable(new FJsonValueObject(FileObject)));
+			}
 		}
+
+		TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(&Value);
+		FJsonSerializer::Serialize(FileObjects, JsonWriter);
+		JsonWriter->Close();
 	}
+
+	FPlatformApplicationMisc::ClipboardCopy(*Value);
 }
 
 void SPakFileView::OnCopyColumnExecute(const FName ColumnId)
 {
+	TArray<FString> Values;
 	TArray<FPakFileEntryPtr> SelectedItems = FileListView->GetSelectedItems();
-	if (SelectedItems.Num() > 0)
+
+	for (const FPakFileEntryPtr PakFileItem : SelectedItems)
 	{
-		FPakFileEntryPtr PakFileItem = SelectedItems[0];
 		if (PakFileItem.IsValid() && PakFileItem->PakEntry)
 		{
-			FString Value;
 			if (ColumnId == FFileColumn::NameColumnName)
 			{
-				Value = FString::Printf(TEXT("Filename: %s"), *PakFileItem->Filename);
+				Values.Add(PakFileItem->Filename);
 			}
 			else if (ColumnId == FFileColumn::PathColumnName)
 			{
-				Value = FString::Printf(TEXT("Path: %s"), *PakFileItem->Path);
+				Values.Add(PakFileItem->Path);
 			}
 			else if (ColumnId == FFileColumn::OffsetColumnName)
 			{
-				Value = FString::Printf(TEXT("Offset: %lld"), PakFileItem->PakEntry->Offset);
+				Values.Add(FString::Printf(TEXT("%lld"), PakFileItem->PakEntry->Offset));
 			}
 			else if (ColumnId == FFileColumn::SizeColumnName)
 			{
-				Value = FString::Printf(TEXT("Size: %lld"), PakFileItem->PakEntry->UncompressedSize);
+				Values.Add(FString::Printf(TEXT("%lld"), PakFileItem->PakEntry->UncompressedSize));
 			}
 			else if (ColumnId == FFileColumn::CompressedSizeColumnName)
 			{
-				Value = FString::Printf(TEXT("Compressed Size: %lld"), PakFileItem->PakEntry->Size);
+				Values.Add(FString::Printf(TEXT("%lld"), PakFileItem->PakEntry->Size));
 			}
 			else if (ColumnId == FFileColumn::CompressionBlockCountColumnName)
 			{
-				Value = FString::Printf(TEXT("Compression Block Count: %d"), PakFileItem->PakEntry->CompressionBlocks.Num());
+				Values.Add(FString::Printf(TEXT("%d"), PakFileItem->PakEntry->CompressionBlocks.Num()));
 			}
 			else if (ColumnId == FFileColumn::CompressionBlockSizeColumnName)
 			{
-				Value = FString::Printf(TEXT("Compression Block Size: %u"), PakFileItem->PakEntry->CompressionBlockSize);
+				Values.Add(FString::Printf(TEXT("%u"), PakFileItem->PakEntry->CompressionBlockSize));
 			}
 			else if (ColumnId == FFileColumn::CompressionMethodColumnName)
 			{
-				//Value = FString::Printf(TEXT("Compression Block Size: %u"), PakFileItem->PakEntry->CompressionBlockSize);
+				Values.Add(ResolveCompressionMethod(PakFileItem->PakEntry));
 			}
 			else if (ColumnId == FFileColumn::SHA1ColumnName)
 			{
-				Value = FString::Printf(TEXT("SHA1: %s"), *BytesToHex(PakFileItem->PakEntry->Hash, sizeof(PakFileItem->PakEntry->Hash)));
+				Values.Add(BytesToHex(PakFileItem->PakEntry->Hash, sizeof(PakFileItem->PakEntry->Hash)));
 			}
 			else if (ColumnId == FFileColumn::IsEncryptedColumnName)
 			{
-				Value = FString::Printf(TEXT("Compressed Size: %s"), PakFileItem->PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False"));
+				Values.Add(FString::Printf(TEXT("%s"), PakFileItem->PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False")));
 			}
-
-			FPlatformApplicationMisc::ClipboardCopy(*Value);
 		}
 	}
+
+	FPlatformApplicationMisc::ClipboardCopy(*FString::Join(Values, TEXT("\n")));
 }
 
 void SPakFileView::OnJumpToTreeViewExecute()
 {
-
+	TArray<FPakFileEntryPtr> SelectedItems = FileListView->GetSelectedItems();
+	if (SelectedItems.Num() > 0 && SelectedItems[0].IsValid())
+	{
+		FWidgetDelegates::GetOnSwitchToTreeView().Broadcast(SelectedItems[0]->Path);
+	}
 }
 
 void SPakFileView::MarkDirty(bool bInIsDirty)

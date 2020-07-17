@@ -15,6 +15,7 @@
 #include "SPakFileView.h"
 #include "SPakSummaryView.h"
 #include "SPakTreeView.h"
+#include "ViewModels/WidgetDelegates.h"
 
 #define LOCTEXT_NAMESPACE "SMainWindow"
 
@@ -24,12 +25,14 @@ static const FName FileViewTabId("UnrealPakViewerFileView");
 
 SMainWindow::SMainWindow()
 {
-
+	FWidgetDelegates::GetOnSwitchToFileView().AddRaw(this, &SMainWindow::OnSwitchToFileView);
+	FWidgetDelegates::GetOnSwitchToTreeView().AddRaw(this, &SMainWindow::OnSwitchToTreeView);
 }
 
 SMainWindow::~SMainWindow()
 {
-
+	FWidgetDelegates::GetOnSwitchToFileView().RemoveAll(this);
+	FWidgetDelegates::GetOnSwitchToTreeView().RemoveAll(this);
 }
 
 void SMainWindow::Construct(const FArguments& Args)
@@ -255,6 +258,21 @@ FString SMainWindow::OnGetAESKey()
 	FSlateApplication::Get().AddModalWindow(KeyInputWindow.ToSharedRef(), SharedThis(this), false);
 
 	return EncryptionKey;
+}
+
+void SMainWindow::OnSwitchToTreeView(const FString& InPath)
+{
+	TSharedPtr<SDockTab> TreeViewTab = TabManager->InvokeTab(TreeViewTabId);
+	if (TreeViewTab.IsValid())
+	{
+		TSharedRef<SPakTreeView> TreeView = StaticCastSharedRef<SPakTreeView>(TreeViewTab->GetContent());
+		TreeView->SetDelayExpandItem(InPath);
+	}
+}
+
+void SMainWindow::OnSwitchToFileView(const FString& InPath)
+{
+	TabManager->InvokeTab(FileViewTabId);
 }
 
 FReply SMainWindow::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)

@@ -16,12 +16,10 @@
 
 SPakTreeView::SPakTreeView()
 {
-
 }
 
 SPakTreeView::~SPakTreeView()
 {
-
 }
 
 void SPakTreeView::Construct(const FArguments& InArgs)
@@ -165,6 +163,12 @@ void SPakTreeView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 		}
 	}
 
+	if (!DelayExpandItemPath.IsEmpty())
+	{
+		ExpandTreeItem(DelayExpandItemPath);
+		DelayExpandItemPath = TEXT("");
+	}
+
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 }
 
@@ -245,6 +249,48 @@ void SPakTreeView::OnSelectionChanged(FPakTreeEntryPtr SelectedItem, ESelectInfo
 	IsEncryptedRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 
 	FileCountRow->SetVisibility(bIsSelectionDirectory ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+}
+
+void SPakTreeView::ExpandTreeItem(const FString& InPath)
+{
+	if (!InPath.IsEmpty() && TreeNodes.Num() > 0)
+	{
+		TreeView->ClearExpandedItems();
+		TreeView->ClearSelection();
+
+		FPakTreeEntryPtr ParentEntry = TreeNodes[0];
+		int32 PathIndex = 0;
+		
+		while (ParentEntry.IsValid() && ParentEntry->Children.Num() > 0)
+		{
+			bool bMatchChild = false;
+			for (FPakTreeEntryPtr ChildEntry : ParentEntry->Children)
+			{
+				if (InPath.StartsWith(ChildEntry->Path))
+				{
+					TreeView->SetItemExpansion(ParentEntry, true);
+
+					if (InPath.Equals(ChildEntry->Path, ESearchCase::IgnoreCase))
+					{
+						TreeView->SetItemSelection(ChildEntry, true, ESelectInfo::Direct);
+						return;
+					}
+
+					bMatchChild = true;
+					ParentEntry = ChildEntry;
+					break;
+				}
+			}
+
+			// not found
+			if (!bMatchChild)
+			{
+				TreeView->ClearExpandedItems();
+				TreeView->ClearSelection();
+				break;
+			}
+		}
+	}
 }
 
 FORCEINLINE FText SPakTreeView::GetSelectionName() const

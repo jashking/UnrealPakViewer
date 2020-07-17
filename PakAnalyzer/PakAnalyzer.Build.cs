@@ -4,23 +4,24 @@ using UnrealBuildTool;
 
 public class PakAnalyzer : ModuleRules
 {
-    public PakAnalyzer(ReadOnlyTargetRules Target) : base(Target)
-    {
-        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+	public PakAnalyzer(ReadOnlyTargetRules Target) : base(Target)
+	{
+		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PrivateDependencyModuleNames.AddRange(
-            new string[]
-            {
-                "Core",
-                "PakFileUtilities",
-            }
-        );
+		PrivateDependencyModuleNames.AddRange(
+			new string[]
+			{
+				"Core",
+				"PakFileUtilities",
+				"Json",
+			}
+		);
 
-        PublicDependencyModuleNames.AddRange(
-            new string[]
-            {
-                "PakFile",
-            }
-        );
-    }
+		PublicDependencyModuleNames.AddRange(
+			new string[]
+			{
+				"PakFile",
+			}
+		);
+	}
 }

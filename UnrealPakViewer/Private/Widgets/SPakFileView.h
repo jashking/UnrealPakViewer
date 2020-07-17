@@ -76,6 +76,7 @@ protected:
 	void OnShowAllColumnsExecute();
 
 	// CopyAllColumns (ContextMenu)
+	bool HasOneFileSelected() const;
 	bool HasFileSelected() const;
 	void OnCopyAllColumnsExecute();
 	void OnCopyColumnExecute(const FName ColumnId);

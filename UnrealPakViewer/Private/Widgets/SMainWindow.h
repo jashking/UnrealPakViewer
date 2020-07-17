@@ -31,6 +31,8 @@ protected:
 	void OnLoadPakFile();
 	void OnLoadPakFailed(const FString& InReason);
 	FString OnGetAESKey();
+	void OnSwitchToTreeView(const FString& InPath);
+	void OnSwitchToFileView(const FString& InPath);
 
 	/**
 	 * Called when the user is dropping something onto a widget; terminates drag and drop.

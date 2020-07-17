@@ -33,6 +33,8 @@ public:
 	 */
 	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
+	FORCEINLINE void SetDelayExpandItem(const FString& InPath) { DelayExpandItemPath = InPath; }
+
 protected:
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Tree View - Table Row
@@ -43,6 +45,8 @@ protected:
 	
 	/** Called by STreeView when selection has changed. */
 	void OnSelectionChanged(FPakTreeEntryPtr SelectedItem, ESelectInfo::Type SelectInfo);
+
+	void ExpandTreeItem(const FString& InPath);
 
 	// Detail View
 	FORCEINLINE FText GetSelectionName() const;
@@ -80,4 +84,6 @@ protected:
 	TSharedPtr<SKeyValueRow> IsEncryptedRow;
 
 	TSharedPtr<SKeyValueRow> FileCountRow;
+
+	FString DelayExpandItemPath;
 };
