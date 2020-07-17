@@ -112,7 +112,7 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 			.AutoHeight()
 			.Padding(0.f, 0.f)
 			[
-				SAssignNew(CompressionBlockSizeRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressionBlockSize", "Compression Block Size:")).ValueText(this, &SPakTreeView::GetSelectionCompressionBlockSize)
+				SAssignNew(CompressionBlockSizeRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressionBlockSize", "Compression Block Size:")).ValueText(this, &SPakTreeView::GetSelectionCompressionBlockSize).ValueToolTipText(this, &SPakTreeView::GetSelectionCompressionBlockSizeToolTip)
 			]
 
 			+ SVerticalBox::Slot()
