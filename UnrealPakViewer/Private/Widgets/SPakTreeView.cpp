@@ -273,6 +273,7 @@ void SPakTreeView::ExpandTreeItem(const FString& InPath)
 					if (InPath.Equals(ChildEntry->Path, ESearchCase::IgnoreCase))
 					{
 						TreeView->SetItemSelection(ChildEntry, true, ESelectInfo::Direct);
+						TreeView->RequestScrollIntoView(ChildEntry);
 						return;
 					}
 
