@@ -15,6 +15,7 @@ struct FPakFileEntry : TSharedFromThis<FPakFileEntry>
 	FPakEntry PakEntry;
 	FName Filename;
 	FString Path;
+	FName CompressionMethod;
 };
 
 typedef TSharedPtr<FPakFileEntry> FPakFileEntryPtr;

@@ -12,7 +12,6 @@ public class PakAnalyzer : ModuleRules
 			new string[]
 			{
 				"Core",
-				"PakFileUtilities",
 				"Json",
 			}
 		);

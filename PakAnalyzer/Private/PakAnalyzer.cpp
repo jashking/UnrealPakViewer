@@ -11,6 +11,7 @@
 #include "Serialization/Archive.h"
 
 #include "CommonDefines.h"
+#include "ExtractThreadWorker.h"
 
 #if ENGINE_MINOR_VERSION >= 26
 typedef FPakFile::FPakEntryIterator RecordIterator;
@@ -19,12 +20,15 @@ typedef FPakFile::FFileIterator RecordIterator;
 #endif
 
 FPakAnalyzer::FPakAnalyzer()
+	: ExtractWorkerCount(1)
 {
 	Reset();
+	InitializeExtractWorker();
 }
 
 FPakAnalyzer::~FPakAnalyzer()
 {
+	ShutdownAllExtractWorker();
 	Reset();
 }
 
@@ -163,12 +167,12 @@ FPakTreeEntryPtr FPakAnalyzer::GetPakTreeRootNode() const
 	return TreeRoot;
 }
 
-FString FPakAnalyzer::ResolveCompressionMethod(int32 InMethod) const
+FString FPakAnalyzer::ResolveCompressionMethod(const FPakEntry* InPakEntry) const
 {
 #if ENGINE_MINOR_VERSION >= 22
-	if (InMethod >= 0 && InMethod < PakFileSumary.PakInfo.CompressionMethods.Num())
+	if (InPakEntry->CompressionMethodIndex >= 0 && InPakEntry->CompressionMethodIndex < (uint32)PakFileSumary.PakInfo.CompressionMethods.Num())
 	{
-		return PakFileSumary.PakInfo.CompressionMethods[InMethod].ToString();
+		return PakFileSumary.PakInfo.CompressionMethods[InPakEntry->CompressionMethodIndex].ToString();
 	}
 	else
 	{
@@ -177,15 +181,61 @@ FString FPakAnalyzer::ResolveCompressionMethod(int32 InMethod) const
 #else
 	static const TArray<FString> CompressionMethods({ TEXT("None"), TEXT("Zlib"), TEXT("Gzip"), TEXT("Unknown"), TEXT("Custom") });
 
-	if (InMethod >= 0 && InMethod < CompressionMethods.Num())
+	if (InPakEntry->CompressionMethod >= 0 && InPakEntry->CompressionMethod < CompressionMethods.Num())
 	{
-		return CompressionMethods[InMethod];
+		return CompressionMethods[InPakEntry->CompressionMethod];
 	}
 	else
 	{
 		return TEXT("Unknown");
 	}
 #endif
+}
+
+void FPakAnalyzer::ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles)
+{
+	const int32 WorkerCount = ExtractWorkers.Num();
+	const int32 FileCount = InFiles.Num();
+
+	if (FileCount <= 0 || WorkerCount <= 0)
+	{
+		return;
+	}
+
+	if (!FPaths::DirectoryExists(InOutputPath))
+	{
+		IFileManager::Get().MakeDirectory(*InOutputPath, true);
+	}
+
+	ShutdownAllExtractWorker();
+
+	// Sort by original size
+	InFiles.Sort([](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
+		{
+			return A->PakEntry.UncompressedSize > B->PakEntry.UncompressedSize;
+		});
+
+	// dispatch files to workers
+	TArray<TArray<FPakFileEntry>> TaskFiles;
+	TaskFiles.AddZeroed(WorkerCount);
+
+	TArray<int64> WorkerSize;
+	WorkerSize.AddZeroed(WorkerCount);
+
+	for (int32 i = 0; i < FileCount; ++i)
+	{
+		int32 MinIndex = 0;
+		FMath::Min(WorkerSize, &MinIndex);
+
+		TaskFiles[MinIndex].Add(*InFiles[i]);
+		WorkerSize[MinIndex] += InFiles[i]->PakEntry.UncompressedSize;
+	}
+
+	for (int32 i = 0; i < WorkerCount; ++i)
+	{
+		ExtractWorkers[i]->InitTaskFiles(TaskFiles[i]);
+		ExtractWorkers[i]->StartExtract(PakFileSumary.PakFilePath, PakFileSumary.PakInfo.Version, CachedAESKey, InOutputPath);
+	}
 }
 
 void FPakAnalyzer::Reset()
@@ -233,6 +283,7 @@ void FPakAnalyzer::InsertFileToTree(const FString& InFullPath, const FPakEntry& 
 			if (bLastItem)
 			{
 				NewChild->PakEntry = InPakEntry;
+				NewChild->CompressionMethod = *ResolveCompressionMethod(&InPakEntry);
 			}
 
 			Parent->ChildrenMap.Add(*PathItems[i], NewChild);
@@ -305,6 +356,7 @@ void FPakAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilter
 				if (!Child->bIsDirectory)
 				{
 					FileEntryPtr->PakEntry = Child->PakEntry;
+					FileEntryPtr->CompressionMethod = Child->CompressionMethod;
 				}
 
 				OutFiles.Add(FileEntryPtr);
@@ -400,6 +452,8 @@ bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
 			}
 			else
 			{
+				CachedAESKey = AESKey;
+
 				UE_LOG(LogPakAnalyzer, Log, TEXT("Use AES encryption key base64[%s] for %s."), *KeyString, *InPakPath);
 				FCoreDelegates::GetPakEncryptionKeyDelegate().BindLambda(
 					[AESKey](uint8 OutKey[32])
@@ -433,4 +487,24 @@ bool FPakAnalyzer::ValidateEncryptionKey(TArray<uint8>& IndexData, const FSHAHas
 	FSHAHash ActualHash;
 	FSHA1::HashBuffer(IndexData.GetData(), IndexData.Num(), ActualHash.Hash);
 	return InExpectedHash == ActualHash;
+}
+
+void FPakAnalyzer::InitializeExtractWorker()
+{
+	ShutdownAllExtractWorker();
+
+	ExtractWorkers.Empty();
+	for (int32 i = 0; i < ExtractWorkerCount; ++i)
+	{
+		TSharedPtr<FExtractThreadWorker> Worker = MakeShared<FExtractThreadWorker>();
+		ExtractWorkers.Add(Worker);
+	}
+}
+
+void FPakAnalyzer::ShutdownAllExtractWorker()
+{
+	for (TSharedPtr<FExtractThreadWorker> Worker : ExtractWorkers)
+	{
+		Worker->Shutdown();
+	}
 }

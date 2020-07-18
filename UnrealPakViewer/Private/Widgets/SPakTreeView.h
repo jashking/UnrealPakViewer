@@ -66,6 +66,16 @@ protected:
 	FORCEINLINE FText GetSelectionIsEncrypted() const;
 	FORCEINLINE FText GetSelectionFileCount() const;
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Tree View - Context Menu
+	TSharedPtr<SWidget> OnGenerateContextMenu();
+
+	void OnExtractExecute();
+	void OnJumpToFileViewExecute();
+	bool HasSelection() const;
+
+	void RetriveFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileEntryPtr>& OutFiles);
+
 protected:
 	TSharedPtr<STreeView<FPakTreeEntryPtr>> TreeView;
 	FPakTreeEntryPtr CurrentSelectedItem;

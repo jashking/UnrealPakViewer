@@ -27,10 +27,12 @@ public:
 	virtual bool IsLoadDirty(const FString& InGuid) const override;
 	virtual const FPakFileSumary& GetPakFileSumary() const override;
 	virtual FPakTreeEntryPtr GetPakTreeRootNode() const override;
-	virtual FString ResolveCompressionMethod(int32 InMethod) const override;
+	virtual void ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles) override;
 
 protected:
 	void Reset();
+
+	FString ResolveCompressionMethod(const FPakEntry* InPakEntry) const;
 
 	void InsertFileToTree(const FString& InFullPath, const FPakEntry& InPakEntry);
 	void RefreshTreeNode(FPakTreeEntryPtr InRoot);
@@ -40,6 +42,9 @@ protected:
 	bool PreLoadPak(const FString& InPakPath);
 	bool ValidateEncryptionKey(TArray<uint8>& IndexData, const FSHAHash& InExpectedHash, const FAES::FAESKey& InAESKey);
 
+	void InitializeExtractWorker();
+	void ShutdownAllExtractWorker();
+
 protected:
 	FCriticalSection CriticalSection;
 
@@ -48,4 +53,9 @@ protected:
 	FGuid LoadGuid;
 
 	FPakFileSumary PakFileSumary;
+
+	int32 ExtractWorkerCount;
+	TArray<TSharedPtr<class FExtractThreadWorker>> ExtractWorkers;
+
+	FAES::FAESKey CachedAESKey;
 };

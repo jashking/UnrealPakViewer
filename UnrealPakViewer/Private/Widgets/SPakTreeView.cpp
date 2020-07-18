@@ -1,6 +1,8 @@
 #include "SPakTreeView.h"
 
+#include "DesktopPlatformModule.h"
 #include "EditorStyle.h"
+#include "Framework/Application/SlateApplication.h"
 #include "IPlatformFilePak.h"
 #include "Misc/Guid.h"
 #include "Misc/Paths.h"
@@ -39,7 +41,7 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 			.OnGetChildren(this, &SPakTreeView::OnGetTreeNodeChildren)
 			.OnGenerateRow(this, &SPakTreeView::OnGenerateTreeRow)
 			.OnSelectionChanged(this, &SPakTreeView::OnSelectionChanged)
-			//.OnContextMenuOpening(this, &SUnrealPakViewer::OnContextMenuOpening)
+			.OnContextMenuOpening(this, &SPakTreeView::OnGenerateContextMenu)
 			//.ClearSelectionOnClick(false)
 			//.OnMouseButtonDoubleClick(this, &SUnrealPakViewer::OnTreeItemDoubleClicked)
 		]
@@ -362,11 +364,7 @@ FORCEINLINE FText SPakTreeView::GetCompressionMethod() const
 {
 	const FPakEntry* PakEntry = CurrentSelectedItem.IsValid() ? &CurrentSelectedItem->PakEntry : nullptr;
 
-#if ENGINE_MINOR_VERSION >= 22
-	return PakEntry ? FText::FromString(IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(PakEntry->CompressionMethodIndex)) : FText();
-#else
-	return PakEntry ? FText::FromString(IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(PakEntry->CompressionMethod)) : FText();
-#endif
+	return PakEntry ? FText::FromName(CurrentSelectedItem->CompressionMethod) : FText();
 }
 
 FORCEINLINE FText SPakTreeView::GetSelectionSHA1() const
@@ -384,6 +382,117 @@ FORCEINLINE FText SPakTreeView::GetSelectionIsEncrypted() const
 FORCEINLINE FText SPakTreeView::GetSelectionFileCount() const
 {
 	return CurrentSelectedItem.IsValid() && CurrentSelectedItem->bIsDirectory ? FText::AsNumber(CurrentSelectedItem->FileCount) : FText();
+}
+
+TSharedPtr<SWidget> SPakTreeView::OnGenerateContextMenu()
+{
+	FMenuBuilder MenuBuilder(true, nullptr);
+
+	// Extract menu
+	MenuBuilder.BeginSection("Extract", LOCTEXT("ContextMenu_Header_Extract", "Extract"));
+	{
+		FUIAction Action_Extract
+		(
+			FExecuteAction::CreateSP(this, &SPakTreeView::OnExtractExecute),
+			FCanExecuteAction::CreateSP(this, &SPakTreeView::HasSelection)
+		);
+		MenuBuilder.AddMenuEntry
+		(
+			LOCTEXT("ContextMenu_Extract", "Extract..."),
+			LOCTEXT("ContextMenu_Extract_Desc", "Extract current selected file or folder to disk"),
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_Extract, NAME_None, EUserInterfaceActionType::Button
+		);
+	}
+	MenuBuilder.EndSection();
+
+	// Extract menu
+	MenuBuilder.BeginSection("Operation", LOCTEXT("ContextMenu_Header_Operation", "Operation"));
+	{
+		FUIAction Action_JumpToFileView
+		(
+			FExecuteAction::CreateSP(this, &SPakTreeView::OnJumpToFileViewExecute),
+			FCanExecuteAction::CreateSP(this, &SPakTreeView::HasSelection)
+		);
+		MenuBuilder.AddMenuEntry
+		(
+			LOCTEXT("ContextMenu_JumpToFileView", "Jump To File View"),
+			LOCTEXT("ContextMenu_JumpToFileView_Desc", "Show current selected file in file view"),
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_JumpToFileView, NAME_None, EUserInterfaceActionType::Button
+		);
+	}
+	MenuBuilder.EndSection();
+
+	return MenuBuilder.MakeWidget();
+}
+
+void SPakTreeView::OnExtractExecute()
+{
+	bool bOpened = false;
+	FString OutputPath;
+
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (DesktopPlatform)
+	{
+		FSlateApplication::Get().CloseToolTip();
+
+		bOpened = DesktopPlatform->OpenDirectoryDialog(
+			FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr),
+			LOCTEXT("OpenExtractDialogTitleText", "Select output path...").ToString(),
+			TEXT(""),
+			OutputPath);
+	}
+
+	if (!bOpened)
+	{
+		return;
+	}
+
+	TArray<FPakFileEntryPtr> TargetFiles;
+
+	TArray<FPakTreeEntryPtr> SelectedItems;
+	TreeView->GetSelectedItems(SelectedItems);
+	for (FPakTreeEntryPtr PakTreeEntry : SelectedItems)
+	{
+		RetriveFiles(PakTreeEntry, TargetFiles);
+	}
+
+	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExtractFiles(OutputPath, TargetFiles);
+}
+
+void SPakTreeView::OnJumpToFileViewExecute()
+{
+
+}
+
+bool SPakTreeView::HasSelection() const
+{
+	TArray<FPakTreeEntryPtr> SelectedItems;
+	TreeView->GetSelectedItems(SelectedItems);
+
+	return SelectedItems.Num() > 0;
+}
+
+void SPakTreeView::RetriveFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileEntryPtr>& OutFiles)
+{
+	if (InRoot->bIsDirectory)
+	{
+		for (auto& Pair : InRoot->ChildrenMap)
+		{
+			FPakTreeEntryPtr Child = Pair.Value;
+			if (Child->bIsDirectory)
+			{
+				RetriveFiles(Child, OutFiles);
+			}
+			else
+			{
+				OutFiles.Add(StaticCastSharedPtr<FPakFileEntry>(Child));
+			}
+		}
+	}
+	else
+	{
+		OutFiles.Add(StaticCastSharedPtr<FPakFileEntry>(InRoot));
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

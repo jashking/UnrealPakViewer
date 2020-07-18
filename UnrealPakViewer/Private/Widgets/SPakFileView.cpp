@@ -6,7 +6,6 @@
 #include "Json.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "IPlatformFilePak.h"
-#include "Launch/Resources/Version.h"
 #include "Misc/Guid.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Layout/SBorder.h"
@@ -22,17 +21,6 @@
 #include "ViewModels/WidgetDelegates.h"
 
 #define LOCTEXT_NAMESPACE "SPakFileView"
-
-// TODO: Export files in current view
-
-static FString ResolveCompressionMethod(const FPakEntry* InPakEntry)
-{
-#if ENGINE_MINOR_VERSION >= 22
-	return IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(InPakEntry->CompressionMethodIndex);
-#else
-	return IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(InPakEntry->CompressionMethod);
-#endif
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // SPakFileRow
@@ -301,7 +289,7 @@ protected:
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
 		if (PakFileItemPin.IsValid())
 		{
-			return FText::FromString(ResolveCompressionMethod(&PakFileItemPin->PakEntry));
+			return FText::FromName(PakFileItemPin->CompressionMethod);
 		}
 		else
 		{
@@ -1004,7 +992,7 @@ void SPakFileView::OnCopyAllColumnsExecute()
 				FileObject->SetNumberField(TEXT("Compressed Size"), PakEntry->Size);
 				FileObject->SetNumberField(TEXT("Compressed Block Count"), PakEntry->CompressionBlocks.Num());
 				FileObject->SetNumberField(TEXT("Compressed Block Size"), PakEntry->CompressionBlockSize);
-				FileObject->SetStringField(TEXT("Compression Method"), ResolveCompressionMethod(PakEntry));
+				FileObject->SetStringField(TEXT("Compression Method"), PakFileItem->CompressionMethod.ToString());
 				FileObject->SetStringField(TEXT("SHA1"), BytesToHex(PakEntry->Hash, sizeof(PakEntry->Hash)));
 				FileObject->SetStringField(TEXT("IsEncrypted"), PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False"));
 				//FileObject->SetStringField(TEXT("Class"), GetAssetClass(InAssetRegistryState, It.Filename()));
@@ -1061,7 +1049,7 @@ void SPakFileView::OnCopyColumnExecute(const FName ColumnId)
 			}
 			else if (ColumnId == FFileColumn::CompressionMethodColumnName)
 			{
-				Values.Add(ResolveCompressionMethod(PakEntry));
+				Values.Add(PakFileItem->CompressionMethod.ToString());
 			}
 			else if (ColumnId == FFileColumn::SHA1ColumnName)
 			{
