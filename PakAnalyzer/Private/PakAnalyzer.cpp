@@ -54,7 +54,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 		return false;
 	}
 
-	PakFile = MakeShared<FPakFile>(*InPakPath, false);
+	TUniquePtr<FPakFile> PakFile = MakeUnique<FPakFile>(*InPakPath, false);
 	if (!PakFile.IsValid())
 	{
 		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Load pak file failed! Create PakFile failed! Path: %s."), *InPakPath));
@@ -76,7 +76,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 
 	// Save pak sumary
 	PakFileSumary.MountPoint = PakFile->GetMountPoint();
-	PakFileSumary.PakInfo = &PakFile->GetInfo();
+	PakFileSumary.PakInfo = PakFile->GetInfo();
 	PakFileSumary.PakFilePath = InPakPath;
 	PakFileSumary.PakFileSize = PakFile->TotalSize();
 
@@ -165,15 +165,10 @@ FPakTreeEntryPtr FPakAnalyzer::GetPakTreeRootNode() const
 
 FString FPakAnalyzer::ResolveCompressionMethod(int32 InMethod) const
 {
-	if (!PakFile.IsValid() || !PakFile->IsValid())
-	{
-		return TEXT("");
-	}
-
 #if ENGINE_MINOR_VERSION >= 22
-	if (InMethod >= 0 && InMethod < PakFileSumary.PakInfo->CompressionMethods.Num())
+	if (InMethod >= 0 && InMethod < PakFileSumary.PakInfo.CompressionMethods.Num())
 	{
-		return PakFileSumary.PakInfo->CompressionMethods[InMethod].ToString();
+		return PakFileSumary.PakInfo.CompressionMethods[InMethod].ToString();
 	}
 	else
 	{
@@ -195,11 +190,10 @@ FString FPakAnalyzer::ResolveCompressionMethod(int32 InMethod) const
 
 void FPakAnalyzer::Reset()
 {
-	PakFile.Reset();
 	LoadGuid.Invalidate();
 
 	PakFileSumary.MountPoint = TEXT("");
-	PakFileSumary.PakInfo = nullptr;
+	PakFileSumary.PakInfo = FPakInfo();
 	PakFileSumary.PakFilePath = TEXT("");
 	PakFileSumary.PakFileSize = 0;
 

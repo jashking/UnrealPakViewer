@@ -45,8 +45,6 @@ protected:
 
 	FPakTreeEntryPtr TreeRoot;
 
-	TSharedPtr<class FPakFile> PakFile;
-
 	FGuid LoadGuid;
 
 	FPakFileSumary PakFileSumary;

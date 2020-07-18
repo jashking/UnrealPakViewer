@@ -47,7 +47,7 @@ typedef TSharedPtr<FPakTreeEntry> FPakTreeEntryPtr;
 
 struct FPakFileSumary
 {
-	const FPakInfo* PakInfo = nullptr;
+	FPakInfo PakInfo;
 	FString MountPoint;
 	FString PakFilePath;
 	int64 PakFileSize;
