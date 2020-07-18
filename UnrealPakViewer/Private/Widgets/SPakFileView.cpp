@@ -456,6 +456,12 @@ void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 
 	if (bIsDirty || PakAnalyzer->IsLoadDirty(LastLoadGuid))
 	{
+		if (PakAnalyzer->IsLoadDirty(LastLoadGuid))
+		{
+			FileCache.Empty();
+			FileListView->RebuildList();
+		}
+
 		if (SortAndFilterTask->IsDone())
 		{
 			LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
