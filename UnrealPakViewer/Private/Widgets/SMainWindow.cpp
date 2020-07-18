@@ -5,6 +5,7 @@
 #include "Framework/Docking/TabManager.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "HAL/PlatformApplicationMisc.h"
+#include "Launch/Resources/Version.h"
 #include "Misc/MessageDialog.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Docking/SDockTab.h"
@@ -262,7 +263,11 @@ FString SMainWindow::OnGetAESKey()
 
 void SMainWindow::OnSwitchToTreeView(const FString& InPath)
 {
+#if ENGINE_MINOR_VERSION >= 26
+	TSharedPtr<SDockTab> TreeViewTab = TabManager->TryInvokeTab(TreeViewTabId);
+#else
 	TSharedPtr<SDockTab> TreeViewTab = TabManager->InvokeTab(TreeViewTabId);
+#endif
 	if (TreeViewTab.IsValid())
 	{
 		TSharedRef<SPakTreeView> TreeView = StaticCastSharedRef<SPakTreeView>(TreeViewTab->GetContent());
@@ -272,7 +277,11 @@ void SMainWindow::OnSwitchToTreeView(const FString& InPath)
 
 void SMainWindow::OnSwitchToFileView(const FString& InPath)
 {
-	TabManager->InvokeTab(FileViewTabId);
+#if ENGINE_MINOR_VERSION >= 26
+	TSharedPtr<SDockTab> TreeViewTab = TabManager->TryInvokeTab(FileViewTabId);
+#else
+	TSharedPtr<SDockTab> TreeViewTab = TabManager->InvokeTab(FileViewTabId);
+#endif
 }
 
 FReply SMainWindow::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)

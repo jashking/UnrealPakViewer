@@ -171,7 +171,7 @@ protected:
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
 		if (PakFileItemPin.IsValid())
 		{
-			return FText::FromString(PakFileItemPin->Filename);
+			return FText::FromName(PakFileItemPin->Filename);
 		}
 		else
 		{
@@ -703,13 +703,13 @@ void SPakFileView::InitializeAndShowHeaderColumns()
 	NameColumn.SetAscendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
-			return A->Filename < B->Filename;
+			return A->Filename.LexicalLess(B->Filename);
 		}
 	);
 	NameColumn.SetDescendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
-			return B->Filename < A->Filename;
+			return B->Filename.LexicalLess(A->Filename);
 		}
 	);
 
@@ -996,7 +996,7 @@ void SPakFileView::OnCopyAllColumnsExecute()
 			{
 				TSharedRef<FJsonObject> FileObject = MakeShareable(new FJsonObject);
 
-				FileObject->SetStringField(TEXT("Name"), PakFileItem->Filename);
+				FileObject->SetStringField(TEXT("Name"), PakFileItem->Filename.ToString());
 				FileObject->SetStringField(TEXT("Path"), PakFileItem->Path);
 				FileObject->SetNumberField(TEXT("Offset"), PakFileItem->PakEntry->Offset);
 				FileObject->SetNumberField(TEXT("Size"), PakFileItem->PakEntry->UncompressedSize);
@@ -1031,7 +1031,7 @@ void SPakFileView::OnCopyColumnExecute(const FName ColumnId)
 		{
 			if (ColumnId == FFileColumn::NameColumnName)
 			{
-				Values.Add(PakFileItem->Filename);
+				Values.Add(PakFileItem->Filename.ToString());
 			}
 			else if (ColumnId == FFileColumn::PathColumnName)
 			{

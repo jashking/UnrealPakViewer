@@ -184,7 +184,7 @@ TSharedRef<ITableRow> SPakTreeView::OnGenerateTreeRow(FPakTreeEntryPtr TreeNode,
 				//.AutoWidth()
 				.HAlign(HAlign_Left)
 				[
-					SNew(STextBlock).Text(FText::FromString(TreeNode->Filename)).ColorAndOpacity(FLinearColor::Green)
+					SNew(STextBlock).Text(FText::FromName(TreeNode->Filename)).ColorAndOpacity(FLinearColor::Green)
 				]
 
 				+ SHorizontalBox::Slot()
@@ -194,7 +194,7 @@ TSharedRef<ITableRow> SPakTreeView::OnGenerateTreeRow(FPakTreeEntryPtr TreeNode,
 					SNew(SBox)
 					.MinDesiredWidth(150.f)
 					.MaxDesiredWidth(200.f)
-					.ToolTipText(FText::Format(LOCTEXT("Tree_View_CompressedPercent", "{0}'s compressed size percent of total compressed size"), FText::FromString(TreeNode->Filename)))
+					.ToolTipText(FText::Format(LOCTEXT("Tree_View_CompressedPercent", "{0}'s compressed size percent of total compressed size"), FText::FromName(TreeNode->Filename)))
 					[
 						SNew(SOverlay)
 
@@ -218,7 +218,7 @@ TSharedRef<ITableRow> SPakTreeView::OnGenerateTreeRow(FPakTreeEntryPtr TreeNode,
 	{
 		return SNew(STableRow<TSharedPtr<FPakTreeEntryPtr>>, OwnerTable)
 			[
-				SNew(STextBlock).Text(FText::FromString(TreeNode->Filename)).ColorAndOpacity(FLinearColor::White)
+				SNew(STextBlock).Text(FText::FromName(TreeNode->Filename)).ColorAndOpacity(FLinearColor::White)
 			];
 	}
 }
@@ -228,7 +228,12 @@ void SPakTreeView::OnGetTreeNodeChildren(FPakTreeEntryPtr InParent, TArray<FPakT
 	if (InParent.IsValid() && InParent->bIsDirectory)
 	{
 		OutChildren.Empty();
-		OutChildren.Append(InParent->Children);
+		
+		for (auto& Pair : InParent->ChildrenMap)
+		{
+			FPakTreeEntryPtr Child = Pair.Value;
+			OutChildren.Add(Child);
+		}
 	}
 }
 
@@ -253,50 +258,45 @@ void SPakTreeView::OnSelectionChanged(FPakTreeEntryPtr SelectedItem, ESelectInfo
 
 void SPakTreeView::ExpandTreeItem(const FString& InPath)
 {
-	if (!InPath.IsEmpty() && TreeNodes.Num() > 0)
+	static const TCHAR* Delims[2] = { TEXT("\\"), TEXT("/") };
+
+	TArray<FString> PathItems;
+	InPath.ParseIntoArray(PathItems, Delims, 2);
+
+	if (PathItems.Num() <= 0 || TreeNodes.Num() <= 0)
 	{
-		TreeView->ClearExpandedItems();
-		TreeView->ClearSelection();
+		return;
+	}
 
-		FPakTreeEntryPtr ParentEntry = TreeNodes[0];
-		int32 PathIndex = 0;
-		
-		while (ParentEntry.IsValid() && ParentEntry->Children.Num() > 0)
+	TreeView->ClearExpandedItems();
+	TreeView->ClearSelection();
+
+	FPakTreeEntryPtr Parent = TreeNodes[0];
+	for (int32 i = 0; i < PathItems.Num(); ++i)
+	{
+		FPakTreeEntryPtr* Child = Parent->ChildrenMap.Find(*PathItems[i]);
+		if (Child)
 		{
-			bool bMatchChild = false;
-			for (FPakTreeEntryPtr ChildEntry : ParentEntry->Children)
+			TreeView->SetItemExpansion(Parent, true);
+			if (i == PathItems.Num() - 1)
 			{
-				if (InPath.StartsWith(ChildEntry->Path))
-				{
-					TreeView->SetItemExpansion(ParentEntry, true);
-
-					if (InPath.Equals(ChildEntry->Path, ESearchCase::IgnoreCase))
-					{
-						TreeView->SetItemSelection(ChildEntry, true, ESelectInfo::Direct);
-						TreeView->RequestScrollIntoView(ChildEntry);
-						return;
-					}
-
-					bMatchChild = true;
-					ParentEntry = ChildEntry;
-					break;
-				}
+				TreeView->SetItemSelection(*Child, true, ESelectInfo::Direct);
+				TreeView->RequestScrollIntoView(*Child);
 			}
 
-			// not found
-			if (!bMatchChild)
-			{
-				TreeView->ClearExpandedItems();
-				TreeView->ClearSelection();
-				break;
-			}
+			Parent = *Child;
+			continue;
+		}
+		else
+		{
+			break;
 		}
 	}
 }
 
 FORCEINLINE FText SPakTreeView::GetSelectionName() const
 {
-	return CurrentSelectedItem.IsValid() ? FText::FromString(CurrentSelectedItem->Filename) : FText();
+	return CurrentSelectedItem.IsValid() ? FText::FromName(CurrentSelectedItem->Filename) : FText();
 }
 
 FORCEINLINE FText SPakTreeView::GetSelectionPath() const

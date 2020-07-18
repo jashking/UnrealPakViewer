@@ -17,14 +17,14 @@ struct FPakFileEntry : TSharedFromThis<FPakFileEntry>
 
 	FPakFileEntry(const FString& InFilename, const FString& InPath, const FPakEntry* InPakEntry)
 		: PakEntry(InPakEntry)
-		, Filename(InFilename)
+		, Filename(*InFilename)
 		, Path(InPath)
 	{
 
 	}
 
 	const FPakEntry* PakEntry;
-	FString Filename;
+	FName Filename;
 	FString Path;
 };
 
@@ -39,7 +39,7 @@ struct FPakTreeEntry : public FPakFileEntry
 	float CompressedSizePercentOfParent;
 
 	bool bIsDirectory;
-	TArray<TSharedPtr<FPakTreeEntry>> Children;
+	TMap<FName, TSharedPtr<FPakTreeEntry>> ChildrenMap;
 
 	FPakTreeEntry(const FString& InFilename, const FString& InPath, const FPakEntry* InPakEntry, bool bInIsDirectory)
 		: FPakFileEntry(InFilename, InPath, InPakEntry)
