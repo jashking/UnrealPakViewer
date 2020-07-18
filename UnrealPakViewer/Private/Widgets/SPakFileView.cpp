@@ -195,9 +195,9 @@ protected:
 	FText GetOffset() const
 	{
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
-		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		if (PakFileItemPin.IsValid())
 		{
-			return FText::AsNumber(PakFileItemPin->PakEntry->Offset);
+			return FText::AsNumber(PakFileItemPin->PakEntry.Offset);
 		}
 		else
 		{
@@ -208,9 +208,9 @@ protected:
 	FText GetSize() const
 	{
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
-		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		if (PakFileItemPin.IsValid())
 		{
-			return FText::AsMemory(PakFileItemPin->PakEntry->UncompressedSize, EMemoryUnitStandard::IEC);
+			return FText::AsMemory(PakFileItemPin->PakEntry.UncompressedSize, EMemoryUnitStandard::IEC);
 		}
 		else
 		{
@@ -221,9 +221,9 @@ protected:
 	FText GetSizeToolTip() const
 	{
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
-		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		if (PakFileItemPin.IsValid())
 		{
-			return FText::AsNumber(PakFileItemPin->PakEntry->UncompressedSize);
+			return FText::AsNumber(PakFileItemPin->PakEntry.UncompressedSize);
 		}
 		else
 		{
@@ -234,9 +234,9 @@ protected:
 	FText GetCompressedSize() const
 	{
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
-		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		if (PakFileItemPin.IsValid())
 		{
-			return FText::AsMemory(PakFileItemPin->PakEntry->Size, EMemoryUnitStandard::IEC);
+			return FText::AsMemory(PakFileItemPin->PakEntry.Size, EMemoryUnitStandard::IEC);
 		}
 		else
 		{
@@ -247,9 +247,9 @@ protected:
 	FText GetCompressedSizeToolTip() const
 	{
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
-		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		if (PakFileItemPin.IsValid())
 		{
-			return FText::AsNumber(PakFileItemPin->PakEntry->Size);
+			return FText::AsNumber(PakFileItemPin->PakEntry.Size);
 		}
 		else
 		{
@@ -260,9 +260,9 @@ protected:
 	FText GetCompressionBlockCount() const
 	{
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
-		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		if (PakFileItemPin.IsValid())
 		{
-			return FText::AsNumber(PakFileItemPin->PakEntry->CompressionBlocks.Num());
+			return FText::AsNumber(PakFileItemPin->PakEntry.CompressionBlocks.Num());
 		}
 		else
 		{
@@ -273,9 +273,9 @@ protected:
 	FText GetCompressionBlockSize() const
 	{
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
-		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		if (PakFileItemPin.IsValid())
 		{
-			return FText::AsMemory(PakFileItemPin->PakEntry->CompressionBlockSize, EMemoryUnitStandard::IEC);
+			return FText::AsMemory(PakFileItemPin->PakEntry.CompressionBlockSize, EMemoryUnitStandard::IEC);
 		}
 		else
 		{
@@ -286,9 +286,9 @@ protected:
 	FText GetCompressionBlockSizeToolTip() const
 	{
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
-		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		if (PakFileItemPin.IsValid())
 		{
-			return FText::AsNumber(PakFileItemPin->PakEntry->CompressionBlockSize);
+			return FText::AsNumber(PakFileItemPin->PakEntry.CompressionBlockSize);
 		}
 		else
 		{
@@ -299,9 +299,9 @@ protected:
 	FText GetCompressionMethod() const
 	{
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
-		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		if (PakFileItemPin.IsValid())
 		{
-			return FText::FromString(ResolveCompressionMethod(PakFileItemPin->PakEntry));
+			return FText::FromString(ResolveCompressionMethod(&PakFileItemPin->PakEntry));
 		}
 		else
 		{
@@ -312,9 +312,9 @@ protected:
 	FText GetSHA1() const
 	{
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
-		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		if (PakFileItemPin.IsValid())
 		{
-			return FText::FromString(BytesToHex(PakFileItemPin->PakEntry->Hash, sizeof(PakFileItemPin->PakEntry->Hash)));
+			return FText::FromString(BytesToHex(PakFileItemPin->PakEntry.Hash, sizeof(PakFileItemPin->PakEntry.Hash)));
 		}
 		else
 		{
@@ -325,9 +325,9 @@ protected:
 	FText GetIsEncrypted() const
 	{
 		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
-		if (PakFileItemPin.IsValid() && PakFileItemPin->PakEntry)
+		if (PakFileItemPin.IsValid())
 		{
-			return FText::FromString(PakFileItemPin->PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False"));
+			return FText::FromString(PakFileItemPin->PakEntry.IsEncrypted() ? TEXT("True") : TEXT("False"));
 		}
 		else
 		{
@@ -452,16 +452,10 @@ void SPakFileView::Construct(const FArguments& InArgs)
 
 void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 
 	if (bIsDirty || PakAnalyzer->IsLoadDirty(LastLoadGuid))
 	{
-		if (PakAnalyzer->IsLoadDirty(LastLoadGuid))
-		{
-			FileCache.Empty();
-			FileListView->RebuildList();
-		}
-
 		if (SortAndFilterTask->IsDone())
 		{
 			LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
@@ -739,13 +733,13 @@ void SPakFileView::InitializeAndShowHeaderColumns()
 	OffsetColumn.SetAscendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
-			return A->PakEntry->Offset < B->PakEntry->Offset;
+			return A->PakEntry.Offset < B->PakEntry.Offset;
 		}
 	);
 	OffsetColumn.SetDescendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
-			return B->PakEntry->Offset < A->PakEntry->Offset;
+			return B->PakEntry.Offset < A->PakEntry.Offset;
 		}
 	);
 
@@ -754,13 +748,13 @@ void SPakFileView::InitializeAndShowHeaderColumns()
 	SizeColumn.SetAscendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
-			return A->PakEntry->UncompressedSize < B->PakEntry->UncompressedSize;
+			return A->PakEntry.UncompressedSize < B->PakEntry.UncompressedSize;
 		}
 	);
 	SizeColumn.SetDescendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
-			return B->PakEntry->UncompressedSize < A->PakEntry->UncompressedSize;
+			return B->PakEntry.UncompressedSize < A->PakEntry.UncompressedSize;
 		}
 	);
 	
@@ -769,13 +763,13 @@ void SPakFileView::InitializeAndShowHeaderColumns()
 	CompressedSizeColumn.SetAscendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
-			return A->PakEntry->Size < B->PakEntry->Size;
+			return A->PakEntry.Size < B->PakEntry.Size;
 		}
 	);
 	CompressedSizeColumn.SetDescendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
-			return B->PakEntry->Size < A->PakEntry->Size;
+			return B->PakEntry.Size < A->PakEntry.Size;
 		}
 	);
 	
@@ -784,13 +778,13 @@ void SPakFileView::InitializeAndShowHeaderColumns()
 	CompressionBlockCountColumn.SetAscendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
-			return A->PakEntry->CompressionBlocks.Num() < B->PakEntry->CompressionBlocks.Num();
+			return A->PakEntry.CompressionBlocks.Num() < B->PakEntry.CompressionBlocks.Num();
 		}
 	);
 	CompressionBlockCountColumn.SetDescendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
-			return B->PakEntry->CompressionBlocks.Num() < A->PakEntry->CompressionBlocks.Num();
+			return B->PakEntry.CompressionBlocks.Num() < A->PakEntry.CompressionBlocks.Num();
 		}
 	);
 	
@@ -998,20 +992,21 @@ void SPakFileView::OnCopyAllColumnsExecute()
 
 		for (const FPakFileEntryPtr PakFileItem : SelectedItems)
 		{
-			if (PakFileItem.IsValid() && PakFileItem->PakEntry)
+			if (PakFileItem.IsValid())
 			{
+				const FPakEntry* PakEntry = &PakFileItem->PakEntry;
 				TSharedRef<FJsonObject> FileObject = MakeShareable(new FJsonObject);
 
 				FileObject->SetStringField(TEXT("Name"), PakFileItem->Filename.ToString());
 				FileObject->SetStringField(TEXT("Path"), PakFileItem->Path);
-				FileObject->SetNumberField(TEXT("Offset"), PakFileItem->PakEntry->Offset);
-				FileObject->SetNumberField(TEXT("Size"), PakFileItem->PakEntry->UncompressedSize);
-				FileObject->SetNumberField(TEXT("Compressed Size"), PakFileItem->PakEntry->Size);
-				FileObject->SetNumberField(TEXT("Compressed Block Count"), PakFileItem->PakEntry->CompressionBlocks.Num());
-				FileObject->SetNumberField(TEXT("Compressed Block Size"), PakFileItem->PakEntry->CompressionBlockSize);
-				FileObject->SetStringField(TEXT("Compression Method"), ResolveCompressionMethod(PakFileItem->PakEntry));
-				FileObject->SetStringField(TEXT("SHA1"), BytesToHex(PakFileItem->PakEntry->Hash, sizeof(PakFileItem->PakEntry->Hash)));
-				FileObject->SetStringField(TEXT("IsEncrypted"), PakFileItem->PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False"));
+				FileObject->SetNumberField(TEXT("Offset"), PakEntry->Offset);
+				FileObject->SetNumberField(TEXT("Size"), PakEntry->UncompressedSize);
+				FileObject->SetNumberField(TEXT("Compressed Size"), PakEntry->Size);
+				FileObject->SetNumberField(TEXT("Compressed Block Count"), PakEntry->CompressionBlocks.Num());
+				FileObject->SetNumberField(TEXT("Compressed Block Size"), PakEntry->CompressionBlockSize);
+				FileObject->SetStringField(TEXT("Compression Method"), ResolveCompressionMethod(PakEntry));
+				FileObject->SetStringField(TEXT("SHA1"), BytesToHex(PakEntry->Hash, sizeof(PakEntry->Hash)));
+				FileObject->SetStringField(TEXT("IsEncrypted"), PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False"));
 				//FileObject->SetStringField(TEXT("Class"), GetAssetClass(InAssetRegistryState, It.Filename()));
 
 				FileObjects.Add(MakeShareable(new FJsonValueObject(FileObject)));
@@ -1033,8 +1028,9 @@ void SPakFileView::OnCopyColumnExecute(const FName ColumnId)
 
 	for (const FPakFileEntryPtr PakFileItem : SelectedItems)
 	{
-		if (PakFileItem.IsValid() && PakFileItem->PakEntry)
+		if (PakFileItem.IsValid())
 		{
+			const FPakEntry* PakEntry = &PakFileItem->PakEntry;
 			if (ColumnId == FFileColumn::NameColumnName)
 			{
 				Values.Add(PakFileItem->Filename.ToString());
@@ -1045,35 +1041,35 @@ void SPakFileView::OnCopyColumnExecute(const FName ColumnId)
 			}
 			else if (ColumnId == FFileColumn::OffsetColumnName)
 			{
-				Values.Add(FString::Printf(TEXT("%lld"), PakFileItem->PakEntry->Offset));
+				Values.Add(FString::Printf(TEXT("%lld"), PakEntry->Offset));
 			}
 			else if (ColumnId == FFileColumn::SizeColumnName)
 			{
-				Values.Add(FString::Printf(TEXT("%lld"), PakFileItem->PakEntry->UncompressedSize));
+				Values.Add(FString::Printf(TEXT("%lld"), PakEntry->UncompressedSize));
 			}
 			else if (ColumnId == FFileColumn::CompressedSizeColumnName)
 			{
-				Values.Add(FString::Printf(TEXT("%lld"), PakFileItem->PakEntry->Size));
+				Values.Add(FString::Printf(TEXT("%lld"), PakEntry->Size));
 			}
 			else if (ColumnId == FFileColumn::CompressionBlockCountColumnName)
 			{
-				Values.Add(FString::Printf(TEXT("%d"), PakFileItem->PakEntry->CompressionBlocks.Num()));
+				Values.Add(FString::Printf(TEXT("%d"), PakEntry->CompressionBlocks.Num()));
 			}
 			else if (ColumnId == FFileColumn::CompressionBlockSizeColumnName)
 			{
-				Values.Add(FString::Printf(TEXT("%u"), PakFileItem->PakEntry->CompressionBlockSize));
+				Values.Add(FString::Printf(TEXT("%u"), PakEntry->CompressionBlockSize));
 			}
 			else if (ColumnId == FFileColumn::CompressionMethodColumnName)
 			{
-				Values.Add(ResolveCompressionMethod(PakFileItem->PakEntry));
+				Values.Add(ResolveCompressionMethod(PakEntry));
 			}
 			else if (ColumnId == FFileColumn::SHA1ColumnName)
 			{
-				Values.Add(BytesToHex(PakFileItem->PakEntry->Hash, sizeof(PakFileItem->PakEntry->Hash)));
+				Values.Add(BytesToHex(PakEntry->Hash, sizeof(PakEntry->Hash)));
 			}
 			else if (ColumnId == FFileColumn::IsEncryptedColumnName)
 			{
-				Values.Add(FString::Printf(TEXT("%s"), PakFileItem->PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False")));
+				Values.Add(FString::Printf(TEXT("%s"), PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False")));
 			}
 		}
 	}

@@ -18,7 +18,7 @@ public:
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
 
-	virtual TSharedPtr<IPakAnalyzer> GetPakAnalyzer() override;
+	virtual IPakAnalyzer* GetPakAnalyzer() override;
 
 protected:
 	TSharedPtr<FPakAnalyzer> AnalyzerInstance;
@@ -36,7 +36,7 @@ void FPakAnalyzerModule::ShutdownModule()
 	AnalyzerInstance.Reset();
 }
 
-TSharedPtr<IPakAnalyzer> FPakAnalyzerModule::GetPakAnalyzer()
+IPakAnalyzer* FPakAnalyzerModule::GetPakAnalyzer()
 {
-	return AnalyzerInstance;
+	return AnalyzerInstance.Get();
 }

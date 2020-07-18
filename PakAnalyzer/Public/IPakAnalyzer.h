@@ -6,6 +6,8 @@
 
 #include "PakFileEntry.h"
 
+struct FPakEntry;
+
 class IPakAnalyzer
 {
 public:

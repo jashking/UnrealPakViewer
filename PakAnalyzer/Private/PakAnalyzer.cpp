@@ -81,7 +81,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 	PakFileSumary.PakFileSize = PakFile->TotalSize();
 
 	// Make tree root
-	TreeRoot = MakeShared<FPakTreeEntry>(FPaths::GetCleanFilename(InPakPath), PakFileSumary.MountPoint, nullptr, true);
+	TreeRoot = MakeShared<FPakTreeEntry>(FPaths::GetCleanFilename(InPakPath), PakFileSumary.MountPoint, true);
 
 	UE_LOG(LogPakAnalyzer, Log, TEXT("Load all file info from pak."));
 
@@ -103,24 +103,22 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 
 	{
 		FScopeLock Lock(&CriticalSection);
-
-		// Allocate enough memory to hold all entries (and not reallocate while they're being added to it).
-		Files.Empty(Records.Num());
+		FPakEntry PakEntry;
 
 		for (auto It : Records)
 		{
-			const int32 Index = Files.Add(It.Info());
+			PakEntry = It.Info();
 
 #if ENGINE_MINOR_VERSION >= 26
-			PakFile->ReadHashFromPayload(It.Info(), Files[Index].Hash);
+			PakFile->ReadHashFromPayload(PakEntry, PakEntry.Hash);
 
 			const FString* Filename = It.TryGetFilename();
 			if (Filename)
 			{
-				InsertFileToTree(*Filename, &Files[Index]);
+				InsertFileToTree(*Filename, PakEntry);
 			}
 #else
-			InsertFileToTree(It.Filename(), &Files[Index]);
+			InsertFileToTree(It.Filename(), PakEntry);
 #endif
 		}
 
@@ -206,14 +204,9 @@ void FPakAnalyzer::Reset()
 	PakFileSumary.PakFileSize = 0;
 
 	TreeRoot.Reset();
-
-	{
-		FScopeLock Lock(&CriticalSection);
-		Files.Empty();
-	}
 }
 
-void FPakAnalyzer::InsertFileToTree(const FString& InFullPath, const FPakEntry* InEntry)
+void FPakAnalyzer::InsertFileToTree(const FString& InFullPath, const FPakEntry& InPakEntry)
 {
 	static const TCHAR* Delims[2] = { TEXT("\\"), TEXT("/") };
 
@@ -241,7 +234,13 @@ void FPakAnalyzer::InsertFileToTree(const FString& InFullPath, const FPakEntry* 
 		else
 		{
 			const bool bLastItem = (i == PathItems.Num() - 1);
-			FPakTreeEntryPtr NewChild = MakeShared<FPakTreeEntry>(PathItems[i], CurrentPath, bLastItem ? InEntry : nullptr, !bLastItem);
+
+			FPakTreeEntryPtr NewChild = MakeShared<FPakTreeEntry>(PathItems[i], CurrentPath, !bLastItem);
+			if (bLastItem)
+			{
+				NewChild->PakEntry = InPakEntry;
+			}
+
 			Parent->ChildrenMap.Add(*PathItems[i], NewChild);
 			Parent = NewChild;
 		}
@@ -260,8 +259,8 @@ void FPakAnalyzer::RefreshTreeNode(FPakTreeEntryPtr InRoot)
 		else
 		{
 			Child->FileCount = 1;
-			Child->Size = Child->PakEntry->UncompressedSize;
-			Child->CompressedSize = Child->PakEntry->Size;
+			Child->Size = Child->PakEntry.UncompressedSize;
+			Child->CompressedSize = Child->PakEntry.Size;
 		}
 
 		InRoot->FileCount += Child->FileCount;
@@ -308,7 +307,12 @@ void FPakAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilter
 		{
 			if (InFilterText.IsEmpty() || /*Child->Filename.Contains(InFilterText) ||*/ Child->Path.Contains(InFilterText))
 			{
-				FPakFileEntryPtr FileEntryPtr = MakeShared<FPakFileEntry>(Child->Filename.ToString(), Child->Path, Child->PakEntry);
+				FPakFileEntryPtr FileEntryPtr = MakeShared<FPakFileEntry>(Child->Filename.ToString(), Child->Path);
+				if (!Child->bIsDirectory)
+				{
+					FileEntryPtr->PakEntry = Child->PakEntry;
+				}
+
 				OutFiles.Add(FileEntryPtr);
 			}
 		}

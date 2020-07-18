@@ -32,7 +32,7 @@ public:
 protected:
 	void Reset();
 
-	void InsertFileToTree(const FString& InFullPath, const FPakEntry* InEntry);
+	void InsertFileToTree(const FString& InFullPath, const FPakEntry& InPakEntry);
 	void RefreshTreeNode(FPakTreeEntryPtr InRoot);
 	void RefreshTreeNodeSizePercent(FPakTreeEntryPtr InRoot);
 	void RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const;
@@ -50,6 +50,4 @@ protected:
 	FGuid LoadGuid;
 
 	FPakFileSumary PakFileSumary;
-
-	TArray<FPakEntry> Files;
 };

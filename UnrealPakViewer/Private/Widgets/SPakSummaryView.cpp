@@ -126,59 +126,59 @@ void SPakSummaryView::Construct(const FArguments& InArgs)
 
 FORCEINLINE FText SPakSummaryView::GetPakPath() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 
-	return PakAnalyzer.IsValid() ? FText::FromString(PakAnalyzer->GetPakFileSumary().PakFilePath) : FText();
+	return PakAnalyzer ? FText::FromString(PakAnalyzer->GetPakFileSumary().PakFilePath) : FText();
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakMountPoint() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 
-	return PakAnalyzer.IsValid() ? FText::FromString(PakAnalyzer->GetPakFileSumary().MountPoint) : FText();
+	return PakAnalyzer ? FText::FromString(PakAnalyzer->GetPakFileSumary().MountPoint) : FText();
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakVersion() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer.IsValid() ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	const FPakInfo* PakInfo = PakAnalyzer ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
 
 	return PakInfo ? FText::AsNumber(PakInfo->Version) : FText();
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakFileSize() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 
-	return PakAnalyzer.IsValid() ? FText::AsMemory(PakAnalyzer->GetPakFileSumary().PakFileSize, EMemoryUnitStandard::IEC) : FText();
+	return PakAnalyzer ? FText::AsMemory(PakAnalyzer->GetPakFileSumary().PakFileSize, EMemoryUnitStandard::IEC) : FText();
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakFileSizeToolTip() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 
-	return PakAnalyzer.IsValid() ? FText::AsNumber(PakAnalyzer->GetPakFileSumary().PakFileSize) : FText();
+	return PakAnalyzer ? FText::AsNumber(PakAnalyzer->GetPakFileSumary().PakFileSize) : FText();
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakFileCount() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 
-	return PakAnalyzer.IsValid() ? FText::AsNumber(PakAnalyzer->GetFileCount()) : FText();
+	return PakAnalyzer ? FText::AsNumber(PakAnalyzer->GetFileCount()) : FText();
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakHeaderSize() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer.IsValid() ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	const FPakInfo* PakInfo = PakAnalyzer ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
 
 	return PakInfo ? FText::AsMemory(PakAnalyzer->GetPakFileSumary().PakFileSize - PakInfo->IndexOffset - PakInfo->IndexSize, EMemoryUnitStandard::IEC) : FText();
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakHeaderSizeToolTip() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer.IsValid() ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	const FPakInfo* PakInfo = PakAnalyzer ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
 
 	return PakInfo ? FText::AsNumber(PakAnalyzer->GetPakFileSumary().PakFileSize - PakInfo->IndexOffset - PakInfo->IndexSize) : FText();
 
@@ -186,56 +186,56 @@ FORCEINLINE FText SPakSummaryView::GetPakHeaderSizeToolTip() const
 
 FORCEINLINE FText SPakSummaryView::GetPakIndexSize() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer.IsValid() ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	const FPakInfo* PakInfo = PakAnalyzer ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
 
 	return PakInfo ? FText::AsMemory(PakInfo->IndexSize, EMemoryUnitStandard::IEC) : FText();
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakIndexSizeToolTip() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer.IsValid() ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	const FPakInfo* PakInfo = PakAnalyzer ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
 
 	return PakInfo ? FText::AsNumber(PakInfo->IndexSize) : FText();
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakFileIndexHash() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer.IsValid() ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	const FPakInfo* PakInfo = PakAnalyzer ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
 	
 	return PakInfo ? FText::FromString(LexToString(PakInfo->IndexHash)) : FText();
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakFileIndexIsEncrypted() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer.IsValid() ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	const FPakInfo* PakInfo = PakAnalyzer ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
 
 	return PakInfo ? FText::FromString(PakInfo->bEncryptedIndex ? TEXT("True") : TEXT("False")) : FText();
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakFileContentSize() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer.IsValid() ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	const FPakInfo* PakInfo = PakAnalyzer ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
 
 	return PakInfo ? FText::AsMemory(PakInfo->IndexOffset, EMemoryUnitStandard::IEC) : FText();
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakFileContentSizeToolTip() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer.IsValid() ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	const FPakInfo* PakInfo = PakAnalyzer ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
 
 	return PakInfo ? FText::AsNumber(PakInfo->IndexOffset) : FText();
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakFileEncryptionMethods() const
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer.IsValid() ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	const FPakInfo* PakInfo = PakAnalyzer ? PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
 
 	TArray<FString> Methods;
 	if (PakInfo)

@@ -34,5 +34,5 @@ public:
 		return FModuleManager::Get().IsModuleLoaded("PakAnalyzer");
 	}
 
-	virtual TSharedPtr<IPakAnalyzer> GetPakAnalyzer() = 0;
+	virtual IPakAnalyzer* GetPakAnalyzer() = 0;
 };

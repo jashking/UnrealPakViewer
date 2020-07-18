@@ -148,9 +148,9 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 
 void SPakTreeView::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 {
-	TSharedPtr<IPakAnalyzer> PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 
-	if (PakAnalyzer.IsValid() && PakAnalyzer->IsLoadDirty(LastLoadGuid))
+	if (PakAnalyzer && PakAnalyzer->IsLoadDirty(LastLoadGuid))
 	{
 		LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
 
@@ -306,7 +306,8 @@ FORCEINLINE FText SPakTreeView::GetSelectionPath() const
 
 FORCEINLINE FText SPakTreeView::GetSelectionOffset() const
 {
-	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::AsNumber(CurrentSelectedItem->PakEntry->Offset) : FText();
+	const FPakEntry* PakEntry = CurrentSelectedItem.IsValid() ? &CurrentSelectedItem->PakEntry : nullptr;
+	return PakEntry ? FText::AsNumber(PakEntry->Offset) : FText();
 }
 
 FORCEINLINE FText SPakTreeView::GetSelectionSize() const
@@ -341,36 +342,43 @@ FORCEINLINE FText SPakTreeView::GetSelectionCompressedSizePercentOfParent() cons
 
 FORCEINLINE FText SPakTreeView::GetSelectionCompressionBlockCount() const
 {
-	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::AsNumber(CurrentSelectedItem->PakEntry->CompressionBlocks.Num()) : FText();
+	const FPakEntry* PakEntry = CurrentSelectedItem.IsValid() ? &CurrentSelectedItem->PakEntry : nullptr;
+	return PakEntry ? FText::AsNumber(PakEntry->CompressionBlocks.Num()) : FText();
 }
 
 FORCEINLINE FText SPakTreeView::GetSelectionCompressionBlockSize() const
 {
-	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::AsMemory(CurrentSelectedItem->PakEntry->CompressionBlockSize, EMemoryUnitStandard::IEC) : FText();
+	const FPakEntry* PakEntry = CurrentSelectedItem.IsValid() ? &CurrentSelectedItem->PakEntry : nullptr;
+	return PakEntry ? FText::AsMemory(PakEntry->CompressionBlockSize, EMemoryUnitStandard::IEC) : FText();
 }
 
 FORCEINLINE FText SPakTreeView::GetSelectionCompressionBlockSizeToolTip() const
 {
-	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::AsNumber(CurrentSelectedItem->PakEntry->CompressionBlockSize) : FText();
+	const FPakEntry* PakEntry = CurrentSelectedItem.IsValid() ? &CurrentSelectedItem->PakEntry : nullptr;
+	return PakEntry ? FText::AsNumber(PakEntry->CompressionBlockSize) : FText();
 }
 
 FORCEINLINE FText SPakTreeView::GetCompressionMethod() const
 {
+	const FPakEntry* PakEntry = CurrentSelectedItem.IsValid() ? &CurrentSelectedItem->PakEntry : nullptr;
+
 #if ENGINE_MINOR_VERSION >= 22
-	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::FromString(IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(CurrentSelectedItem->PakEntry->CompressionMethodIndex)) : FText();
+	return PakEntry ? FText::FromString(IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(PakEntry->CompressionMethodIndex)) : FText();
 #else
-	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::FromString(IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(CurrentSelectedItem->PakEntry->CompressionMethod)) : FText();
+	return PakEntry ? FText::FromString(IPakAnalyzerModule::Get().GetPakAnalyzer()->ResolveCompressionMethod(PakEntry->CompressionMethod)) : FText();
 #endif
 }
 
 FORCEINLINE FText SPakTreeView::GetSelectionSHA1() const
 {
-	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::FromString(BytesToHex(CurrentSelectedItem->PakEntry->Hash, sizeof(CurrentSelectedItem->PakEntry->Hash))) : FText();
+	const FPakEntry* PakEntry = CurrentSelectedItem.IsValid() ? &CurrentSelectedItem->PakEntry : nullptr;
+	return PakEntry ? FText::FromString(BytesToHex(PakEntry->Hash, sizeof(PakEntry->Hash))) : FText();
 }
 
 FORCEINLINE FText SPakTreeView::GetSelectionIsEncrypted() const
 {
-	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::FromString(CurrentSelectedItem->PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False")) : FText();
+	const FPakEntry* PakEntry = CurrentSelectedItem.IsValid() ? &CurrentSelectedItem->PakEntry : nullptr;
+	return PakEntry ? FText::FromString(PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False")) : FText();
 }
 
 FORCEINLINE FText SPakTreeView::GetSelectionFileCount() const

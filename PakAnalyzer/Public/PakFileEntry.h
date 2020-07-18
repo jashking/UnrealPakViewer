@@ -1,29 +1,18 @@
 #pragma once
 
 #include "CoreMinimal.h"
-
-struct FPakEntry;
-struct FPakInfo;
+#include "IPlatformFilePak.h"
 
 struct FPakFileEntry : TSharedFromThis<FPakFileEntry>
 {
-	FPakFileEntry()
-		: PakEntry(nullptr)
-		, Filename(TEXT(""))
-		, Path(TEXT(""))
-	{
-
-	}
-
-	FPakFileEntry(const FString& InFilename, const FString& InPath, const FPakEntry* InPakEntry)
-		: PakEntry(InPakEntry)
-		, Filename(*InFilename)
+	FPakFileEntry(const FString& InFilename, const FString& InPath)
+		: Filename(*InFilename)
 		, Path(InPath)
 	{
 
 	}
 
-	const FPakEntry* PakEntry;
+	FPakEntry PakEntry;
 	FName Filename;
 	FString Path;
 };
@@ -41,8 +30,8 @@ struct FPakTreeEntry : public FPakFileEntry
 	bool bIsDirectory;
 	TMap<FName, TSharedPtr<FPakTreeEntry>> ChildrenMap;
 
-	FPakTreeEntry(const FString& InFilename, const FString& InPath, const FPakEntry* InPakEntry, bool bInIsDirectory)
-		: FPakFileEntry(InFilename, InPath, InPakEntry)
+	FPakTreeEntry(const FString& InFilename, const FString& InPath, bool bInIsDirectory)
+		: FPakFileEntry(InFilename, InPath)
 		, FileCount(0)
 		, Size(0)
 		, CompressedSize(0)
