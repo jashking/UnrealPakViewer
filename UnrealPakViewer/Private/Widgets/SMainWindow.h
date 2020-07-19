@@ -21,7 +21,6 @@ protected:
 	TSharedRef<SWidget> MakeMainMenu();
 	void FillFileMenu(class FMenuBuilder& MenuBuilder);
 	void FillViewsMenu(class FMenuBuilder& MenuBuilder);
-	void FillOptionsMenu(class FMenuBuilder& MenuBuilder);
 
 	TSharedRef<class SDockTab> OnSpawnTab_SummaryView(const FSpawnTabArgs& Args);
 	TSharedRef<class SDockTab> OnSpawnTab_TreeView(const FSpawnTabArgs& Args);
@@ -33,6 +32,9 @@ protected:
 	FString OnGetAESKey();
 	void OnSwitchToTreeView(const FString& InPath);
 	void OnSwitchToFileView(const FString& InPath);
+
+	void OnOpenOptionsDialog();
+	void OnOpenAboutDialog();
 
 	/**
 	 * Called when the user is dropping something onto a widget; terminates drag and drop.

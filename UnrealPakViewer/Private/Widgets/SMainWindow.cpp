@@ -17,6 +17,7 @@
 #include "SPakFileView.h"
 #include "SPakSummaryView.h"
 #include "SPakTreeView.h"
+#include "UnrealPakViewerStyle.h"
 #include "ViewModels/WidgetDelegates.h"
 
 #define LOCTEXT_NAMESPACE "SMainWindow"
@@ -127,10 +128,28 @@ TSharedRef<SWidget> SMainWindow::MakeMainMenu()
 		FNewMenuDelegate::CreateRaw(this, &SMainWindow::FillViewsMenu)
 	);
 
-	MenuBarBuilder.AddPullDownMenu(
+	MenuBarBuilder.AddMenuEntry(
 		LOCTEXT("OptionsMenu", "Options"),
 		FText::GetEmpty(),
-		FNewMenuDelegate::CreateRaw(this, &SMainWindow::FillOptionsMenu)
+		FSlateIcon(),
+		FUIAction(
+			FExecuteAction::CreateSP(this, &SMainWindow::OnOpenOptionsDialog),
+			FCanExecuteAction()
+		),
+		NAME_None,
+		EUserInterfaceActionType::Button
+	);
+
+	MenuBarBuilder.AddMenuEntry(
+		LOCTEXT("AboutMenu", "About"),
+		FText::GetEmpty(),
+		FSlateIcon(),
+		FUIAction(
+			FExecuteAction::CreateSP(this, &SMainWindow::OnOpenAboutDialog),
+			FCanExecuteAction()
+		),
+		NAME_None,
+		EUserInterfaceActionType::Button
 	);
 
 	// Create the menu bar
@@ -144,17 +163,24 @@ TSharedRef<SWidget> SMainWindow::MakeMainMenu()
 
 void SMainWindow::FillFileMenu(class FMenuBuilder& MenuBuilder)
 {
-	MenuBuilder.AddMenuEntry(
-		LOCTEXT("Open", "Open pak..."),
-		LOCTEXT("Open_ToolTip", "Open an unreal pak file."),
-		FSlateIcon(),
-		FUIAction(
-			FExecuteAction::CreateSP(this, &SMainWindow::OnLoadPakFile),
-			FCanExecuteAction()
-		),
-		NAME_None,
-		EUserInterfaceActionType::Button
-	);
+	MenuBuilder.BeginSection("Load and Save", LOCTEXT("LoadText", "Load"));
+	{
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("Open", "Open pak..."),
+			LOCTEXT("Open_ToolTip", "Open an unreal pak file."),
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "LoadPak"),
+			FUIAction(
+				FExecuteAction::CreateSP(this, &SMainWindow::OnLoadPakFile),
+				FCanExecuteAction()
+			),
+			NAME_None,
+			EUserInterfaceActionType::Button
+		);
+	}
+	MenuBuilder.EndSection();
+
+	MenuBuilder.BeginSection("Recent files", LOCTEXT("RecentFilesText", "Recent files"));
+	MenuBuilder.EndSection();
 }
 
 void SMainWindow::FillViewsMenu(class FMenuBuilder& MenuBuilder)
@@ -169,11 +195,6 @@ void SMainWindow::FillViewsMenu(class FMenuBuilder& MenuBuilder)
 #endif //!WITH_EDITOR
 
 	TabManager->PopulateLocalTabSpawnerMenu(MenuBuilder);
-}
-
-void SMainWindow::FillOptionsMenu(class FMenuBuilder& MenuBuilder)
-{
-
 }
 
 TSharedRef<class SDockTab> SMainWindow::OnSpawnTab_SummaryView(const FSpawnTabArgs& Args)
@@ -283,6 +304,16 @@ void SMainWindow::OnSwitchToFileView(const FString& InPath)
 #else
 	TSharedPtr<SDockTab> TreeViewTab = TabManager->InvokeTab(FileViewTabId);
 #endif
+}
+
+void SMainWindow::OnOpenOptionsDialog()
+{
+
+}
+
+void SMainWindow::OnOpenAboutDialog()
+{
+
 }
 
 FReply SMainWindow::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)

@@ -13,6 +13,7 @@
 
 #include "PakAnalyzerModule.h"
 #include "SKeyValueRow.h"
+#include "UnrealPakViewerStyle.h"
 
 #define LOCTEXT_NAMESPACE "SPakTreeView"
 
@@ -183,8 +184,16 @@ TSharedRef<ITableRow> SPakTreeView::OnGenerateTreeRow(FPakTreeEntryPtr TreeNode,
 				SNew(SHorizontalBox)
 
 				+ SHorizontalBox::Slot()
-				//.AutoWidth()
-				.HAlign(HAlign_Left)
+				.AutoWidth()
+				.Padding(FMargin(2.f, 0.f, 2.f, 0.f))
+				[
+					// FUnrealPakViewerStyle::Get().GetOptionalBrush("FolderClosed")
+					SNew(SImage).Image(this, &SPakTreeView::GetFolderImage, TreeNode).ColorAndOpacity(FLinearColor::Green)
+				]
+
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
 				[
 					SNew(STextBlock).Text(FText::FromName(TreeNode->Filename)).ColorAndOpacity(FLinearColor::Green)
 				]
@@ -384,6 +393,11 @@ FORCEINLINE FText SPakTreeView::GetSelectionFileCount() const
 	return CurrentSelectedItem.IsValid() && CurrentSelectedItem->bIsDirectory ? FText::AsNumber(CurrentSelectedItem->FileCount) : FText();
 }
 
+FORCEINLINE const FSlateBrush* SPakTreeView::GetFolderImage(FPakTreeEntryPtr InTreeNode) const
+{
+	return TreeView->IsItemExpanded(InTreeNode) ? FUnrealPakViewerStyle::Get().GetOptionalBrush("FolderOpen") : FUnrealPakViewerStyle::Get().GetOptionalBrush("FolderClosed");
+}
+
 TSharedPtr<SWidget> SPakTreeView::OnGenerateContextMenu()
 {
 	FMenuBuilder MenuBuilder(true, nullptr);
@@ -400,7 +414,7 @@ TSharedPtr<SWidget> SPakTreeView::OnGenerateContextMenu()
 		(
 			LOCTEXT("ContextMenu_Extract", "Extract..."),
 			LOCTEXT("ContextMenu_Extract_Desc", "Extract current selected file or folder to disk"),
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_Extract, NAME_None, EUserInterfaceActionType::Button
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Extract"), Action_Extract, NAME_None, EUserInterfaceActionType::Button
 		);
 	}
 	MenuBuilder.EndSection();
@@ -417,7 +431,7 @@ TSharedPtr<SWidget> SPakTreeView::OnGenerateContextMenu()
 		(
 			LOCTEXT("ContextMenu_JumpToFileView", "Jump To File View"),
 			LOCTEXT("ContextMenu_JumpToFileView_Desc", "Show current selected file in file view"),
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_JumpToFileView, NAME_None, EUserInterfaceActionType::Button
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Find"), Action_JumpToFileView, NAME_None, EUserInterfaceActionType::Button
 		);
 	}
 	MenuBuilder.EndSection();

@@ -11,6 +11,7 @@
 #include "Stats/Stats2.h"
 #include "Styling/CoreStyle.h"
 
+#include "UnrealPakViewerStyle.h"
 #include "Widgets/SMainWindow.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,6 +55,7 @@ void FUnrealPakViewerApplication::Exec()
 void FUnrealPakViewerApplication::InitializeApplication()
 {
 	FCoreStyle::ResetToDefault();
+	FUnrealPakViewerStyle::Initialize();
 
 	// Load required modules.
 	FModuleManager::Get().LoadModuleChecked("EditorStyle");
@@ -78,4 +80,6 @@ void FUnrealPakViewerApplication::ShutdownApplication()
 {
 	// Shut down application.
 	FSlateApplication::Shutdown();
+
+	FUnrealPakViewerStyle::Shutdown();
 }

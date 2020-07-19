@@ -65,6 +65,7 @@ protected:
 	FORCEINLINE FText GetSelectionSHA1() const;
 	FORCEINLINE FText GetSelectionIsEncrypted() const;
 	FORCEINLINE FText GetSelectionFileCount() const;
+	FORCEINLINE const FSlateBrush* GetFolderImage(FPakTreeEntryPtr InTreeNode) const;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Tree View - Context Menu

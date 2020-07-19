@@ -50,6 +50,7 @@ protected:
 	void OnBuildCopyColumnMenu(FMenuBuilder& MenuBuilder);
 	void OnBuildViewColumnMenu(FMenuBuilder& MenuBuilder);
 	void OnBuildExportMenu(FMenuBuilder& MenuBuilder);
+	void OnBuildExtractMenu(FMenuBuilder& MenuBuilder);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// File List View - Columns

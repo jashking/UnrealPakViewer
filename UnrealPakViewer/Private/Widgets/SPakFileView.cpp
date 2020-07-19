@@ -17,6 +17,7 @@
 #include "Widgets/Views/STableViewBase.h"
 
 #include "PakAnalyzerModule.h"
+#include "UnrealPakViewerStyle.h"
 #include "ViewModels/FileSortAndFilter.h"
 #include "ViewModels/WidgetDelegates.h"
 
@@ -481,6 +482,34 @@ TSharedPtr<SWidget> SPakFileView::OnGenerateContextMenu()
 {
 	FMenuBuilder MenuBuilder(true, nullptr);
 
+	// Extract menu
+	MenuBuilder.BeginSection("Extract", LOCTEXT("ContextMenu_Header_Extract", "Extract"));
+	{
+		MenuBuilder.AddSubMenu
+		(
+			LOCTEXT("ContextMenu_Header_ExtractText", "Extract File(s) "),
+			LOCTEXT("ContextMenu_Header_ExtractText_Desc", "Extract file(s) to disk"),
+			FNewMenuDelegate::CreateSP(this, &SPakFileView::OnBuildExtractMenu),
+			false,
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Extract")
+		);
+	}
+	MenuBuilder.EndSection();
+
+	// Export menu
+	MenuBuilder.BeginSection("Export", LOCTEXT("ContextMenu_Header_Export", "Export"));
+	{
+		MenuBuilder.AddSubMenu
+		(
+			LOCTEXT("ContextMenu_Header_Columns_Export", "Export File(s) Info"),
+			LOCTEXT("ContextMenu_Header_Columns_Export_Desc", "Export file(s) info to json or csv"),
+			FNewMenuDelegate::CreateSP(this, &SPakFileView::OnBuildExportMenu),
+			false,
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export")
+		);
+	}
+	MenuBuilder.EndSection();
+
 	// Operation menu
 	MenuBuilder.BeginSection("Operation", LOCTEXT("ContextMenu_Header_Operation", "Operation"));
 	{
@@ -493,7 +522,7 @@ TSharedPtr<SWidget> SPakFileView::OnGenerateContextMenu()
 		(
 			LOCTEXT("ContextMenu_Columns_JumpToTreeView", "Jump To Tree View"),
 			LOCTEXT("ContextMenu_Columns_JumpToTreeView_Desc", "Show current selected file in tree view"),
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_JumpToTreeView, NAME_None, EUserInterfaceActionType::Button
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Find"), Action_JumpToTreeView, NAME_None, EUserInterfaceActionType::Button
 		);
 
 		MenuBuilder.AddSubMenu
@@ -502,16 +531,7 @@ TSharedPtr<SWidget> SPakFileView::OnGenerateContextMenu()
 			LOCTEXT("ContextMenu_Header_Columns_Copy_Desc", "Copy value of column(s)"),
 			FNewMenuDelegate::CreateSP(this, &SPakFileView::OnBuildCopyColumnMenu),
 			false,
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.CopyColumn")
-		);
-
-		MenuBuilder.AddSubMenu
-		(
-			LOCTEXT("ContextMenu_Header_Columns_Export", "Export File(s)"),
-			LOCTEXT("ContextMenu_Header_Columns_Export_Desc", "Export file(s) to json or csv"),
-			FNewMenuDelegate::CreateSP(this, &SPakFileView::OnBuildExportMenu),
-			false,
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.CopyColumn")
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Copy")
 		);
 	}
 	MenuBuilder.EndSection();
@@ -525,7 +545,7 @@ TSharedPtr<SWidget> SPakFileView::OnGenerateContextMenu()
 			LOCTEXT("ContextMenu_Header_Columns_View_Desc", "Hides or shows columns"),
 			FNewMenuDelegate::CreateSP(this, &SPakFileView::OnBuildViewColumnMenu),
 			false,
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ViewColumn")
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "View")
 		);
 
 		FUIAction Action_ShowAllColumns
@@ -537,7 +557,7 @@ TSharedPtr<SWidget> SPakFileView::OnGenerateContextMenu()
 		(
 			LOCTEXT("ContextMenu_Header_Columns_ShowAllColumns", "Show All Columns"),
 			LOCTEXT("ContextMenu_Header_Columns_ShowAllColumns_Desc", "Resets tree view to show all columns"),
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_ShowAllColumns, NAME_None, EUserInterfaceActionType::Button
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "View"), Action_ShowAllColumns, NAME_None, EUserInterfaceActionType::Button
 		);
 	}
 	MenuBuilder.EndSection();
@@ -563,7 +583,7 @@ void SPakFileView::OnBuildCopyColumnMenu(FMenuBuilder& MenuBuilder)
 		(
 			LOCTEXT("ContextMenu_Columns_CopyAllColumns", "Copy All Columns"),
 			LOCTEXT("ContextMenu_Columns_CopyAllColumns_Desc", "Copy all columns of selected file to clipboard"),
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_CopyAllColumns, NAME_None, EUserInterfaceActionType::Button
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Copy"), Action_CopyAllColumns, NAME_None, EUserInterfaceActionType::Button
 		);
 	}
 	MenuBuilder.EndSection();
@@ -586,7 +606,7 @@ void SPakFileView::OnBuildCopyColumnMenu(FMenuBuilder& MenuBuilder)
 				(
 					FText::Format(LOCTEXT("ContextMenu_Columns_CopySingleColumn", "Copy {0}(s)"), Column.GetTitleName()),
 					FText::Format(LOCTEXT("ContextMenu_Columns_CopySingleColumn_Desc", "Copy {0}(s) of selected file to clipboard"), Column.GetTitleName()),
-					FSlateIcon(FEditorStyle::GetStyleSetName(), "Profiler.EventGraph.ResetColumn"), Action_CopyColumn, NAME_None, EUserInterfaceActionType::Button
+					FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Copy"), Action_CopyColumn, NAME_None, EUserInterfaceActionType::Button
 				);
 			}
 		}
@@ -621,13 +641,13 @@ void SPakFileView::OnBuildViewColumnMenu(FMenuBuilder& MenuBuilder)
 
 void SPakFileView::OnBuildExportMenu(FMenuBuilder& MenuBuilder)
 {
-	MenuBuilder.BeginSection("ExportToJson", LOCTEXT("ContextMenu_Header_Columns_ExportToJson", "Export To Json"));
+	MenuBuilder.BeginSection("ExportToJson", LOCTEXT("ContextMenu_Header_Columns_ExportToJson", "Export File Info To Json"));
 	{
 		MenuBuilder.AddMenuEntry
 		(
 			LOCTEXT("ContextMenu_Export_All_To_Json", "Export All Files"),
 			LOCTEXT("ContextMenu_Export_All_To_Json_Desc", "Export all files in current list to json"),
-			FSlateIcon(),
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export"),
 			FUIAction
 			(
 				FExecuteAction::CreateSP(this, &SPakFileView::OnExportAllFilesToJson),
@@ -640,7 +660,7 @@ void SPakFileView::OnBuildExportMenu(FMenuBuilder& MenuBuilder)
 		(
 			LOCTEXT("ContextMenu_Export_Selected_To_Json", "Export Selected File(s)"),
 			LOCTEXT("ContextMenu_Export_Selected_To_Json_Desc", "Export selected file(s) to json"),
-			FSlateIcon(),
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export"),
 			FUIAction
 			(
 				FExecuteAction::CreateSP(this, &SPakFileView::OnExportSelectedFileToJson),
@@ -651,13 +671,13 @@ void SPakFileView::OnBuildExportMenu(FMenuBuilder& MenuBuilder)
 	}
 	MenuBuilder.EndSection();
 
-	MenuBuilder.BeginSection("ExportToCsv", LOCTEXT("ContextMenu_Header_Columns_ExportToCsv", "Export To Csv"));
+	MenuBuilder.BeginSection("ExportToCsv", LOCTEXT("ContextMenu_Header_Columns_ExportToCsv", "Export File Info To Csv"));
 	{
 		MenuBuilder.AddMenuEntry
 		(
 			LOCTEXT("ContextMenu_Export_All_To_Csv", "Export All Files"),
 			LOCTEXT("ContextMenu_Export_All_To_Csv_Desc", "Export all files in current list to csv"),
-			FSlateIcon(),
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export"),
 			FUIAction
 			(
 				FExecuteAction::CreateSP(this, &SPakFileView::OnExportAllFilesToCsv),
@@ -670,7 +690,7 @@ void SPakFileView::OnBuildExportMenu(FMenuBuilder& MenuBuilder)
 		(
 			LOCTEXT("ContextMenu_Export_Selected_To_Csv", "Export Selected File(s)"),
 			LOCTEXT("ContextMenu_Export_Selected_To_Csv_Desc", "Export selected file(s) to csv"),
-			FSlateIcon(),
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export"),
 			FUIAction
 			(
 				FExecuteAction::CreateSP(this, &SPakFileView::OnExportSelectedFileToCsv),
@@ -680,6 +700,11 @@ void SPakFileView::OnBuildExportMenu(FMenuBuilder& MenuBuilder)
 		);
 	}
 	MenuBuilder.EndSection();
+}
+
+void SPakFileView::OnBuildExtractMenu(FMenuBuilder& MenuBuilder)
+{
+
 }
 
 void SPakFileView::InitializeAndShowHeaderColumns()
