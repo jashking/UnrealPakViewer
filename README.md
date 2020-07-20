@@ -1,12 +1,30 @@
 # UnrealPakViewer ##
 
+![UnrealPakViewer.png](UnrealPakViewer.png)
+
+![FileList.png](FileList.png)
+
+## 编译 ##
+
+将代码克隆到 *Engine\Source\Programs* 目录下，重新生成解决方案编译即可
+
+* 已编译通过的引擎版本
+  * 4.24
+  * 4.25
+  * 4.26
+
+## 特性 ##
+
+* 查看 pak 文件头信息
+* 树形视图查看 pak 文件
+  * 文件夹大小占比进度条
+* 列表视图查看 pak 文件
+  * 支持过滤
+  * 支持升降排序
+* 多线程解压
+
 ## TODO ##
 
-* Pak文件头大学，索引区大小，资源文件内容大小，mount point信息，pak路径信息，总大小
-* 多线程解压，可配置线程数，暂停恢复，取消功能，解压进度显示
-* 树视图，icon图标，占比进度条
-* 文件视图，占比进度条
-* CPU Usage Optimize
 * Pak compare visiualize
 * file group by class or extension
 * resource load heat map
