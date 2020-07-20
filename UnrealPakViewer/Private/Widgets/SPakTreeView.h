@@ -33,7 +33,7 @@ public:
 	 */
 	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
-	FORCEINLINE void SetDelayExpandItem(const FString& InPath) { DelayExpandItemPath = InPath; }
+	FORCEINLINE void SetDelayHighlightItem(const FString& InPath) { DelayHighlightItem = InPath; }
 
 protected:
 	////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,6 +74,7 @@ protected:
 	void OnExtractExecute();
 	void OnJumpToFileViewExecute();
 	bool HasSelection() const;
+	bool HasFileSelection() const;
 	void OnExportToJson();
 	void OnExportToCsv();
 
@@ -98,5 +99,5 @@ protected:
 
 	TSharedPtr<SKeyValueRow> FileCountRow;
 
-	FString DelayExpandItemPath;
+	FString DelayHighlightItem;
 };

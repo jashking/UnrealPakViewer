@@ -166,10 +166,10 @@ void SPakTreeView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 		}
 	}
 
-	if (!DelayExpandItemPath.IsEmpty())
+	if (!DelayHighlightItem.IsEmpty())
 	{
-		ExpandTreeItem(DelayExpandItemPath);
-		DelayExpandItemPath = TEXT("");
+		ExpandTreeItem(DelayHighlightItem);
+		DelayHighlightItem = TEXT("");
 	}
 
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
@@ -456,7 +456,7 @@ TSharedPtr<SWidget> SPakTreeView::OnGenerateContextMenu()
 		FUIAction Action_JumpToFileView
 		(
 			FExecuteAction::CreateSP(this, &SPakTreeView::OnJumpToFileViewExecute),
-			FCanExecuteAction::CreateSP(this, &SPakTreeView::HasSelection)
+			FCanExecuteAction::CreateSP(this, &SPakTreeView::HasFileSelection)
 		);
 		MenuBuilder.AddMenuEntry
 		(
@@ -508,7 +508,11 @@ void SPakTreeView::OnExtractExecute()
 
 void SPakTreeView::OnJumpToFileViewExecute()
 {
-
+	TArray<FPakTreeEntryPtr> SelectedItems = TreeView->GetSelectedItems();
+	if (SelectedItems.Num() > 0 && SelectedItems[0].IsValid())
+	{
+		FWidgetDelegates::GetOnSwitchToFileView().Broadcast(SelectedItems[0]->Path);
+	}
 }
 
 bool SPakTreeView::HasSelection() const
@@ -517,6 +521,14 @@ bool SPakTreeView::HasSelection() const
 	TreeView->GetSelectedItems(SelectedItems);
 
 	return SelectedItems.Num() > 0;
+}
+
+bool SPakTreeView::HasFileSelection() const
+{
+	TArray<FPakTreeEntryPtr> SelectedItems;
+	TreeView->GetSelectedItems(SelectedItems);
+
+	return SelectedItems.Num() > 0 && !SelectedItems[0]->bIsDirectory;
 }
 
 void SPakTreeView::OnExportToJson()

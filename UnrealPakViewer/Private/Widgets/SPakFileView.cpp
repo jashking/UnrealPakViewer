@@ -456,6 +456,12 @@ void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 		}
 	}
 
+	if (!DelayHighlightItem.IsEmpty() && FileCache.Num() > 0)
+	{
+		ScrollToItem(DelayHighlightItem);
+		DelayHighlightItem = TEXT("");
+	}
+
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 }
 
@@ -1184,6 +1190,20 @@ void SPakFileView::OnExtract()
 	const FString PakFileName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
 
 	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExtractFiles(OutputPath / PakFileName, SelectedItems);
+}
+
+void SPakFileView::ScrollToItem(const FString& InPath)
+{
+	for (const FPakFileEntryPtr FileEntry : FileCache)
+	{
+		if (FileEntry->Path.Equals(InPath, ESearchCase::IgnoreCase))
+		{
+			TArray<FPakFileEntryPtr> SelectArray = { FileEntry };
+			FileListView->SetItemSelection(SelectArray, true, ESelectInfo::Direct);
+			FileListView->RequestScrollIntoView(FileEntry);
+			return;
+		}
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

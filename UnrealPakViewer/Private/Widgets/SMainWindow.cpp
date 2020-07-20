@@ -297,17 +297,22 @@ void SMainWindow::OnSwitchToTreeView(const FString& InPath)
 	if (TreeViewTab.IsValid())
 	{
 		TSharedRef<SPakTreeView> TreeView = StaticCastSharedRef<SPakTreeView>(TreeViewTab->GetContent());
-		TreeView->SetDelayExpandItem(InPath);
+		TreeView->SetDelayHighlightItem(InPath);
 	}
 }
 
 void SMainWindow::OnSwitchToFileView(const FString& InPath)
 {
 #if ENGINE_MINOR_VERSION >= 26
-	TSharedPtr<SDockTab> TreeViewTab = TabManager->TryInvokeTab(FileViewTabId);
+	TSharedPtr<SDockTab> FileViewTab = TabManager->TryInvokeTab(FileViewTabId);
 #else
-	TSharedPtr<SDockTab> TreeViewTab = TabManager->InvokeTab(FileViewTabId);
+	TSharedPtr<SDockTab> FileViewTab = TabManager->InvokeTab(FileViewTabId);
 #endif
+	if (FileViewTab.IsValid())
+	{
+		TSharedRef<SPakFileView> FileView = StaticCastSharedRef<SPakFileView>(FileViewTab->GetContent());
+		FileView->SetDelayHighlightItem(InPath);
+	}
 }
 
 void SMainWindow::OnExtractStart()

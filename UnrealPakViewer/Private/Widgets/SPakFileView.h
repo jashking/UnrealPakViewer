@@ -37,6 +37,8 @@ public:
 
 	FText GetSearchText() const;
 
+	FORCEINLINE void SetDelayHighlightItem(const FString& InPath) { DelayHighlightItem = InPath; }
+
 protected:
 	bool SearchBoxIsEnabled() const;
 	void OnSearchBoxTextChanged(const FText& InFilterText);
@@ -93,6 +95,8 @@ protected:
 	void OnExportToCsv();
 	void OnExtract();
 
+	void ScrollToItem(const FString& InPath);
+
 protected:
 	/** External scrollbar used to synchronize file view position. */
 	TSharedPtr<class SScrollBar> ExternalScrollbar;
@@ -123,4 +127,6 @@ protected:
 	bool bIsDirty = false;
 
 	FString LastLoadGuid;
+
+	FString DelayHighlightItem;
 };
