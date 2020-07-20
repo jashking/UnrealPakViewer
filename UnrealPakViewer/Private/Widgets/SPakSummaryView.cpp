@@ -235,18 +235,8 @@ FORCEINLINE FText SPakSummaryView::GetPakFileContentSizeToolTip() const
 FORCEINLINE FText SPakSummaryView::GetPakFileEncryptionMethods() const
 {
 	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer ? &PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
 
-	TArray<FString> Methods;
-	if (PakInfo)
-	{
-		for (const FName& Name : PakInfo->CompressionMethods)
-		{
-			Methods.Add(Name.ToString());
-		}
-	}
-
-	return PakInfo && PakAnalyzer->HasPakLoaded() ? FText::FromString(FString::Join(Methods, TEXT(", "))) : FText();
+	return PakAnalyzer && PakAnalyzer->HasPakLoaded() ? FText::FromString(PakAnalyzer->GetPakFileSumary().CompressionMethods) : FText();
 }
 
 #undef LOCTEXT_NAMESPACE

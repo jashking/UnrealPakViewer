@@ -85,6 +85,13 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 	PakFileSumary.PakFilePath = InPakPath;
 	PakFileSumary.PakFileSize = PakFile->TotalSize();
 
+	TArray<FString> Methods;
+	for (const FName& Name : PakFileSumary.PakInfo.CompressionMethods)
+	{
+		Methods.Add(Name.ToString());
+	}
+	PakFileSumary.CompressionMethods = FString::Join(Methods, TEXT(", "));
+
 	// Make tree root
 	TreeRoot = MakeShared<FPakTreeEntry>(FPaths::GetCleanFilename(InPakPath), PakFileSumary.MountPoint, true);
 
@@ -364,6 +371,7 @@ void FPakAnalyzer::Reset()
 	PakFileSumary.PakInfo = FPakInfo();
 	PakFileSumary.PakFilePath = TEXT("");
 	PakFileSumary.PakFileSize = 0;
+	PakFileSumary.CompressionMethods = TEXT("");
 
 	TreeRoot.Reset();
 

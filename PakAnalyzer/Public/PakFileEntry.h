@@ -52,4 +52,5 @@ struct FPakFileSumary
 	FString MountPoint;
 	FString PakFilePath;
 	int64 PakFileSize;
+	FString CompressionMethods;
 };
