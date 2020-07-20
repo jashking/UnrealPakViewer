@@ -131,6 +131,8 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 		RefreshTreeNodeSizePercent(TreeRoot);
 	}
 
+	bHasPakLoaded = true;
+
 	UE_LOG(LogPakAnalyzer, Log, TEXT("Finish load pak file: %s."), *InPakPath);
 
 	return true;
@@ -349,6 +351,11 @@ bool FPakAnalyzer::ExportToCsv(const FString& InOutputPath, const TArray<FPakFil
 	return bExportResult;
 }
 
+bool FPakAnalyzer::HasPakLoaded() const
+{
+	return bHasPakLoaded;
+}
+
 void FPakAnalyzer::Reset()
 {
 	LoadGuid.Invalidate();
@@ -359,6 +366,8 @@ void FPakAnalyzer::Reset()
 	PakFileSumary.PakFileSize = 0;
 
 	TreeRoot.Reset();
+
+	bHasPakLoaded = false;
 }
 
 void FPakAnalyzer::InsertFileToTree(const FString& InFullPath, const FPakEntry& InPakEntry)

@@ -31,6 +31,7 @@ public:
 	virtual void CancelExtract() override;
 	virtual bool ExportToJson(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) override;
 	virtual bool ExportToCsv(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) override;
+	virtual bool HasPakLoaded() const override;
 
 protected:
 	void Reset();
@@ -74,4 +75,6 @@ protected:
 	TMap<FGuid, FExtractProgress> ExtractWorkerProgresses;
 
 	FAES::FAESKey CachedAESKey;
+
+	bool bHasPakLoaded;
 };

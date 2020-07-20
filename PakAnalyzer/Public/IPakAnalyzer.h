@@ -25,4 +25,5 @@ public:
 	virtual void CancelExtract() = 0;
 	virtual bool ExportToJson(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) = 0;
 	virtual bool ExportToCsv(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) = 0;
+	virtual bool HasPakLoaded() const = 0;
 };
