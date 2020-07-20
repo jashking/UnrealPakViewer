@@ -52,7 +52,7 @@ void SMainWindow::Construct(const FArguments& Args)
 	TSharedRef<FWorkspaceItem> AppMenuGroup = TabManager->AddLocalWorkspaceMenuCategory(LOCTEXT("UnrealPakViewerMenuGroupName", "UnrealPak Viewer"));
 
 	TabManager->RegisterTabSpawner(SummaryViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab_SummaryView))
-		.SetDisplayName(LOCTEXT("DetailViewTabTitle", "Detail View"))
+		.SetDisplayName(LOCTEXT("SummaryViewTabTitle", "Summary View"))
 		.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "UnrealPakViewer.Tabs.Tools"))
 		.SetGroup(AppMenuGroup);
 
