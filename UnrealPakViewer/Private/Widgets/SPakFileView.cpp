@@ -549,7 +549,7 @@ TSharedPtr<SWidget> SPakFileView::OnGenerateContextMenu()
 		);
 		MenuBuilder.AddMenuEntry
 		(
-			LOCTEXT("ContextMenu_Columns_JumpToTreeView", "Jump To Tree View"),
+			LOCTEXT("ContextMenu_Columns_JumpToTreeView", "Show In Tree View"),
 			LOCTEXT("ContextMenu_Columns_JumpToTreeView_Desc", "Show current selected file in tree view"),
 			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Find"), Action_JumpToTreeView, NAME_None, EUserInterfaceActionType::Button
 		);
