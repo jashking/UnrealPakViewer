@@ -10,6 +10,9 @@
 class FExtractThreadWorker : public FRunnable
 {
 public:
+	DECLARE_DELEGATE_FourParams(FOnUpdateExtractProgress, const FGuid& /*WorkerGuid*/, int32 /*CompleteCount*/, int32 /*ErrorCount*/, int32 /*TotalCount*/);
+
+public:
 	FExtractThreadWorker();
 	~FExtractThreadWorker();
 
@@ -23,10 +26,11 @@ public:
 	void StartExtract(const FString& InPakFile, int32 InPakVersion, const FAES::FAESKey& InKey, const FString& InOutputPath);
 	void InitTaskFiles(TArray<FPakFileEntry>& InFiles);
 
+	FOnUpdateExtractProgress& GetOnUpdateExtractProgressDelegate();
+
 protected:
 	bool BufferedCopyFile(FArchive& Dest, FArchive& Source, const FPakEntry& Entry, void* Buffer, int64 BufferSize, const FAES::FAESKey& InKey);
 	bool UncompressCopyFile(FArchive& Dest, FArchive& Source, const FPakEntry& Entry, uint8*& PersistentBuffer, int64& BufferSize, const FAES::FAESKey& InKey, FName InCompressionMethod, bool bHasRelativeCompressedChunkOffsets);
-
 
 protected:
 	class FRunnableThread* Thread;
@@ -39,4 +43,6 @@ protected:
 	int32 PakVersion;
 	FAES::FAESKey AESKey;
 	FString OutputPath;
+
+	FOnUpdateExtractProgress OnUpdateExtractProgress;
 };

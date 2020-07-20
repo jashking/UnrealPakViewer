@@ -32,6 +32,7 @@ protected:
 	FString OnGetAESKey();
 	void OnSwitchToTreeView(const FString& InPath);
 	void OnSwitchToFileView(const FString& InPath);
+	void OnExtractStart();
 
 	void OnOpenOptionsDialog();
 	void OnOpenAboutDialog();

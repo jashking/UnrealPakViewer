@@ -7,12 +7,17 @@
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPakAnalyzer, Log, All);
 
-DECLARE_DELEGATE_RetVal(FString, FOnGetAESKey);
-DECLARE_DELEGATE_OneParam(FOnLoadPakFailed, const FString&)
-
 class FPakAnalyzerDelegates
 {
 public:
+	DECLARE_DELEGATE_RetVal(FString, FOnGetAESKey);
+	DECLARE_DELEGATE_OneParam(FOnLoadPakFailed, const FString&)
+	DECLARE_DELEGATE_ThreeParams(FOnUpdateExtractProgress, int32 /*CompleteCount*/, int32 /*ErrorCount*/, int32 /*TotalCount*/);
+	DECLARE_DELEGATE(FOnExtractStart);
+
+public:
 	static FOnGetAESKey OnGetAESKey;
 	static FOnLoadPakFailed OnLoadPakFailed;
+	static FOnUpdateExtractProgress OnUpdateExtractProgress;
+	static FOnExtractStart OnExtractStart;
 }; 

@@ -28,6 +28,7 @@ public:
 	virtual const FPakFileSumary& GetPakFileSumary() const override;
 	virtual FPakTreeEntryPtr GetPakTreeRootNode() const override;
 	virtual void ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles) override;
+	virtual void CancelExtract() override;
 
 protected:
 	void Reset();
@@ -45,6 +46,18 @@ protected:
 	void InitializeExtractWorker();
 	void ShutdownAllExtractWorker();
 
+	// Extract progress
+	void OnUpdateExtractProgress(const FGuid& WorkerGuid, int32 CompleteCount, int32 ErrorCount, int32 TotalCount);
+
+	struct FExtractProgress
+	{
+		int32 CompleteCount;
+		int32 ErrorCount;
+		int32 TotalCount;
+	};
+
+	void ResetProgress();
+
 protected:
 	FCriticalSection CriticalSection;
 
@@ -56,6 +69,7 @@ protected:
 
 	int32 ExtractWorkerCount;
 	TArray<TSharedPtr<class FExtractThreadWorker>> ExtractWorkers;
+	TMap<FGuid, FExtractProgress> ExtractWorkerProgresses;
 
 	FAES::FAESKey CachedAESKey;
 };

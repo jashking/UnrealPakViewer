@@ -20,7 +20,7 @@ typedef FPakFile::FFileIterator RecordIterator;
 #endif
 
 FPakAnalyzer::FPakAnalyzer()
-	: ExtractWorkerCount(1)
+	: ExtractWorkerCount(4)
 {
 	Reset();
 	InitializeExtractWorker();
@@ -202,6 +202,8 @@ void FPakAnalyzer::ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntr
 		return;
 	}
 
+	FPakAnalyzerDelegates::OnExtractStart.ExecuteIfBound();
+
 	if (!FPaths::DirectoryExists(InOutputPath))
 	{
 		IFileManager::Get().MakeDirectory(*InOutputPath, true);
@@ -231,11 +233,18 @@ void FPakAnalyzer::ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntr
 		WorkerSize[MinIndex] += InFiles[i]->PakEntry.UncompressedSize;
 	}
 
+	ResetProgress();
+
 	for (int32 i = 0; i < WorkerCount; ++i)
 	{
 		ExtractWorkers[i]->InitTaskFiles(TaskFiles[i]);
 		ExtractWorkers[i]->StartExtract(PakFileSumary.PakFilePath, PakFileSumary.PakInfo.Version, CachedAESKey, InOutputPath);
 	}
+}
+
+void FPakAnalyzer::CancelExtract()
+{
+	ShutdownAllExtractWorker();
 }
 
 void FPakAnalyzer::Reset()
@@ -497,8 +506,12 @@ void FPakAnalyzer::InitializeExtractWorker()
 	for (int32 i = 0; i < ExtractWorkerCount; ++i)
 	{
 		TSharedPtr<FExtractThreadWorker> Worker = MakeShared<FExtractThreadWorker>();
+		Worker->GetOnUpdateExtractProgressDelegate().BindRaw(this, &FPakAnalyzer::OnUpdateExtractProgress);
+
 		ExtractWorkers.Add(Worker);
 	}
+
+	ResetProgress();
 }
 
 void FPakAnalyzer::ShutdownAllExtractWorker()
@@ -507,4 +520,34 @@ void FPakAnalyzer::ShutdownAllExtractWorker()
 	{
 		Worker->Shutdown();
 	}
+}
+
+void FPakAnalyzer::OnUpdateExtractProgress(const FGuid& WorkerGuid, int32 CompleteCount, int32 ErrorCount, int32 TotalCount)
+{
+	FFunctionGraphTask::CreateAndDispatchWhenReady([this, &WorkerGuid, CompleteCount, ErrorCount, TotalCount]()
+		{
+			FExtractProgress& Progress = ExtractWorkerProgresses.FindOrAdd(WorkerGuid);
+
+			Progress.CompleteCount = CompleteCount;
+			Progress.ErrorCount = ErrorCount;
+			Progress.TotalCount = TotalCount;
+
+			int32 TotalCompleteCount = 0;
+			int32 TotalErrorCount = 0;
+			int32 TotalTotalCount = 0;
+			for (const auto& It : ExtractWorkerProgresses)
+			{
+				TotalCompleteCount += It.Value.CompleteCount;
+				TotalErrorCount += It.Value.ErrorCount;
+				TotalTotalCount += It.Value.TotalCount;
+			}
+
+			FPakAnalyzerDelegates::OnUpdateExtractProgress.ExecuteIfBound(TotalCompleteCount, TotalErrorCount, TotalTotalCount);
+		},
+		TStatId(), nullptr, ENamedThreads::GameThread);
+}
+
+void FPakAnalyzer::ResetProgress()
+{
+	ExtractWorkerProgresses.Empty(ExtractWorkers.Num());
 }

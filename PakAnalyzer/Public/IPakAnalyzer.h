@@ -22,4 +22,5 @@ public:
 	virtual const FPakFileSumary& GetPakFileSumary() const = 0;
 	virtual FPakTreeEntryPtr GetPakTreeRootNode() const = 0;
 	virtual void ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles) = 0;
+	virtual void CancelExtract() = 0;
 };

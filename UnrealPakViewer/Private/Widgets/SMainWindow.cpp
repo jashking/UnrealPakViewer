@@ -1,5 +1,6 @@
 #include "SMainWindow.h"
 
+#include "Async/TaskGraphInterfaces.h"
 #include "DesktopPlatformModule.h"
 #include "EditorStyleSet.h"
 #include "Framework/Application/SlateApplication.h"
@@ -7,12 +8,14 @@
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "Launch/Resources/Version.h"
+#include "Misc/DateTime.h"
 #include "Misc/MessageDialog.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Docking/SDockTab.h"
 
 #include "CommonDefines.h"
 #include "PakAnalyzerModule.h"
+#include "SExtractProgressWindow.h"
 #include "SKeyInputWindow.h"
 #include "SPakFileView.h"
 #include "SPakSummaryView.h"
@@ -30,6 +33,7 @@ SMainWindow::SMainWindow()
 {
 	FWidgetDelegates::GetOnSwitchToFileView().AddRaw(this, &SMainWindow::OnSwitchToFileView);
 	FWidgetDelegates::GetOnSwitchToTreeView().AddRaw(this, &SMainWindow::OnSwitchToTreeView);
+	FPakAnalyzerDelegates::OnExtractStart.BindRaw(this, &SMainWindow::OnExtractStart);
 }
 
 SMainWindow::~SMainWindow()
@@ -304,6 +308,18 @@ void SMainWindow::OnSwitchToFileView(const FString& InPath)
 #else
 	TSharedPtr<SDockTab> TreeViewTab = TabManager->InvokeTab(FileViewTabId);
 #endif
+}
+
+void SMainWindow::OnExtractStart()
+{
+	FFunctionGraphTask::CreateAndDispatchWhenReady([this]()
+		{
+			TSharedPtr<SExtractProgressWindow> ExtractProgressWindow = SNew(SExtractProgressWindow).StartTime(FDateTime::Now());
+
+			FSlateApplication::Get().AddModalWindow(ExtractProgressWindow.ToSharedRef(), SharedThis(this), true);
+			ExtractProgressWindow->ShowWindow();
+		},
+		TStatId(), nullptr, ENamedThreads::GameThread);
 }
 
 void SMainWindow::OnOpenOptionsDialog()

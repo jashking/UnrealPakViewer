@@ -12,11 +12,14 @@ public:
 	/** Virtual destructor. */
 	virtual ~SKeyValueRow() {}
 
-	SLATE_BEGIN_ARGS(SKeyValueRow) {}
-		SLATE_ATTRIBUTE(FText, KeyText)
-		SLATE_ATTRIBUTE(FText, KeyToolTipText)
-		SLATE_ATTRIBUTE(FText, ValueText)
-		SLATE_ATTRIBUTE(FText, ValueToolTipText)
+	SLATE_BEGIN_ARGS(SKeyValueRow)
+		: _KeyStretchCoefficient(0.4f)
+	{}
+	SLATE_ATTRIBUTE(FText, KeyText)
+	SLATE_ATTRIBUTE(FText, KeyToolTipText)
+	SLATE_ATTRIBUTE(FText, ValueText)
+	SLATE_ATTRIBUTE(FText, ValueToolTipText)
+	SLATE_ATTRIBUTE(float, KeyStretchCoefficient)
 	SLATE_END_ARGS()
 
 	/** Constructs this widget. */
@@ -27,4 +30,5 @@ protected:
 	TAttribute<FText> KeyToolTipText;
 	TAttribute<FText> ValueText;
 	TAttribute<FText> ValueToolTipText;
+	TAttribute<float> KeyStretchCoefficient;
 };

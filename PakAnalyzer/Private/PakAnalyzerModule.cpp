@@ -8,8 +8,10 @@
 
 DEFINE_LOG_CATEGORY(LogPakAnalyzer);
 
-FOnGetAESKey FPakAnalyzerDelegates::OnGetAESKey;
-FOnLoadPakFailed FPakAnalyzerDelegates::OnLoadPakFailed;
+FPakAnalyzerDelegates::FOnGetAESKey FPakAnalyzerDelegates::OnGetAESKey;
+FPakAnalyzerDelegates::FOnLoadPakFailed FPakAnalyzerDelegates::OnLoadPakFailed;
+FPakAnalyzerDelegates::FOnUpdateExtractProgress FPakAnalyzerDelegates::OnUpdateExtractProgress;
+FPakAnalyzerDelegates::FOnExtractStart FPakAnalyzerDelegates::OnExtractStart;
 
 class FPakAnalyzerModule : public IPakAnalyzerModule
 {

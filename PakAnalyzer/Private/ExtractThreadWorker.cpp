@@ -31,13 +31,16 @@ uint32 FExtractThreadWorker::Run()
 {
 	FArchive* ReaderArchive = IFileManager::Get().CreateFileReader(*PakFilePath);
 
-	FPakEntry EntryInfo;
 	const int64 BufferSize = 8 * 1024 * 1024; // 8MB buffer for extracting
 	void* Buffer = FMemory::Malloc(BufferSize);
 	uint8* PersistantCompressionBuffer = NULL;
 	int64 CompressionBufferSize = 0;
 
 	const bool bHasRelativeCompressedChunkOffsets = PakVersion >= FPakInfo::PakFile_Version_RelativeChunkOffsets;
+
+	int32 CompleteCount = 0;
+	int32 ErrorCount = 0;
+	const int32 TotalCount = Files.Num();
 
 	for (const FPakFileEntry& File : Files)
 	{
@@ -47,6 +50,8 @@ uint32 FExtractThreadWorker::Run()
 		}
 
 		ReaderArchive->Seek(File.PakEntry.Offset);
+
+		FPakEntry EntryInfo;
 		EntryInfo.Serialize(*ReaderArchive, PakVersion);
 		if (File.PakEntry == EntryInfo)
 		{
@@ -64,36 +69,55 @@ uint32 FExtractThreadWorker::Run()
 				{
 					if (!BufferedCopyFile(*FileHandle, *ReaderArchive, File.PakEntry, Buffer, BufferSize, AESKey))
 					{
-						// TODO: Add to failed list
+						// Add to failed list
+						++ErrorCount;
+						UE_LOG(LogPakAnalyzer, Error, TEXT("Extract none-compressed file failed! File: %s"), *File.Path);
 					}
 				}
 				else
 				{
 					if (!UncompressCopyFile(*FileHandle, *ReaderArchive, File.PakEntry, PersistantCompressionBuffer, CompressionBufferSize, AESKey, File.CompressionMethod, bHasRelativeCompressedChunkOffsets))
 					{
-						// TODO: Add to failed list
+						// Add to failed list
+						++ErrorCount;
+						UE_LOG(LogPakAnalyzer, Error, TEXT("Extract compressed file failed! File: %s"), *File.Path);
 					}
 				}
 			}
 			else
 			{
-				// TODO: open to write failed
+				// open to write failed
+				++ErrorCount;
+				UE_LOG(LogPakAnalyzer, Error, TEXT("Open local file to write failed! File: %s"), *OutputFilePath);
 			}
 		}
 		else
 		{
-			// TODO: mismatch
+			// mismatch
+			++ErrorCount;
+			UE_LOG(LogPakAnalyzer, Error, TEXT("Extract file failed! PakEntry mismatch! File: %s"), *File.Path);
 		}
 
-		FPlatformProcess::SleepNoStats(0);
+		++CompleteCount;
+
+		OnUpdateExtractProgress.ExecuteIfBound(Guid, CompleteCount, ErrorCount, TotalCount);
+		//FPlatformProcess::SleepNoStats(0);
 	}
 
 	FMemory::Free(Buffer);
 	FMemory::Free(PersistantCompressionBuffer);
-	//UE_LOG(LogPakAnalyzer, Log, TEXT("Extract worker: %s finished, file count: %d."), *Guid.ToString(), Files.Num());
 
 	ReaderArchive->Close();
 	delete ReaderArchive;
+
+	if (CompleteCount == TotalCount)
+	{
+		UE_LOG(LogPakAnalyzer, Log, TEXT("Extract worker: %s finished, file count: %d, error count: %d."), *Guid.ToString(), TotalCount, ErrorCount);
+	}
+	else
+	{
+		UE_LOG(LogPakAnalyzer, Warning, TEXT("Extract worker: %s interrupted, file count: %d, complete count: %d, error count: %d."), *Guid.ToString(), TotalCount, CompleteCount, ErrorCount);
+	}
 
 	StopTaskCounter.Reset();
 	return 0;
@@ -149,6 +173,11 @@ void FExtractThreadWorker::StartExtract(const FString& InPakFile, int32 InPakVer
 void FExtractThreadWorker::InitTaskFiles(TArray<FPakFileEntry>& InFiles)
 {
 	Files = MoveTemp(InFiles);
+}
+
+FExtractThreadWorker::FOnUpdateExtractProgress& FExtractThreadWorker::GetOnUpdateExtractProgressDelegate()
+{
+	return OnUpdateExtractProgress;
 }
 
 bool FExtractThreadWorker::BufferedCopyFile(FArchive& Dest, FArchive& Source, const FPakEntry& Entry, void* Buffer, int64 BufferSize, const FAES::FAESKey& InKey)

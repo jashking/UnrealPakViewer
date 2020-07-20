@@ -55,91 +55,91 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f)
+			.Padding(0.f, 2.f)
 			[
 				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_Name", "Name:")).ValueText(this, &SPakTreeView::GetSelectionName)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f)
+			.Padding(0.f, 2.f)
 			[
 				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_Path", "Path:")).ValueText(this, &SPakTreeView::GetSelectionPath)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f)
+			.Padding(0.f, 2.f)
 			[
 				SAssignNew(OffsetRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_Offset", "Offset:")).ValueText(this, &SPakTreeView::GetSelectionOffset)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f)
+			.Padding(0.f, 2.f)
 			[
 				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_Size", "Size:")).ValueText(this, &SPakTreeView::GetSelectionSize).ValueToolTipText(this, &SPakTreeView::GetSelectionSizeToolTip)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f)
+			.Padding(0.f, 2.f)
 			[
 				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressedSize", "Compressed Size:")).ValueText(this, &SPakTreeView::GetSelectionCompressedSize).ValueToolTipText(this, &SPakTreeView::GetSelectionCompressedSizeToolTip)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f)
+			.Padding(0.f, 2.f)
 			[
 				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressedSizeOfTotal", "Compressed Size Of Total:")).ValueText(this, &SPakTreeView::GetSelectionCompressedSizePercentOfTotal)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f)
+			.Padding(0.f, 2.f)
 			[
 				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressedSizeOfParent", "Compressed Size Of Parent:")).ValueText(this, &SPakTreeView::GetSelectionCompressedSizePercentOfParent)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f)
+			.Padding(0.f, 2.f)
 			[
 				SAssignNew(CompressionBlockCountRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressionBlockCount", "Compression Block Count:")).ValueText(this, &SPakTreeView::GetSelectionCompressionBlockCount)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f)
+			.Padding(0.f, 2.f)
 			[
 				SAssignNew(CompressionBlockSizeRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressionBlockSize", "Compression Block Size:")).ValueText(this, &SPakTreeView::GetSelectionCompressionBlockSize).ValueToolTipText(this, &SPakTreeView::GetSelectionCompressionBlockSizeToolTip)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f)
+			.Padding(0.f, 2.f)
 			[
 				SAssignNew(CompressionMethodRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_CompressionMethod", "Compression Method:")).ValueText(this, &SPakTreeView::GetCompressionMethod)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f)
+			.Padding(0.f, 2.f)
 			[
 				SAssignNew(SHA1Row, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_SHA1", "SHA1:")).ValueText(this, &SPakTreeView::GetSelectionSHA1)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f)
+			.Padding(0.f, 2.f)
 			[
 				SAssignNew(IsEncryptedRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_IsEncrypted", "IsEncrypted:")).ValueText(this, &SPakTreeView::GetSelectionIsEncrypted)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f)
+			.Padding(0.f, 2.f)
 			[
 				SAssignNew(FileCountRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_FileCount", "File Count:")).ValueText(this, &SPakTreeView::GetSelectionFileCount)
 			]
@@ -195,7 +195,7 @@ TSharedRef<ITableRow> SPakTreeView::OnGenerateTreeRow(FPakTreeEntryPtr TreeNode,
 				.AutoWidth()
 				.VAlign(VAlign_Center)
 				[
-					SNew(STextBlock).Text(FText::FromName(TreeNode->Filename)).ColorAndOpacity(FLinearColor::Green)
+					SNew(STextBlock).Text(FText::FromName(TreeNode->Filename)).ColorAndOpacity(FLinearColor::Green).ShadowOffset(FVector2D(1.f, 1.f))
 				]
 
 				+ SHorizontalBox::Slot()
