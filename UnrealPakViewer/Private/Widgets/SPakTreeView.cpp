@@ -419,7 +419,38 @@ TSharedPtr<SWidget> SPakTreeView::OnGenerateContextMenu()
 	}
 	MenuBuilder.EndSection();
 
-	// Extract menu
+	// Export menu
+	MenuBuilder.BeginSection("Export", LOCTEXT("ContextMenu_Header_Export", "Export File Info"));
+	{
+		MenuBuilder.AddMenuEntry
+		(
+			LOCTEXT("ContextMenu_Export_To_Json", "Export To Json..."),
+			LOCTEXT("ContextMenu_Export_To_Json_Desc", "Export selected file(s) info to json"),
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export"),
+			FUIAction
+			(
+				FExecuteAction::CreateSP(this, &SPakTreeView::OnExportToJson),
+				FCanExecuteAction::CreateSP(this, &SPakTreeView::HasSelection)
+			),
+			NAME_None, EUserInterfaceActionType::Button
+		);
+
+		MenuBuilder.AddMenuEntry
+		(
+			LOCTEXT("ContextMenu_Export_To_Csv", "Export To Csv..."),
+			LOCTEXT("ContextMenu_Export_To_Csv_Desc", "Export selected file(s) info to csv"),
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export"),
+			FUIAction
+			(
+				FExecuteAction::CreateSP(this, &SPakTreeView::OnExportToCsv),
+				FCanExecuteAction::CreateSP(this, &SPakTreeView::HasSelection)
+			),
+			NAME_None, EUserInterfaceActionType::Button
+		);
+	}
+	MenuBuilder.EndSection();
+
+	// Operation menu
 	MenuBuilder.BeginSection("Operation", LOCTEXT("ContextMenu_Header_Operation", "Operation"));
 	{
 		FUIAction Action_JumpToFileView
@@ -462,8 +493,8 @@ void SPakTreeView::OnExtractExecute()
 	}
 
 	TArray<FPakFileEntryPtr> TargetFiles;
-
 	TArray<FPakTreeEntryPtr> SelectedItems;
+
 	TreeView->GetSelectedItems(SelectedItems);
 	for (FPakTreeEntryPtr PakTreeEntry : SelectedItems)
 	{
@@ -486,6 +517,82 @@ bool SPakTreeView::HasSelection() const
 	TreeView->GetSelectedItems(SelectedItems);
 
 	return SelectedItems.Num() > 0;
+}
+
+void SPakTreeView::OnExportToJson()
+{
+	bool bOpened = false;
+	const FString PakName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
+	TArray<FString> OutFileNames;
+
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (DesktopPlatform)
+	{
+		FSlateApplication::Get().CloseToolTip();
+
+		bOpened = DesktopPlatform->SaveFileDialog(
+			FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr),
+			LOCTEXT("OpenExportDialogTitleText", "Select output json file path...").ToString(),
+			TEXT(""),
+			FString::Printf(TEXT("%s.json"), *PakName),
+			TEXT("Json Files (*.json)|*.json|All Files (*.*)|*.*"),
+			EFileDialogFlags::None,
+			OutFileNames);
+	}
+
+	if (!bOpened || OutFileNames.Num() <= 0)
+	{
+		return;
+	}
+
+	TArray<FPakFileEntryPtr> TargetFiles;
+	TArray<FPakTreeEntryPtr> SelectedItems;
+
+	TreeView->GetSelectedItems(SelectedItems);
+	for (FPakTreeEntryPtr PakTreeEntry : SelectedItems)
+	{
+		RetriveFiles(PakTreeEntry, TargetFiles);
+	}
+
+	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExportToJson(OutFileNames[0], TargetFiles);
+}
+
+void SPakTreeView::OnExportToCsv()
+{
+	bool bOpened = false;
+	const FString PakName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
+	TArray<FString> OutFileNames;
+
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (DesktopPlatform)
+	{
+		FSlateApplication::Get().CloseToolTip();
+
+		bOpened = DesktopPlatform->SaveFileDialog(
+			FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr),
+			LOCTEXT("OpenExportDialogTitleText", "Select output csv file path...").ToString(),
+			TEXT(""),
+			FString::Printf(TEXT("%s.csv"), *PakName),
+			TEXT("Json Files (*.csv)|*.csv|All Files (*.*)|*.*"),
+			EFileDialogFlags::None,
+			OutFileNames);
+	}
+
+	if (!bOpened || OutFileNames.Num() <= 0)
+	{
+		return;
+	}
+
+	TArray<FPakFileEntryPtr> TargetFiles;
+	TArray<FPakTreeEntryPtr> SelectedItems;
+
+	TreeView->GetSelectedItems(SelectedItems);
+	for (FPakTreeEntryPtr PakTreeEntry : SelectedItems)
+	{
+		RetriveFiles(PakTreeEntry, TargetFiles);
+	}
+
+	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExportToCsv(OutFileNames[0], TargetFiles);
 }
 
 void SPakTreeView::RetriveFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileEntryPtr>& OutFiles)

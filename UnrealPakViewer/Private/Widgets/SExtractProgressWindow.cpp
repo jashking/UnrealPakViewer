@@ -124,6 +124,7 @@ void SExtractProgressWindow::Tick(const FGeometry& AllottedGeometry, const doubl
 {
 	SWindow::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 
+	bExtractFinished = CompleteCount == TotalCount;
 	if (!bExtractFinished)
 	{
 		LastTime = FDateTime::Now();
@@ -169,7 +170,6 @@ void SExtractProgressWindow::OnExit(const TSharedRef<SWindow>& InWindow)
 
 void SExtractProgressWindow::OnUpdateExtractProgress(int32 InCompleteCount, int32 InErrorCount, int32 InTotalCount)
 {
-	bExtractFinished = InCompleteCount == TotalCount;
 	CompleteCount = InCompleteCount;
 	ErrorCount = InErrorCount;
 	TotalCount = InTotalCount;

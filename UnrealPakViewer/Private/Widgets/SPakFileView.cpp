@@ -2,7 +2,9 @@
 
 #include "Async/AsyncWork.h"
 #include "Async/TaskGraphInterfaces.h"
+#include "DesktopPlatformModule.h"
 #include "EditorStyle.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Json.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "IPlatformFilePak.h"
@@ -485,27 +487,48 @@ TSharedPtr<SWidget> SPakFileView::OnGenerateContextMenu()
 	// Extract menu
 	MenuBuilder.BeginSection("Extract", LOCTEXT("ContextMenu_Header_Extract", "Extract"));
 	{
-		MenuBuilder.AddSubMenu
+		MenuBuilder.AddMenuEntry
 		(
-			LOCTEXT("ContextMenu_Header_ExtractText", "Extract File(s) "),
-			LOCTEXT("ContextMenu_Header_ExtractText_Desc", "Extract file(s) to disk"),
-			FNewMenuDelegate::CreateSP(this, &SPakFileView::OnBuildExtractMenu),
-			false,
-			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Extract")
+			LOCTEXT("ContextMenu_Extract", "Extract..."),
+			LOCTEXT("ContextMenu_Extract_Desc", "Extract selected files to disk"),
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Extract"),
+			FUIAction
+			(
+				FExecuteAction::CreateSP(this, &SPakFileView::OnExtract),
+				FCanExecuteAction::CreateSP(this, &SPakFileView::HasFileSelected)
+			),
+			NAME_None, EUserInterfaceActionType::Button
 		);
 	}
 	MenuBuilder.EndSection();
 
 	// Export menu
-	MenuBuilder.BeginSection("Export", LOCTEXT("ContextMenu_Header_Export", "Export"));
+	MenuBuilder.BeginSection("Export", LOCTEXT("ContextMenu_Header_Export", "Export File Info"));
 	{
-		MenuBuilder.AddSubMenu
+		MenuBuilder.AddMenuEntry
 		(
-			LOCTEXT("ContextMenu_Header_Columns_Export", "Export File(s) Info"),
-			LOCTEXT("ContextMenu_Header_Columns_Export_Desc", "Export file(s) info to json or csv"),
-			FNewMenuDelegate::CreateSP(this, &SPakFileView::OnBuildExportMenu),
-			false,
-			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export")
+			LOCTEXT("ContextMenu_Export_To_Json", "Export To Json..."),
+			LOCTEXT("ContextMenu_Export_To_Json_Desc", "Export selected file(s) info to json"),
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export"),
+			FUIAction
+			(
+				FExecuteAction::CreateSP(this, &SPakFileView::OnExportToJson),
+				FCanExecuteAction::CreateSP(this, &SPakFileView::HasFileSelected)
+			),
+			NAME_None, EUserInterfaceActionType::Button
+		);
+
+		MenuBuilder.AddMenuEntry
+		(
+			LOCTEXT("ContextMenu_Export_To_Csv", "Export To Csv..."),
+			LOCTEXT("ContextMenu_Export_To_Csv_Desc", "Export selected file(s) info to csv"),
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export"),
+			FUIAction
+			(
+				FExecuteAction::CreateSP(this, &SPakFileView::OnExportToCsv),
+				FCanExecuteAction::CreateSP(this, &SPakFileView::HasFileSelected)
+			),
+			NAME_None, EUserInterfaceActionType::Button
 		);
 	}
 	MenuBuilder.EndSection();
@@ -637,74 +660,6 @@ void SPakFileView::OnBuildViewColumnMenu(FMenuBuilder& MenuBuilder)
 	}
 
 	MenuBuilder.EndSection();
-}
-
-void SPakFileView::OnBuildExportMenu(FMenuBuilder& MenuBuilder)
-{
-	MenuBuilder.BeginSection("ExportToJson", LOCTEXT("ContextMenu_Header_Columns_ExportToJson", "Export File Info To Json"));
-	{
-		MenuBuilder.AddMenuEntry
-		(
-			LOCTEXT("ContextMenu_Export_All_To_Json", "Export All Files"),
-			LOCTEXT("ContextMenu_Export_All_To_Json_Desc", "Export all files in current list to json"),
-			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export"),
-			FUIAction
-			(
-				FExecuteAction::CreateSP(this, &SPakFileView::OnExportAllFilesToJson),
-				FCanExecuteAction::CreateSP(this, &SPakFileView::IsFileListEmpty)
-			),
-			NAME_None, EUserInterfaceActionType::Button
-		);
-
-		MenuBuilder.AddMenuEntry
-		(
-			LOCTEXT("ContextMenu_Export_Selected_To_Json", "Export Selected File(s)"),
-			LOCTEXT("ContextMenu_Export_Selected_To_Json_Desc", "Export selected file(s) to json"),
-			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export"),
-			FUIAction
-			(
-				FExecuteAction::CreateSP(this, &SPakFileView::OnExportSelectedFileToJson),
-				FCanExecuteAction::CreateSP(this, &SPakFileView::HasFileSelected)
-			),
-			NAME_None, EUserInterfaceActionType::Button
-		);
-	}
-	MenuBuilder.EndSection();
-
-	MenuBuilder.BeginSection("ExportToCsv", LOCTEXT("ContextMenu_Header_Columns_ExportToCsv", "Export File Info To Csv"));
-	{
-		MenuBuilder.AddMenuEntry
-		(
-			LOCTEXT("ContextMenu_Export_All_To_Csv", "Export All Files"),
-			LOCTEXT("ContextMenu_Export_All_To_Csv_Desc", "Export all files in current list to csv"),
-			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export"),
-			FUIAction
-			(
-				FExecuteAction::CreateSP(this, &SPakFileView::OnExportAllFilesToCsv),
-				FCanExecuteAction::CreateSP(this, &SPakFileView::IsFileListEmpty)
-			),
-			NAME_None, EUserInterfaceActionType::Button
-		);
-
-		MenuBuilder.AddMenuEntry
-		(
-			LOCTEXT("ContextMenu_Export_Selected_To_Csv", "Export Selected File(s)"),
-			LOCTEXT("ContextMenu_Export_Selected_To_Csv_Desc", "Export selected file(s) to csv"),
-			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Export"),
-			FUIAction
-			(
-				FExecuteAction::CreateSP(this, &SPakFileView::OnExportSelectedFileToCsv),
-				FCanExecuteAction::CreateSP(this, &SPakFileView::HasFileSelected)
-			),
-			NAME_None, EUserInterfaceActionType::Button
-		);
-	}
-	MenuBuilder.EndSection();
-}
-
-void SPakFileView::OnBuildExtractMenu(FMenuBuilder& MenuBuilder)
-{
-
 }
 
 void SPakFileView::InitializeAndShowHeaderColumns()
@@ -1137,24 +1092,98 @@ bool SPakFileView::IsFileListEmpty() const
 	return FileCache.Num() > 0;
 }
 
-void SPakFileView::OnExportAllFilesToJson()
+void SPakFileView::OnExportToJson()
 {
+	bool bOpened = false;
+	const FString PakName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
+	TArray<FString> OutFileNames;
 
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (DesktopPlatform)
+	{
+		FSlateApplication::Get().CloseToolTip();
+
+		bOpened = DesktopPlatform->SaveFileDialog(
+			FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr),
+			LOCTEXT("OpenExportDialogTitleText", "Select output json file path...").ToString(),
+			TEXT(""),
+			FString::Printf(TEXT("%s.json"), *PakName),
+			TEXT("Json Files (*.json)|*.json|All Files (*.*)|*.*"),
+			EFileDialogFlags::None,
+			OutFileNames);
+	}
+
+	if (!bOpened || OutFileNames.Num() <= 0)
+	{
+		return;
+	}
+
+	TArray<FPakFileEntryPtr> SelectedItems;
+	FileListView->GetSelectedItems(SelectedItems);
+
+	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExportToJson(OutFileNames[0], SelectedItems);
 }
 
-void SPakFileView::OnExportSelectedFileToJson()
+void SPakFileView::OnExportToCsv()
 {
+	bool bOpened = false;
+	const FString PakName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
+	TArray<FString> OutFileNames;
 
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (DesktopPlatform)
+	{
+		FSlateApplication::Get().CloseToolTip();
+
+		bOpened = DesktopPlatform->SaveFileDialog(
+			FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr),
+			LOCTEXT("OpenExportDialogTitleText", "Select output csv file path...").ToString(),
+			TEXT(""),
+			FString::Printf(TEXT("%s.csv"), *PakName),
+			TEXT("Json Files (*.csv)|*.csv|All Files (*.*)|*.*"),
+			EFileDialogFlags::None,
+			OutFileNames);
+	}
+
+	if (!bOpened || OutFileNames.Num() <= 0)
+	{
+		return;
+	}
+
+	TArray<FPakFileEntryPtr> SelectedItems;
+	FileListView->GetSelectedItems(SelectedItems);
+
+	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExportToCsv(OutFileNames[0], SelectedItems);
 }
 
-void SPakFileView::OnExportAllFilesToCsv()
+void SPakFileView::OnExtract()
 {
+	bool bOpened = false;
+	FString OutputPath;
 
-}
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (DesktopPlatform)
+	{
+		FSlateApplication::Get().CloseToolTip();
 
-void SPakFileView::OnExportSelectedFileToCsv()
-{
+		bOpened = DesktopPlatform->OpenDirectoryDialog(
+			FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr),
+			LOCTEXT("OpenExtractDialogTitleText", "Select output path...").ToString(),
+			TEXT(""),
+			OutputPath);
+	}
 
+	if (!bOpened)
+	{
+		return;
+	}
+
+	TArray<FPakFileEntryPtr> SelectedItems;
+	FileListView->GetSelectedItems(SelectedItems);
+
+	const FString PakFileName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
+
+	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExtractFiles(OutputPath / PakFileName, SelectedItems);
 }
 
 #undef LOCTEXT_NAMESPACE

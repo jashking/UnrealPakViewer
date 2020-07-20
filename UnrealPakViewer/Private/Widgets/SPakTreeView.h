@@ -74,6 +74,8 @@ protected:
 	void OnExtractExecute();
 	void OnJumpToFileViewExecute();
 	bool HasSelection() const;
+	void OnExportToJson();
+	void OnExportToCsv();
 
 	void RetriveFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileEntryPtr>& OutFiles);
 

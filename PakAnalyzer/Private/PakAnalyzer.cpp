@@ -4,6 +4,7 @@
 
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFile.h"
+#include "Json.h"
 #include "Launch/Resources/Version.h"
 #include "Misc/Base64.h"
 #include "Misc/Paths.h"
@@ -245,6 +246,107 @@ void FPakAnalyzer::ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntr
 void FPakAnalyzer::CancelExtract()
 {
 	ShutdownAllExtractWorker();
+}
+
+bool FPakAnalyzer::ExportToJson(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles)
+{
+	UE_LOG(LogPakAnalyzer, Log, TEXT("Export to json: %s."), *InOutputPath);
+
+	TSharedRef<FJsonObject> RootObject = MakeShareable(new FJsonObject);
+	RootObject->SetStringField(TEXT("Name"), FPaths::GetCleanFilename(PakFileSumary.PakFilePath));
+	RootObject->SetStringField(TEXT("Path"), PakFileSumary.PakFilePath);
+	RootObject->SetNumberField(TEXT("Pak File Size"), PakFileSumary.PakFileSize);
+	RootObject->SetNumberField(TEXT("File Count"), TreeRoot->FileCount);
+	RootObject->SetNumberField(TEXT("Total Size"), TreeRoot->Size);
+	RootObject->SetNumberField(TEXT("Total Compressed Size"), TreeRoot->CompressedSize);
+	RootObject->SetStringField(TEXT("MountPoint"), PakFileSumary.MountPoint);
+	//RootObject->SetNumberField(TEXT("IndexSize"), PakFileSumary.PakInfo.IndexSize);
+	//RootObject->SetNumberField(TEXT("IndexOffset"), PakFileSumary.PakInfo.IndexOffset);
+	//RootObject->SetNumberField(TEXT("IndexEncrypted"), PakFileSumary.PakInfo.bEncryptedIndex);
+	//RootObject->SetNumberField(TEXT("HeaderSize"), PakFileSumary.PakFileSize - PakFileSumary.PakInfo.IndexSize - PakFileSumary.PakInfo.IndexOffset);
+	RootObject->SetNumberField(TEXT("PakVersion"), PakFileSumary.PakInfo.Version);
+
+	TArray<TSharedPtr<FJsonValue>> FileObjects;
+
+	int64 TotalSize = 0;
+	int64 TotalCompressedSize = 0;
+
+	for (const FPakFileEntryPtr It : InFiles)
+	{
+		const FPakEntry& PakEntry = It->PakEntry;
+
+		TSharedRef<FJsonObject> FileObject = MakeShareable(new FJsonObject);
+
+		FileObject->SetStringField(TEXT("Name"), It->Filename.ToString());
+		FileObject->SetStringField(TEXT("Path"), It->Path);
+		FileObject->SetNumberField(TEXT("Offset"), PakEntry.Offset);
+		FileObject->SetNumberField(TEXT("Size"), PakEntry.UncompressedSize);
+		FileObject->SetNumberField(TEXT("Compressed Size"), PakEntry.Size);
+		FileObject->SetNumberField(TEXT("Compressed Block Count"), PakEntry.CompressionBlocks.Num());
+		FileObject->SetNumberField(TEXT("Compressed Block Size"), PakEntry.CompressionBlockSize);
+		FileObject->SetStringField(TEXT("SHA1"), BytesToHex(PakEntry.Hash, sizeof(PakEntry.Hash)));
+		FileObject->SetStringField(TEXT("IsEncrypted"), PakEntry.IsEncrypted() ? TEXT("True") : TEXT("False"));
+		FileObject->SetStringField(TEXT("Class"), TEXT("Unknown")/*GetAssetClass(InAssetRegistryState, It.Filename())*/);
+
+		FileObjects.Add(MakeShareable(new FJsonValueObject(FileObject)));
+
+		TotalSize += PakEntry.UncompressedSize;
+		TotalCompressedSize += PakEntry.Size;
+	}
+
+	RootObject->SetNumberField(TEXT("Exported File Count"), InFiles.Num());
+	RootObject->SetNumberField(TEXT("Exported Total Size"), TotalSize);
+	RootObject->SetNumberField(TEXT("Exported Total Compressed Size"), TotalCompressedSize);
+	RootObject->SetArrayField(TEXT("Files"), FileObjects);
+
+	bool bExportResult = false;
+
+	FString FileContents;
+	TSharedRef<TJsonWriter<>> JsonWriter = TJsonWriterFactory<>::Create(&FileContents);
+	if (FJsonSerializer::Serialize(RootObject, JsonWriter))
+	{
+		JsonWriter->Close();
+		bExportResult = FFileHelper::SaveStringToFile(FileContents, *InOutputPath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	}
+
+	UE_LOG(LogPakAnalyzer, Log, TEXT("Export to json: %s finished, file count: %d, result: %d."), *InOutputPath, InFiles.Num(), bExportResult);
+
+	return bExportResult;
+}
+
+bool FPakAnalyzer::ExportToCsv(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles)
+{
+	UE_LOG(LogPakAnalyzer, Log, TEXT("Export to csv: %s."), *InOutputPath);
+
+	TArray<FString> Lines;
+	Lines.Empty(InFiles.Num() + 2);
+	Lines.Add(TEXT("Id, Name, Path, Offset, Class, Size, Compressed Size, Compressed Block Count, Compressed Block Size, SHA1, IsEncrypted"));
+
+	int32 Index = 1;
+	for (const FPakFileEntryPtr It : InFiles)
+	{
+		const FPakEntry& PakEntry = It->PakEntry;
+
+		Lines.Add(FString::Printf(TEXT("%d, %s, %s, %lld, %s, %lld, %lld, %d, %d, %s, %s"),
+			Index,
+			*It->Filename.ToString(),
+			*It->Path,
+			PakEntry.Offset,
+			TEXT("Unknown")/**GetAssetClass(InAssetRegistryState, It.Filename())*/,
+			PakEntry.UncompressedSize,
+			PakEntry.Size,
+			PakEntry.CompressionBlocks.Num(),
+			PakEntry.CompressionBlockSize,
+			*BytesToHex(PakEntry.Hash, sizeof(PakEntry.Hash)),
+			PakEntry.IsEncrypted() ? TEXT("True") : TEXT("False")));
+		++Index;
+	}
+
+	const bool bExportResult = FFileHelper::SaveStringArrayToFile(Lines, *InOutputPath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+
+	UE_LOG(LogPakAnalyzer, Log, TEXT("Export to csv: %s finished, file count: %d, result: %d."), *InOutputPath, InFiles.Num(), bExportResult);
+
+	return bExportResult;
 }
 
 void FPakAnalyzer::Reset()

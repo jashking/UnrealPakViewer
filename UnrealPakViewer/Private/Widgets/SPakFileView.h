@@ -49,8 +49,6 @@ protected:
 	void OnBuildSortByMenu(FMenuBuilder& MenuBuilder);
 	void OnBuildCopyColumnMenu(FMenuBuilder& MenuBuilder);
 	void OnBuildViewColumnMenu(FMenuBuilder& MenuBuilder);
-	void OnBuildExportMenu(FMenuBuilder& MenuBuilder);
-	void OnBuildExtractMenu(FMenuBuilder& MenuBuilder);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// File List View - Columns
@@ -91,10 +89,9 @@ protected:
 
 	// Export
 	bool IsFileListEmpty() const;
-	void OnExportAllFilesToJson();
-	void OnExportSelectedFileToJson();
-	void OnExportAllFilesToCsv();
-	void OnExportSelectedFileToCsv();
+	void OnExportToJson();
+	void OnExportToCsv();
+	void OnExtract();
 
 protected:
 	/** External scrollbar used to synchronize file view position. */

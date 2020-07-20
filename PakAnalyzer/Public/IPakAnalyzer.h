@@ -23,4 +23,6 @@ public:
 	virtual FPakTreeEntryPtr GetPakTreeRootNode() const = 0;
 	virtual void ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles) = 0;
 	virtual void CancelExtract() = 0;
+	virtual bool ExportToJson(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) = 0;
+	virtual bool ExportToCsv(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) = 0;
 };
