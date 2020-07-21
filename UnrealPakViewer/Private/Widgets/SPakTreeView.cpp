@@ -14,6 +14,7 @@
 #include "PakAnalyzerModule.h"
 #include "SKeyValueRow.h"
 #include "UnrealPakViewerStyle.h"
+#include "ViewModels/WidgetDelegates.h"
 
 #define LOCTEXT_NAMESPACE "SPakTreeView"
 

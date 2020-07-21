@@ -2,6 +2,7 @@
 
 #include "EditorStyleSet.h"
 #include "Framework/Application/SlateApplication.h"
+#include "HAL/PlatformApplicationMisc.h"
 #include "IImageWrapper.h"
 #include "IImageWrapperModule.h"
 #include "Launch/Resources/Version.h"

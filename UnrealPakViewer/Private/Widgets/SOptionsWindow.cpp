@@ -2,6 +2,7 @@
 
 #include "EditorStyleSet.h"
 #include "HAL/PlatformMisc.h"
+#include "HAL/PlatformApplicationMisc.h"
 
 #include "CommonDefines.h"
 #include "PakAnalyzerModule.h"
