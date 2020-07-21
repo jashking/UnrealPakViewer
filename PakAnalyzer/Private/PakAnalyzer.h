@@ -32,6 +32,7 @@ public:
 	virtual bool ExportToJson(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) override;
 	virtual bool ExportToCsv(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) override;
 	virtual bool HasPakLoaded() const override;
+	virtual void SetExtractThreadCount(int32 InThreadCount) override;
 
 protected:
 	void Reset();

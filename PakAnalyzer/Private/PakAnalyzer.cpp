@@ -4,6 +4,7 @@
 
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFile.h"
+#include "HAL/PlatformMisc.h"
 #include "Json.h"
 #include "Launch/Resources/Version.h"
 #include "Misc/Base64.h"
@@ -21,7 +22,7 @@ typedef FPakFile::FFileIterator RecordIterator;
 #endif
 
 FPakAnalyzer::FPakAnalyzer()
-	: ExtractWorkerCount(4)
+	: ExtractWorkerCount(DEFAULT_EXTRACT_THREAD_COUNT)
 {
 	Reset();
 	InitializeExtractWorker();
@@ -363,6 +364,18 @@ bool FPakAnalyzer::HasPakLoaded() const
 	return bHasPakLoaded;
 }
 
+void FPakAnalyzer::SetExtractThreadCount(int32 InThreadCount)
+{
+	const int32 ClampThreadCount = FMath::Clamp(InThreadCount, 1, FPlatformMisc::NumberOfCoresIncludingHyperthreads());
+	if (ClampThreadCount != ExtractWorkerCount)
+	{
+		UE_LOG(LogPakAnalyzer, Log, TEXT("Set extract worker count: %d."), ClampThreadCount);
+
+		ExtractWorkerCount = ClampThreadCount;
+		InitializeExtractWorker();
+	}
+}
+
 void FPakAnalyzer::Reset()
 {
 	LoadGuid.Invalidate();
@@ -619,6 +632,8 @@ bool FPakAnalyzer::ValidateEncryptionKey(TArray<uint8>& IndexData, const FSHAHas
 
 void FPakAnalyzer::InitializeExtractWorker()
 {
+	UE_LOG(LogPakAnalyzer, Log, TEXT("Initialize extract worker count: %d."), ExtractWorkerCount);
+
 	ShutdownAllExtractWorker();
 
 	ExtractWorkers.Empty();

@@ -17,6 +17,7 @@
 #include "PakAnalyzerModule.h"
 #include "SExtractProgressWindow.h"
 #include "SKeyInputWindow.h"
+#include "SOptionsWindow.h"
 #include "SPakFileView.h"
 #include "SPakSummaryView.h"
 #include "SPakTreeView.h"
@@ -329,7 +330,10 @@ void SMainWindow::OnExtractStart()
 
 void SMainWindow::OnOpenOptionsDialog()
 {
+	TSharedPtr<SOptionsWindow> OptionsWindow = SNew(SOptionsWindow);
 
+	FSlateApplication::Get().AddModalWindow(OptionsWindow.ToSharedRef(), SharedThis(this), true);
+	OptionsWindow->ShowWindow();
 }
 
 void SMainWindow::OnOpenAboutDialog()

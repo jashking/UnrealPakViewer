@@ -8,6 +8,8 @@
 
 struct FPakEntry;
 
+static const int32 DEFAULT_EXTRACT_THREAD_COUNT = 4;
+
 class IPakAnalyzer
 {
 public:
@@ -26,4 +28,5 @@ public:
 	virtual bool ExportToJson(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) = 0;
 	virtual bool ExportToCsv(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) = 0;
 	virtual bool HasPakLoaded() const = 0;
+	virtual void SetExtractThreadCount(int32 InThreadCount) = 0;
 };

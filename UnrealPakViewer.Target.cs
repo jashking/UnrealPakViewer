@@ -27,5 +27,7 @@ public class UnrealPakViewerTarget : TargetRules
         bCompileWithPluginSupport = true;
 
         bHasExports = false;
-    }
+
+		GlobalDefinitions.Add("NOINITCRASHREPORTER=1");
+	}
 }
