@@ -29,5 +29,7 @@ public class UnrealPakViewerTarget : TargetRules
         bHasExports = false;
 
 		GlobalDefinitions.Add("NOINITCRASHREPORTER=1");
+
+		GlobalDefinitions.Add(string.Format("UNREAL_PAK_VIEWER_VERSION=TEXT(\"{0}\")", "1.0"));
 	}
 }

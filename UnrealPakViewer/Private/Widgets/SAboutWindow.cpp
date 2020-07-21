@@ -40,6 +40,13 @@ void SAboutWindow::Construct(const FArguments& Args)
 					SNew(SKeyValueRow).KeyStretchCoefficient(0.2f).KeyText(LOCTEXT("Built_With_Text", "Built With:")).ValueText(FText::Format(LOCTEXT("Engine_Version_Text", "UE {0}.{1}.{2}"), ENGINE_MAJOR_VERSION, ENGINE_MINOR_VERSION, ENGINE_PATCH_VERSION))
 				]
 
+#if defined(UNREAL_PAK_VIEWER_VERSION)
+				+SVerticalBox::Slot()
+				.AutoHeight()
+				[
+					SNew(SKeyValueRow).KeyStretchCoefficient(0.2f).KeyText(LOCTEXT("Version_Text", "Version:")).ValueText(FText::FromString(UNREAL_PAK_VIEWER_VERSION))
+				]
+#endif
 				//+ SVerticalBox::Slot()
 				//.AutoHeight()
 				//.HAlign(HAlign_Right)
