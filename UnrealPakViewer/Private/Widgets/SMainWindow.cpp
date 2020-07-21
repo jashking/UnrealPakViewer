@@ -16,6 +16,7 @@
 
 #include "CommonDefines.h"
 #include "PakAnalyzerModule.h"
+#include "SAboutWindow.h"
 #include "SExtractProgressWindow.h"
 #include "SKeyInputWindow.h"
 #include "SOptionsWindow.h"
@@ -365,7 +366,10 @@ void SMainWindow::OnOpenOptionsDialog()
 
 void SMainWindow::OnOpenAboutDialog()
 {
+	TSharedPtr<SAboutWindow> AboutWindow = SNew(SAboutWindow);
 
+	FSlateApplication::Get().AddModalWindow(AboutWindow.ToSharedRef(), SharedThis(this), true);
+	AboutWindow->ShowWindow();
 }
 
 FReply SMainWindow::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)

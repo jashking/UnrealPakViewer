@@ -27,4 +27,3 @@ void SKeyValueRow::Construct(const FArguments& InArgs)
 		]
 	];
 }
-
