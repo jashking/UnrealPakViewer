@@ -167,7 +167,7 @@ void FExtractThreadWorker::StartExtract(const FString& InPakFile, int32 InPakVer
 	PakVersion = InPakVersion;
 	AESKey = InKey;
 
-	Thread = FRunnableThread::Create(this, TEXT("ExtractThreadWorker"), 0, EThreadPriority::TPri_AboveNormal);
+	Thread = FRunnableThread::Create(this, TEXT("ExtractThreadWorker"), 0, EThreadPriority::TPri_Highest);
 }
 
 void FExtractThreadWorker::InitTaskFiles(TArray<FPakFileEntry>& InFiles)
