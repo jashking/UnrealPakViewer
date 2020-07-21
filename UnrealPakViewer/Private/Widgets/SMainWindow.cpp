@@ -10,6 +10,7 @@
 #include "Launch/Resources/Version.h"
 #include "Misc/DateTime.h"
 #include "Misc/MessageDialog.h"
+#include "Misc/Paths.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Docking/SDockTab.h"
 
@@ -45,6 +46,8 @@ SMainWindow::~SMainWindow()
 
 void SMainWindow::Construct(const FArguments& Args)
 {
+	GConfig->GetArray(TEXT("UnrealPakViewer"), TEXT("RecentFiles"), RecentFiles, GEngineIni);
+
 	const float DPIScaleFactor = FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(10.0f, 10.0f);
 
 	const TSharedRef<SDockTab> DockTab = SNew(SDockTab).TabRole(ETabRole::MajorTab);
@@ -185,6 +188,20 @@ void SMainWindow::FillFileMenu(class FMenuBuilder& MenuBuilder)
 	MenuBuilder.EndSection();
 
 	MenuBuilder.BeginSection("Recent files", LOCTEXT("RecentFilesText", "Recent files"));
+	for (const FString& File : RecentFiles)
+	{
+		MenuBuilder.AddMenuEntry(
+			FText::FromString(FPaths::GetCleanFilename(File)),
+			FText::FromString(File),
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "LoadPak"),
+			FUIAction(
+				FExecuteAction::CreateSP(this, &SMainWindow::OnLoadRecentFile, File),
+				FCanExecuteAction::CreateSP(this, &SMainWindow::OnLoadRecentFileCanExecute, File)
+			),
+			NAME_None,
+			EUserInterfaceActionType::Button
+		);
+	}
 	MenuBuilder.EndSection();
 }
 
@@ -266,7 +283,7 @@ void SMainWindow::OnLoadPakFile()
 
 	if (bOpened && OutFiles.Num() > 0)
 	{
-		IPakAnalyzerModule::Get().GetPakAnalyzer()->LoadPakFile(OutFiles[0]);
+		LoadPakFile(OutFiles[0]);
 	}
 }
 
@@ -328,6 +345,16 @@ void SMainWindow::OnExtractStart()
 		TStatId(), nullptr, ENamedThreads::GameThread);
 }
 
+void SMainWindow::OnLoadRecentFile(FString InPath)
+{
+	LoadPakFile(InPath);
+}
+
+bool SMainWindow::OnLoadRecentFileCanExecute(FString InPath) const
+{
+	return FPaths::FileExists(InPath);
+}
+
 void SMainWindow::OnOpenOptionsDialog()
 {
 	TSharedPtr<SOptionsWindow> OptionsWindow = SNew(SOptionsWindow);
@@ -355,7 +382,7 @@ FReply SMainWindow::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& Dr
 				const FString DraggedFileExtension = FPaths::GetExtension(Files[0], true);
 				if (DraggedFileExtension == TEXT(".pak"))
 				{
-					IPakAnalyzerModule::Get().GetPakAnalyzer()->LoadPakFile(Files[0]);
+					LoadPakFile(Files[0]);
 					return FReply::Handled();
 				}
 			}
@@ -385,6 +412,27 @@ FReply SMainWindow::OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent
 	}
 
 	return SCompoundWidget::OnDragOver(MyGeometry, DragDropEvent);
+}
+
+void SMainWindow::LoadPakFile(const FString& PakFilePath)
+{
+	static const int32 MAX_RECENT_FILE_COUNT = 5;
+
+	const FString FullPath = FPaths::ConvertRelativePathToFull(PakFilePath);
+
+	const bool bLoadResult = IPakAnalyzerModule::Get().GetPakAnalyzer()->LoadPakFile(FullPath);
+	if (bLoadResult)
+	{
+		RecentFiles.Remove(FullPath);
+		RecentFiles.Insert(FullPath, 0);
+		if (RecentFiles.Num() > MAX_RECENT_FILE_COUNT)
+		{
+			RecentFiles.SetNum(MAX_RECENT_FILE_COUNT); // keep max 5 recent files
+		}
+		
+		GConfig->SetArray(TEXT("UnrealPakViewer"), TEXT("RecentFiles"), RecentFiles, GEngineIni);
+		GConfig->Flush(false, GEngineIni);
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

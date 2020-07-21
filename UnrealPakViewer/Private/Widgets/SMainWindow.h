@@ -33,6 +33,8 @@ protected:
 	void OnSwitchToTreeView(const FString& InPath);
 	void OnSwitchToFileView(const FString& InPath);
 	void OnExtractStart();
+	void OnLoadRecentFile(FString InPath);
+	bool OnLoadRecentFileCanExecute(FString InPath) const;
 
 	void OnOpenOptionsDialog();
 	void OnOpenAboutDialog();
@@ -57,10 +59,14 @@ protected:
 	 */
 	virtual FReply OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)  override;
 
+	void LoadPakFile(const FString& PakFilePath);
+
 protected:
 	static const int32 WINDOW_WIDTH = 1200;
 	static const int32 WINDOW_HEIGHT = 800;
 
 	/** Holds the tab manager that manages the front-end's tabs. */
 	TSharedPtr<class FTabManager> TabManager;
+
+	TArray<FString> RecentFiles;
 };
