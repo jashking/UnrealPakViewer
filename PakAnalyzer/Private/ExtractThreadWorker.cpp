@@ -237,7 +237,7 @@ bool FExtractThreadWorker::UncompressCopyFile(FArchive& Dest, FArchive& Source, 
 
 		if (Entry.IsEncrypted())
 		{
-			FAES::DecryptData(PersistentBuffer, SizeToRead, AESKey);
+			FAES::DecryptData(PersistentBuffer, SizeToRead, InKey);
 		}
 
 		if (!FCompression::UncompressMemory(InCompressionMethod, UncompressedBuffer, UncompressedBlockSize, PersistentBuffer, CompressedBlockSize))

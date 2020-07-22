@@ -9,6 +9,7 @@
 #include "Misc/AES.h"
 #include "Misc/Guid.h"
 #include "Misc/SecureHash.h"
+#include "Serialization/ArrayReader.h"
 
 #include "IPakAnalyzer.h"
 
@@ -33,19 +34,23 @@ public:
 	virtual bool ExportToCsv(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) override;
 	virtual bool HasPakLoaded() const override;
 	virtual void SetExtractThreadCount(int32 InThreadCount) override;
+	virtual bool LoadAssetRegistry(const FString& InRegristryPath) override;
 
 protected:
 	void Reset();
 
 	FString ResolveCompressionMethod(const FPakEntry* InPakEntry) const;
 
-	void InsertFileToTree(const FString& InFullPath, const FPakEntry& InPakEntry);
+	FPakTreeEntryPtr InsertFileToTree(const FString& InFullPath, const FPakEntry& InPakEntry);
 	void RefreshTreeNode(FPakTreeEntryPtr InRoot);
 	void RefreshTreeNodeSizePercent(FPakTreeEntryPtr InRoot);
 	void RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const;
 	void RefreshClassMap(FPakTreeEntryPtr InRoot);
 	void InsertClassInfo(FPakTreeEntryPtr InRoot, FName InClassName, int32 InFileCount, int64 InSize, int64 InCompressedSize);
 	FName GetAssetClass(const FString& InFilename);
+
+	bool LoadAssetRegistryFromPak(TSharedPtr<FPakFile> InPakFile, FPakFileEntryPtr InPakFileEntry);
+	bool LoadAssetRegistry(FArrayReader& InData);
 
 	bool PreLoadPak(const FString& InPakPath);
 	bool ValidateEncryptionKey(TArray<uint8>& IndexData, const FSHAHash& InExpectedHash, const FAES::FAESKey& InAESKey);
@@ -81,4 +86,6 @@ protected:
 	FAES::FAESKey CachedAESKey;
 
 	bool bHasPakLoaded;
+
+	TSharedPtr<class FAssetRegistryState> AssetRegistryState;
 };

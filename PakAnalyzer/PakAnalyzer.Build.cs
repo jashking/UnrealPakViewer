@@ -13,6 +13,8 @@ public class PakAnalyzer : ModuleRules
 			{
 				"Core",
 				"Json",
+				"AssetRegistry",
+				"CoreUObject",
 			}
 		);
 

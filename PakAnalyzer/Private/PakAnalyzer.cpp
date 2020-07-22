@@ -2,6 +2,9 @@
 
 #include "PakAnalyzer.h"
 
+#include "ARFilter.h"
+#include "AssetData.h"
+#include "AssetRegistryState.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFile.h"
 #include "HAL/PlatformMisc.h"
@@ -11,6 +14,7 @@
 #include "Misc/Paths.h"
 #include "Misc/ScopeLock.h"
 #include "Serialization/Archive.h"
+#include "Serialization/MemoryWriter.h"
 
 #include "CommonDefines.h"
 #include "ExtractThreadWorker.h"
@@ -60,7 +64,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 		return false;
 	}
 
-	TUniquePtr<FPakFile> PakFile = MakeUnique<FPakFile>(*InPakPath, false);
+	TSharedPtr<FPakFile> PakFile = MakeShared<FPakFile>(*InPakPath, false);
 	if (!PakFile.IsValid())
 	{
 		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Load pak file failed! Create PakFile failed! Path: %s."), *InPakPath));
@@ -120,6 +124,8 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 
 		for (auto It : Records)
 		{
+			FPakTreeEntryPtr Child = nullptr;
+
 			PakEntry = It.Info();
 
 #if ENGINE_MINOR_VERSION >= 26
@@ -128,11 +134,15 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 			const FString* Filename = It.TryGetFilename();
 			if (Filename)
 			{
-				InsertFileToTree(*Filename, PakEntry);
+				Child = InsertFileToTree(*Filename, PakEntry);
 			}
 #else
-			InsertFileToTree(It.Filename(), PakEntry);
+			Child = InsertFileToTree(It.Filename(), PakEntry);
 #endif
+			if (Child.IsValid() && Child->Filename == TEXT("AssetRegistry.bin"))
+			{
+				LoadAssetRegistryFromPak(PakFile, Child);
+			}
 		}
 
 		RefreshTreeNode(TreeRoot);
@@ -388,11 +398,12 @@ void FPakAnalyzer::Reset()
 	PakFileSumary.CompressionMethods = TEXT("");
 
 	TreeRoot.Reset();
+	AssetRegistryState.Reset();
 
 	bHasPakLoaded = false;
 }
 
-void FPakAnalyzer::InsertFileToTree(const FString& InFullPath, const FPakEntry& InPakEntry)
+FPakTreeEntryPtr FPakAnalyzer::InsertFileToTree(const FString& InFullPath, const FPakEntry& InPakEntry)
 {
 	static const TCHAR* Delims[2] = { TEXT("\\"), TEXT("/") };
 
@@ -401,7 +412,7 @@ void FPakAnalyzer::InsertFileToTree(const FString& InFullPath, const FPakEntry& 
 
 	if (PathItems.Num() <= 0)
 	{
-		return;
+		return nullptr;
 	}
 
 	FString CurrentPath;
@@ -432,6 +443,8 @@ void FPakAnalyzer::InsertFileToTree(const FString& InFullPath, const FPakEntry& 
 			Parent = NewChild;
 		}
 	}
+
+	return Parent;
 }
 
 void FPakAnalyzer::RefreshTreeNode(FPakTreeEntryPtr InRoot)
@@ -553,27 +566,104 @@ void FPakAnalyzer::InsertClassInfo(FPakTreeEntryPtr InRoot, FName InClassName, i
 FName FPakAnalyzer::GetAssetClass(const FString& InFilename)
 {
 	FName AssetClass = *FPaths::GetExtension(InFilename);
-	//if (InAssetRegistryState.IsValid())
-	//{
-	//	FString ObjectPath = InFilename;
-	//	if (ObjectPath.StartsWith(TEXT("Engine/Content")))
-	//	{
-	//		ObjectPath = ObjectPath.Replace(TEXT("Engine/Content"), TEXT("/Engine"));
-	//	}
-	//	else if (ObjectPath.StartsWith(TEXT("ACMobileClient/Content")))
-	//	{
-	//		ObjectPath = ObjectPath.Replace(TEXT("ACMobileClient/Content"), TEXT("/Game"));
-	//	}
-
-	//	ObjectPath = FPaths::ChangeExtension(ObjectPath, FPaths::GetBaseFilename(ObjectPath));
-	//	const FAssetData* AssetData = InAssetRegistryState->GetAssetByObjectPath(*ObjectPath);
-	//	if (AssetData)
-	//	{
-	//		AssetClass = AssetData->AssetClass.ToString();
-	//	}
-	//}
+	if (AssetRegistryState.IsValid())
+	{
+		const FString FullPath = PakFileSumary.MountPoint / InFilename;
+		FString Left, Right;
+		if (FullPath.Split(TEXT("Content"), &Left, &Right))
+		{
+			const FString Prefix = FPaths::GetPathLeaf(Left);
+			FString FullObjectPath = Prefix == TEXT("Engine") ? TEXT("/Engine") / Right : TEXT("/Game") / Right;
+			FullObjectPath = FPaths::ChangeExtension(FullObjectPath, FPaths::GetBaseFilename(FullObjectPath));
+			const FAssetData* AssetData = AssetRegistryState->GetAssetByObjectPath(*FullObjectPath);
+			if (AssetData)
+			{
+				AssetClass = AssetData->AssetClass;
+			}
+		}
+	}
 
 	return AssetClass.IsNone() ? TEXT("Unknown") : AssetClass;
+}
+
+bool FPakAnalyzer::LoadAssetRegistryFromPak(TSharedPtr<FPakFile> InPakFile, FPakFileEntryPtr InPakFileEntry)
+{
+	if (!InPakFile.IsValid() || !InPakFile->IsValid() || !InPakFileEntry.IsValid())
+	{
+		return false;
+	}
+
+	const bool bHasRelativeCompressedChunkOffsets = InPakFile->GetInfo().Version >= FPakInfo::PakFile_Version_RelativeChunkOffsets;
+
+	const int64 BufferSize = 8 * 1024 * 1024; // 8MB buffer for extracting
+	void* Buffer = FMemory::Malloc(BufferSize);
+	uint8* PersistantCompressionBuffer = NULL;
+	int64 CompressionBufferSize = 0;
+
+	bool bReadResult = true;
+	const FPakEntry& EntryInfo = InPakFileEntry->PakEntry;
+
+	FArrayReader ContentReader;
+	ContentReader.AddZeroed(InPakFileEntry->PakEntry.UncompressedSize);
+
+	FMemoryWriter ContentWriter(ContentReader);
+
+	if (EntryInfo.CompressionMethodIndex == 0)
+	{
+		if (!FExtractThreadWorker::BufferedCopyFile(ContentWriter, *InPakFile->GetSharedReader(nullptr), EntryInfo, Buffer, BufferSize, CachedAESKey))
+		{
+			bReadResult = false;
+		}
+	}
+	else
+	{
+		if (!FExtractThreadWorker::UncompressCopyFile(ContentWriter, *InPakFile->GetSharedReader(nullptr), EntryInfo, PersistantCompressionBuffer, CompressionBufferSize, CachedAESKey, InPakFileEntry->CompressionMethod, bHasRelativeCompressedChunkOffsets))
+		{
+			bReadResult = false;
+		}
+	}
+
+	FMemory::Free(Buffer);
+	FMemory::Free(PersistantCompressionBuffer);
+
+	if (!bReadResult)
+	{
+		return false;
+	}
+
+	return LoadAssetRegistry(ContentReader);
+}
+
+bool FPakAnalyzer::LoadAssetRegistry(FArrayReader& InData)
+{
+	FAssetRegistrySerializationOptions LoadOptions;
+	LoadOptions.bSerializeDependencies = false;
+	LoadOptions.bSerializePackageData = false;
+
+	AssetRegistryState = MakeShared<FAssetRegistryState>();
+	return AssetRegistryState->Serialize(InData, LoadOptions);
+}
+
+bool FPakAnalyzer::LoadAssetRegistry(const FString& InRegristryPath)
+{
+	if (!bHasPakLoaded)
+	{
+		return false;
+	}
+
+	FArrayReader ContentReader;
+	if (!FFileHelper::LoadFileToArray(ContentReader, *InRegristryPath))
+	{
+		return false;
+	}
+
+	if (!LoadAssetRegistry(ContentReader))
+	{
+		return false;
+	}
+
+	RefreshClassMap(TreeRoot);
+	return true;
 }
 
 bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)

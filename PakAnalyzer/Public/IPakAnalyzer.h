@@ -29,4 +29,5 @@ public:
 	virtual bool ExportToCsv(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) = 0;
 	virtual bool HasPakLoaded() const = 0;
 	virtual void SetExtractThreadCount(int32 InThreadCount) = 0;
+	virtual bool LoadAssetRegistry(const FString& InRegristryPath) = 0;
 };

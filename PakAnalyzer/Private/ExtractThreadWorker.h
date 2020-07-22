@@ -28,9 +28,8 @@ public:
 
 	FOnUpdateExtractProgress& GetOnUpdateExtractProgressDelegate();
 
-protected:
-	bool BufferedCopyFile(FArchive& Dest, FArchive& Source, const FPakEntry& Entry, void* Buffer, int64 BufferSize, const FAES::FAESKey& InKey);
-	bool UncompressCopyFile(FArchive& Dest, FArchive& Source, const FPakEntry& Entry, uint8*& PersistentBuffer, int64& BufferSize, const FAES::FAESKey& InKey, FName InCompressionMethod, bool bHasRelativeCompressedChunkOffsets);
+	static bool BufferedCopyFile(FArchive& Dest, FArchive& Source, const FPakEntry& Entry, void* Buffer, int64 BufferSize, const FAES::FAESKey& InKey);
+	static bool UncompressCopyFile(FArchive& Dest, FArchive& Source, const FPakEntry& Entry, uint8*& PersistentBuffer, int64& BufferSize, const FAES::FAESKey& InKey, FName InCompressionMethod, bool bHasRelativeCompressedChunkOffsets);
 
 protected:
 	class FRunnableThread* Thread;
