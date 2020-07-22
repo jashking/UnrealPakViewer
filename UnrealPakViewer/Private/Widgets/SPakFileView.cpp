@@ -1056,7 +1056,7 @@ void SPakFileView::OnJumpToTreeViewExecute()
 	TArray<FPakFileEntryPtr> SelectedItems = FileListView->GetSelectedItems();
 	if (SelectedItems.Num() > 0 && SelectedItems[0].IsValid())
 	{
-		FWidgetDelegates::GetOnSwitchToTreeView().Broadcast(SelectedItems[0]->Path);
+		FWidgetDelegates::GetOnSwitchToTreeViewDelegate().Broadcast(SelectedItems[0]->Path);
 	}
 }
 

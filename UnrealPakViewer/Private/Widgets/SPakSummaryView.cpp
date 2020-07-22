@@ -9,6 +9,7 @@
 
 #include "PakAnalyzerModule.h"
 #include "SKeyValueRow.h"
+#include "ViewModels/WidgetDelegates.h"
 
 #define LOCTEXT_NAMESPACE "SPakSummaryView"
 
@@ -308,7 +309,7 @@ FReply SPakSummaryView::OnLoadAssetRegistry()
 	{
 		if (PakAnalyzer->LoadAssetRegistry(OutFiles[0]))
 		{
-			// reload pak tree view
+			FWidgetDelegates::GetOnLoadAssetRegistryFinishedDelegate().Broadcast();
 		}
 	}
 	return FReply::Handled();

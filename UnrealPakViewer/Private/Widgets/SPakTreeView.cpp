@@ -21,10 +21,12 @@
 
 SPakTreeView::SPakTreeView()
 {
+	FWidgetDelegates::GetOnLoadAssetRegistryFinishedDelegate().AddRaw(this, &SPakTreeView::OnLoadAssetReigstryFinished);
 }
 
 SPakTreeView::~SPakTreeView()
 {
+	FWidgetDelegates::GetOnLoadAssetRegistryFinishedDelegate().RemoveAll(this);
 }
 
 void SPakTreeView::Construct(const FArguments& InArgs)
@@ -526,7 +528,7 @@ void SPakTreeView::OnJumpToFileViewExecute()
 	TArray<FPakTreeEntryPtr> SelectedItems = TreeView->GetSelectedItems();
 	if (SelectedItems.Num() > 0 && SelectedItems[0].IsValid())
 	{
-		FWidgetDelegates::GetOnSwitchToFileView().Broadcast(SelectedItems[0]->Path);
+		FWidgetDelegates::GetOnSwitchToFileViewDelegate().Broadcast(SelectedItems[0]->Path);
 	}
 }
 
@@ -642,6 +644,14 @@ void SPakTreeView::RetriveFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileEntryPtr
 	else
 	{
 		OutFiles.Add(StaticCastSharedPtr<FPakFileEntry>(InRoot));
+	}
+}
+
+void SPakTreeView::OnLoadAssetReigstryFinished()
+{
+	if (CurrentSelectedItem.IsValid() && CurrentSelectedItem->bIsDirectory)
+	{
+		ClassView->Reload(CurrentSelectedItem);
 	}
 }
 

@@ -38,7 +38,4 @@ protected:
 	FORCEINLINE FText GetAssetRegistryPath() const;
 
 	FReply OnLoadAssetRegistry();
-
-protected:
-	TSharedPtr<SButton> LoadAssetRegistryButton;
 };

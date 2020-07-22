@@ -80,6 +80,8 @@ protected:
 
 	void RetriveFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileEntryPtr>& OutFiles);
 
+	void OnLoadAssetReigstryFinished();
+
 protected:
 	TSharedPtr<STreeView<FPakTreeEntryPtr>> TreeView;
 	FPakTreeEntryPtr CurrentSelectedItem;

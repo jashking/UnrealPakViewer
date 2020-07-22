@@ -34,15 +34,15 @@ static const FName FileViewTabId("UnrealPakViewerFileView");
 
 SMainWindow::SMainWindow()
 {
-	FWidgetDelegates::GetOnSwitchToFileView().AddRaw(this, &SMainWindow::OnSwitchToFileView);
-	FWidgetDelegates::GetOnSwitchToTreeView().AddRaw(this, &SMainWindow::OnSwitchToTreeView);
+	FWidgetDelegates::GetOnSwitchToFileViewDelegate().AddRaw(this, &SMainWindow::OnSwitchToFileView);
+	FWidgetDelegates::GetOnSwitchToTreeViewDelegate().AddRaw(this, &SMainWindow::OnSwitchToTreeView);
 	FPakAnalyzerDelegates::OnExtractStart.BindRaw(this, &SMainWindow::OnExtractStart);
 }
 
 SMainWindow::~SMainWindow()
 {
-	FWidgetDelegates::GetOnSwitchToFileView().RemoveAll(this);
-	FWidgetDelegates::GetOnSwitchToTreeView().RemoveAll(this);
+	FWidgetDelegates::GetOnSwitchToFileViewDelegate().RemoveAll(this);
+	FWidgetDelegates::GetOnSwitchToTreeViewDelegate().RemoveAll(this);
 }
 
 void SMainWindow::Construct(const FArguments& Args)
