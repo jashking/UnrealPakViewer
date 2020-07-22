@@ -96,8 +96,8 @@ protected:
 	TSharedPtr<SKeyValueRow> CompressionMethodRow;
 	TSharedPtr<SKeyValueRow> SHA1Row;
 	TSharedPtr<SKeyValueRow> IsEncryptedRow;
-
 	TSharedPtr<SKeyValueRow> FileCountRow;
+	TSharedPtr<class SPakClassView> ClassView;
 
 	FString DelayHighlightItem;
 };

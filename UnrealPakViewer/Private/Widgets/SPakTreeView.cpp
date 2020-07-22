@@ -13,6 +13,7 @@
 
 #include "PakAnalyzerModule.h"
 #include "SKeyValueRow.h"
+#include "SPakClassView.h"
 #include "UnrealPakViewerStyle.h"
 #include "ViewModels/WidgetDelegates.h"
 
@@ -144,6 +145,13 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 			[
 				SAssignNew(FileCountRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_FileCount", "File Count:")).ValueText(this, &SPakTreeView::GetSelectionFileCount)
 			]
+
+			+ SVerticalBox::Slot()
+			.FillHeight(1.f)
+			.Padding(0.f, 2.f)
+			[
+				SAssignNew(ClassView, SPakClassView)
+			]
 		]
 	];
 
@@ -266,6 +274,12 @@ void SPakTreeView::OnSelectionChanged(FPakTreeEntryPtr SelectedItem, ESelectInfo
 	IsEncryptedRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 
 	FileCountRow->SetVisibility(bIsSelectionDirectory ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+	ClassView->SetVisibility(bIsSelectionDirectory ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+
+	if (bIsSelectionDirectory)
+	{
+		ClassView->Reload(CurrentSelectedItem);
+	}
 }
 
 void SPakTreeView::ExpandTreeItem(const FString& InPath)

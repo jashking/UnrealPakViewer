@@ -137,6 +137,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 
 		RefreshTreeNode(TreeRoot);
 		RefreshTreeNodeSizePercent(TreeRoot);
+		RefreshClassMap(TreeRoot);
 	}
 
 	bHasPakLoaded = true;
@@ -470,8 +471,8 @@ void FPakAnalyzer::RefreshTreeNodeSizePercent(FPakTreeEntryPtr InRoot)
 	for (auto& Pair : InRoot->ChildrenMap)
 	{
 		FPakTreeEntryPtr Child = Pair.Value;
-		Child->CompressedSizePercentOfTotal = (float)Child->CompressedSize / TreeRoot->CompressedSize;
-		Child->CompressedSizePercentOfParent = (float)Child->CompressedSize / InRoot->CompressedSize;
+		Child->CompressedSizePercentOfTotal = TreeRoot->CompressedSize > 0 ? (float)Child->CompressedSize / TreeRoot->CompressedSize : 0.f;
+		Child->CompressedSizePercentOfParent = InRoot->CompressedSize > 0 ? (float)Child->CompressedSize / InRoot->CompressedSize : 0.f;
 
 		if (Child->bIsDirectory)
 		{
@@ -504,6 +505,75 @@ void FPakAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilter
 			}
 		}
 	}
+}
+
+void FPakAnalyzer::RefreshClassMap(FPakTreeEntryPtr InRoot)
+{
+	for (auto& Pair : InRoot->ChildrenMap)
+	{
+		FPakTreeEntryPtr Child = Pair.Value;
+		if (Child->bIsDirectory)
+		{
+			RefreshClassMap(Child);
+			for (auto& ClassPair : Child->FileClassMap)
+			{
+				InsertClassInfo(InRoot, ClassPair.Key, ClassPair.Value->FileCount, ClassPair.Value->Size, ClassPair.Value->CompressedSize);
+			}
+		}
+		else
+		{
+			InsertClassInfo(InRoot, GetAssetClass(Child->Path), 1, Child->Size, Child->CompressedSize);
+		}
+	}
+}
+
+void FPakAnalyzer::InsertClassInfo(FPakTreeEntryPtr InRoot, FName InClassName, int32 InFileCount, int64 InSize, int64 InCompressedSize)
+{
+	FPakClassEntryPtr* ClassEntryPtr = InRoot->FileClassMap.Find(InClassName);
+	FPakClassEntryPtr ClassEntry = nullptr;
+
+	if (!ClassEntryPtr)
+	{
+		ClassEntry = MakeShared<FPakClassEntry>(InClassName, InSize, InCompressedSize, InFileCount);
+		InRoot->FileClassMap.Add(InClassName, ClassEntry);
+	}
+	else
+	{
+		ClassEntry = *ClassEntryPtr;
+		ClassEntry->Class = InClassName;
+		ClassEntry->FileCount += InFileCount;
+		ClassEntry->Size += InSize;
+		ClassEntry->CompressedSize += InCompressedSize;
+	}
+
+	ClassEntry->PercentOfTotal = TreeRoot->CompressedSize > 0 ? (float)ClassEntry->CompressedSize / TreeRoot->CompressedSize : 0.f;
+	ClassEntry->PercentOfParent = InRoot->CompressedSize > 0 ? (float)ClassEntry->CompressedSize / InRoot->CompressedSize : 0.f;
+}
+
+FName FPakAnalyzer::GetAssetClass(const FString& InFilename)
+{
+	FName AssetClass = *FPaths::GetExtension(InFilename);
+	//if (InAssetRegistryState.IsValid())
+	//{
+	//	FString ObjectPath = InFilename;
+	//	if (ObjectPath.StartsWith(TEXT("Engine/Content")))
+	//	{
+	//		ObjectPath = ObjectPath.Replace(TEXT("Engine/Content"), TEXT("/Engine"));
+	//	}
+	//	else if (ObjectPath.StartsWith(TEXT("ACMobileClient/Content")))
+	//	{
+	//		ObjectPath = ObjectPath.Replace(TEXT("ACMobileClient/Content"), TEXT("/Game"));
+	//	}
+
+	//	ObjectPath = FPaths::ChangeExtension(ObjectPath, FPaths::GetBaseFilename(ObjectPath));
+	//	const FAssetData* AssetData = InAssetRegistryState->GetAssetByObjectPath(*ObjectPath);
+	//	if (AssetData)
+	//	{
+	//		AssetClass = AssetData->AssetClass.ToString();
+	//	}
+	//}
+
+	return AssetClass.IsNone() ? TEXT("Unknown") : AssetClass;
 }
 
 bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)

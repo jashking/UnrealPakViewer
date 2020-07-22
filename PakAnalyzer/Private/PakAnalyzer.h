@@ -43,6 +43,9 @@ protected:
 	void RefreshTreeNode(FPakTreeEntryPtr InRoot);
 	void RefreshTreeNodeSizePercent(FPakTreeEntryPtr InRoot);
 	void RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const;
+	void RefreshClassMap(FPakTreeEntryPtr InRoot);
+	void InsertClassInfo(FPakTreeEntryPtr InRoot, FName InClassName, int32 InFileCount, int64 InSize, int64 InCompressedSize);
+	FName GetAssetClass(const FString& InFilename);
 
 	bool PreLoadPak(const FString& InPakPath);
 	bool ValidateEncryptionKey(TArray<uint8>& IndexData, const FSHAHash& InExpectedHash, const FAES::FAESKey& InAESKey);

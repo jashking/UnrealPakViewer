@@ -25,6 +25,7 @@
 
 ## TODO ##
 
+* 文件列表视图增加文件类型过滤器下拉列表
 * Pak compare visiualize
 * file group by class or extension
 * resource load heat map
