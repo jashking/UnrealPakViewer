@@ -78,4 +78,5 @@ struct FPakFileSumary
 	FString PakFilePath;
 	int64 PakFileSize;
 	FString CompressionMethods;
+	FString AssetRegistryPath;
 };

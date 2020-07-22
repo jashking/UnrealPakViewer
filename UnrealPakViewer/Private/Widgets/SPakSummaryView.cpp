@@ -1,6 +1,8 @@
 #include "SPakSummaryView.h"
 
+#include "DesktopPlatformModule.h"
 #include "EditorStyle.h"
+#include "Framework/Application/SlateApplication.h"
 #include "IPlatformFilePak.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Layout/SExpandableArea.h"
@@ -141,17 +143,15 @@ void SPakSummaryView::Construct(const FArguments& InArgs)
 
 			+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f, 0.f, 5.f, 0.f)
 			[
-				SNew(SEditableTextBox).IsReadOnly(true)
+				SNew(SEditableTextBox).IsReadOnly(true).Text(this, &SPakSummaryView::GetAssetRegistryPath)
 			]
 
 			+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 0.f, 0.f).VAlign(VAlign_Center)
 			[
-				SAssignNew(LoadAssetRegistryButton, SButton).Text(LOCTEXT("LoadAssetRegistryText", "Load Asset Registry"))
+				SNew(SButton).Text(LOCTEXT("LoadAssetRegistryText", "Load Asset Registry")).OnClicked(this, &SPakSummaryView::OnLoadAssetRegistry)
 			]
 		]
 	];
-
-	LoadAssetRegistryButton->SetEnabled(false);
 }
 
 FORCEINLINE FText SPakSummaryView::GetPakPath() const
@@ -267,6 +267,51 @@ FORCEINLINE FText SPakSummaryView::GetPakFileEncryptionMethods() const
 	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 
 	return PakAnalyzer && PakAnalyzer->HasPakLoaded() ? FText::FromString(PakAnalyzer->GetPakFileSumary().CompressionMethods) : FText();
+}
+
+FORCEINLINE FText SPakSummaryView::GetAssetRegistryPath() const
+{
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+
+	return PakAnalyzer && PakAnalyzer->HasPakLoaded() ? FText::FromString(PakAnalyzer->GetPakFileSumary().AssetRegistryPath) : FText();
+}
+
+FReply SPakSummaryView::OnLoadAssetRegistry()
+{
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	if (!PakAnalyzer || !PakAnalyzer->HasPakLoaded())
+	{
+		return FReply::Handled();
+	}
+
+	TArray<FString> OutFiles;
+	bool bOpened = false;
+
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (DesktopPlatform)
+	{
+		FSlateApplication::Get().CloseToolTip();
+
+		bOpened = DesktopPlatform->OpenFileDialog
+		(
+			FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr),
+			LOCTEXT("LoadAssetRegistry_FileDesc", "Open asset registry file...").ToString(),
+			TEXT(""),
+			TEXT(""),
+			LOCTEXT("LoadAssetRegistry_FileFilter", "Asset regirstry files (*.bin)|*.bin|All files (*.*)|*.*").ToString(),
+			EFileDialogFlags::None,
+			OutFiles
+		);
+	}
+
+	if (bOpened && OutFiles.Num() > 0)
+	{
+		if (PakAnalyzer->LoadAssetRegistry(OutFiles[0]))
+		{
+			// reload pak tree view
+		}
+	}
+	return FReply::Handled();
 }
 
 #undef LOCTEXT_NAMESPACE

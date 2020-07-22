@@ -396,6 +396,7 @@ void FPakAnalyzer::Reset()
 	PakFileSumary.PakFilePath = TEXT("");
 	PakFileSumary.PakFileSize = 0;
 	PakFileSumary.CompressionMethods = TEXT("");
+	PakFileSumary.AssetRegistryPath = TEXT("");
 
 	TreeRoot.Reset();
 	AssetRegistryState.Reset();
@@ -631,7 +632,13 @@ bool FPakAnalyzer::LoadAssetRegistryFromPak(TSharedPtr<FPakFile> InPakFile, FPak
 		return false;
 	}
 
-	return LoadAssetRegistry(ContentReader);
+	const bool bLoadResult = LoadAssetRegistry(ContentReader);
+	if (bLoadResult)
+	{
+		PakFileSumary.AssetRegistryPath = InPakFileEntry->Path;
+	}
+
+	return bLoadResult;
 }
 
 bool FPakAnalyzer::LoadAssetRegistry(FArrayReader& InData)
@@ -640,8 +647,14 @@ bool FPakAnalyzer::LoadAssetRegistry(FArrayReader& InData)
 	LoadOptions.bSerializeDependencies = false;
 	LoadOptions.bSerializePackageData = false;
 
-	AssetRegistryState = MakeShared<FAssetRegistryState>();
-	return AssetRegistryState->Serialize(InData, LoadOptions);
+	TSharedPtr<FAssetRegistryState> NewAssetRegistryState = MakeShared<FAssetRegistryState>();
+	if (NewAssetRegistryState->Serialize(InData, LoadOptions))
+	{
+		AssetRegistryState = NewAssetRegistryState;
+		return true;
+	}
+	
+	return false;
 }
 
 bool FPakAnalyzer::LoadAssetRegistry(const FString& InRegristryPath)
@@ -661,6 +674,8 @@ bool FPakAnalyzer::LoadAssetRegistry(const FString& InRegristryPath)
 	{
 		return false;
 	}
+
+	PakFileSumary.AssetRegistryPath = FPaths::ConvertRelativePathToFull(InRegristryPath);
 
 	RefreshClassMap(TreeRoot);
 	return true;

@@ -35,6 +35,9 @@ protected:
 	FORCEINLINE FText GetPakFileContentSize() const;
 	FORCEINLINE FText GetPakFileContentSizeToolTip() const;
 	FORCEINLINE FText GetPakFileEncryptionMethods() const;
+	FORCEINLINE FText GetAssetRegistryPath() const;
+
+	FReply OnLoadAssetRegistry();
 
 protected:
 	TSharedPtr<SButton> LoadAssetRegistryButton;
