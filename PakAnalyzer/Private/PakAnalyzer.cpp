@@ -353,10 +353,10 @@ bool FPakAnalyzer::ExportToJson(const FString& InOutputPath, const TArray<FPakFi
 		ClassObject->SetNumberField(TEXT("Size"), ClassEntry.Size);
 		ClassObject->SetNumberField(TEXT("Compressed Size"), ClassEntry.CompressedSize);
 		ClassObject->SetNumberField(TEXT("Compressed Size Percent Of Exported"), TotalCompressedSize > 0 ? 100 * (float)ClassEntry.CompressedSize / TotalCompressedSize : 0.f);
-	
+
 		ClassObjects.Add(MakeShareable(new FJsonValueObject(ClassObject)));
 	}
-	
+
 	RootObject->SetArrayField(TEXT("Group By Class"), ClassObjects);
 	RootObject->SetArrayField(TEXT("Files"), FileObjects);
 
@@ -585,7 +585,7 @@ void FPakAnalyzer::RefreshClassMap(FPakTreeEntryPtr InRoot)
 		{
 			Child->Class = GetAssetClass(Child->Path);
 			InsertClassInfo(InRoot, Child->Class, 1, Child->Size, Child->CompressedSize);
-			
+
 		}
 	}
 }
@@ -623,12 +623,14 @@ FName FPakAnalyzer::GetAssetClass(const FString& InFilename)
 		if (FullPath.Split(TEXT("Content"), &Left, &Right))
 		{
 			const FString Prefix = FPaths::GetPathLeaf(Left);
-			FString FullObjectPath = Prefix == TEXT("Engine") ? TEXT("/Engine") / Right : TEXT("/Game") / Right;
-			FullObjectPath = FPaths::ChangeExtension(FullObjectPath, FPaths::GetBaseFilename(FullObjectPath));
-			const FAssetData* AssetData = AssetRegistryState->GetAssetByObjectPath(*FullObjectPath);
-			if (AssetData)
+			const bool bNotUseGamePrefix = Prefix == TEXT("Engine") || FullPath.Contains(TEXT("Plugin"));
+
+			const FString FullObjectPath = FPaths::SetExtension(bNotUseGamePrefix ? TEXT("/") / Prefix / Right : TEXT("/Game") / Right, TEXT(""));
+
+			const TArray<const FAssetData*>& AssetDataArray = AssetRegistryState->GetAssetsByPackageName(*FullObjectPath);
+			if (AssetDataArray.Num() > 0)
 			{
-				AssetClass = AssetData->AssetClass;
+				AssetClass = AssetDataArray[0]->AssetClass;
 			}
 		}
 	}
@@ -702,7 +704,7 @@ bool FPakAnalyzer::LoadAssetRegistry(FArrayReader& InData)
 		AssetRegistryState = NewAssetRegistryState;
 		return true;
 	}
-	
+
 	return false;
 }
 
