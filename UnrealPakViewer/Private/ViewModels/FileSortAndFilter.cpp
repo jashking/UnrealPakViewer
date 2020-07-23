@@ -14,7 +14,7 @@ void FFileSortAndFilterTask::DoWork()
 	}
 
 	TArray<FPakFileEntryPtr> FilterResult;
-	IPakAnalyzerModule::Get().GetPakAnalyzer()->GetFiles(CurrentSearchText, FilterResult);
+	IPakAnalyzerModule::Get().GetPakAnalyzer()->GetFiles(CurrentSearchText, ClassFilterMap, FilterResult);
 
 	const FFileColumn* Column = PakFileViewPin->FindCoulum(CurrentSortedColumn);
 	if (!Column)
@@ -44,12 +44,13 @@ void FFileSortAndFilterTask::DoWork()
 	OnWorkFinished.ExecuteIfBound(CurrentSortedColumn, CurrentSortMode, CurrentSearchText, CurrentLoadGuid);
 }
 
-void FFileSortAndFilterTask::SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid)
+void FFileSortAndFilterTask::SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid, const TMap<FName, bool>& InClassFilterMap)
 {
 	CurrentSortedColumn = InSortedColumn;
 	CurrentSortMode = InSortMode;
 	CurrentSearchText = InSearchText;
 	CurrentLoadGuid = InLoadGuid;
+	ClassFilterMap = InClassFilterMap;
 }
 
 void FFileSortAndFilterTask::RetriveResult(TArray<FPakFileEntryPtr>& OutResult)

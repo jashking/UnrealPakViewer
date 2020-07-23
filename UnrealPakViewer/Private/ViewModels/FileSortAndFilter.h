@@ -25,7 +25,7 @@ public:
 	}
 
 	void DoWork();
-	void SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid);
+	void SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid, const TMap<FName, bool>& InClassFilterMap);
 	FOnSortAndFilterFinished& GetOnSortAndFilterFinishedDelegate() { return OnWorkFinished; }
 
 	FORCEINLINE TStatId GetStatId() const
@@ -48,4 +48,6 @@ protected:
 
 	FCriticalSection CriticalSection;
 	TArray<FPakFileEntryPtr> Result;
+
+	TMap<FName, bool> ClassFilterMap;
 };

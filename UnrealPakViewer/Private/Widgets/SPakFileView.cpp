@@ -509,14 +509,20 @@ void SPakFileView::Construct(const FArguments& InArgs)
 void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 {
 	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	const bool bLoadDirty = PakAnalyzer->IsLoadDirty(LastLoadGuid);
 
-	if (bIsDirty || PakAnalyzer->IsLoadDirty(LastLoadGuid))
+	if (bIsDirty || bLoadDirty)
 	{
 		if (SortAndFilterTask->IsDone())
 		{
+			if (bLoadDirty)
+			{
+				FillClassesFilter();
+			}
+
 			LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
 
-			InnderTask->SetWorkInfo(CurrentSortedColumn, CurrentSortMode, CurrentSearchText, LastLoadGuid);
+			InnderTask->SetWorkInfo(CurrentSortedColumn, CurrentSortMode, CurrentSearchText, LastLoadGuid, ClassFilterMap);
 			SortAndFilterTask->StartBackgroundTask();
 		}
 	}
@@ -790,7 +796,7 @@ void SPakFileView::OnShowAllClassesExecute()
 		Pair.Value = !bIsShowAll;
 	}
 
-	//MarkDirty(true);
+	MarkDirty(true);
 }
 
 bool SPakFileView::IsShowAllClassesChecked() const
@@ -812,6 +818,7 @@ void SPakFileView::OnToggleClassesExecute(FName InClassName)
 	if (bShow)
 	{
 		*bShow = !(*bShow);
+		MarkDirty(true);
 	}
 }
 
@@ -819,6 +826,21 @@ bool SPakFileView::IsClassesFilterChecked(FName InClassName) const
 {
 	const bool* bShow = ClassFilterMap.Find(InClassName);
 	return bShow ? *bShow : false;
+}
+
+void SPakFileView::FillClassesFilter()
+{
+	ClassFilterMap.Empty();
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+
+	FPakTreeEntryPtr TreeRoot = PakAnalyzer->GetPakTreeRootNode();
+	if (TreeRoot.IsValid())
+	{
+		for (const auto& Pair : TreeRoot->FileClassMap)
+		{
+			ClassFilterMap.Add(Pair.Key, true);
+		}
+	}
 }
 
 void SPakFileView::InitializeAndShowHeaderColumns()
@@ -1242,16 +1264,6 @@ void SPakFileView::OnSortAndFilterFinihed(const FName InSortedColumn, EColumnSor
 	FFunctionGraphTask::CreateAndDispatchWhenReady([this, InLoadGuid, InSearchText]()
 		{
 			IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-			
-			ClassFilterMap.Empty();
-			FPakTreeEntryPtr TreeRoot = PakAnalyzer->GetPakTreeRootNode();
-			if (TreeRoot.IsValid())
-			{
-				for (const auto& Pair : TreeRoot->FileClassMap)
-				{
-					ClassFilterMap.Add(Pair.Key, true);
-				}
-			}
 
 			InnderTask->RetriveResult(FileCache);
 			FileListView->RebuildList();
@@ -1392,6 +1404,8 @@ void SPakFileView::ScrollToItem(const FString& InPath)
 
 void SPakFileView::OnLoadAssetReigstryFinished()
 {
+	FillClassesFilter();
+
 	MarkDirty(true);
 }
 

@@ -23,7 +23,7 @@ public:
 
 	virtual bool LoadPakFile(const FString& InPakPath) override;
 	virtual int32 GetFileCount() const override;
-	virtual void GetFiles(const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const override;
+	virtual void GetFiles(const FString& InFilterText, const TMap<FName, bool>& InClassFilterMap, TArray<FPakFileEntryPtr>& OutFiles) const override;
 	virtual FString GetLastLoadGuid() const override;
 	virtual bool IsLoadDirty(const FString& InGuid) const override;
 	virtual const FPakFileSumary& GetPakFileSumary() const override;
@@ -44,7 +44,7 @@ protected:
 	FPakTreeEntryPtr InsertFileToTree(const FString& InFullPath, const FPakEntry& InPakEntry);
 	void RefreshTreeNode(FPakTreeEntryPtr InRoot);
 	void RefreshTreeNodeSizePercent(FPakTreeEntryPtr InRoot);
-	void RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const;
+	void RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, const TMap<FName, bool>& InClassFilterMap, TArray<FPakFileEntryPtr>& OutFiles) const;
 	void RefreshClassMap(FPakTreeEntryPtr InRoot);
 	void InsertClassInfo(FPakTreeEntryPtr InRoot, FName InClassName, int32 InFileCount, int64 InSize, int64 InCompressedSize);
 	FName GetAssetClass(const FString& InFilename);

@@ -162,13 +162,13 @@ int32 FPakAnalyzer::GetFileCount() const
 	return TreeRoot.IsValid() ? TreeRoot->FileCount : 0;
 }
 
-void FPakAnalyzer::GetFiles(const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const
+void FPakAnalyzer::GetFiles(const FString& InFilterText, const TMap<FName, bool>& InClassFilterMap, TArray<FPakFileEntryPtr>& OutFiles) const
 {
 	FScopeLock Lock(const_cast<FCriticalSection*>(&CriticalSection));
 
 	if (TreeRoot.IsValid())
 	{
-		RetriveFiles(TreeRoot, InFilterText, OutFiles);
+		RetriveFiles(TreeRoot, InFilterText, InClassFilterMap, OutFiles);
 	}
 }
 
@@ -535,18 +535,21 @@ void FPakAnalyzer::RefreshTreeNodeSizePercent(FPakTreeEntryPtr InRoot)
 	}
 }
 
-void FPakAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const
+void FPakAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, const TMap<FName, bool>& InClassFilterMap, TArray<FPakFileEntryPtr>& OutFiles) const
 {
 	for (auto& Pair : InRoot->ChildrenMap)
 	{
 		FPakTreeEntryPtr Child = Pair.Value;
 		if (Child->bIsDirectory)
 		{
-			RetriveFiles(Child, InFilterText, OutFiles);
+			RetriveFiles(Child, InFilterText, InClassFilterMap, OutFiles);
 		}
 		else
 		{
-			if (InFilterText.IsEmpty() || /*Child->Filename.Contains(InFilterText) ||*/ Child->Path.Contains(InFilterText))
+			const bool* bShow = InClassFilterMap.Find(Child->Class);
+			const bool bMatchClass = (InClassFilterMap.Num() <= 0 || (bShow && *bShow));
+
+			if (bMatchClass && (InFilterText.IsEmpty() || /*Child->Filename.Contains(InFilterText) ||*/ Child->Path.Contains(InFilterText)))
 			{
 				FPakFileEntryPtr FileEntryPtr = MakeShared<FPakFileEntry>(Child->Filename.ToString(), Child->Path);
 				if (!Child->bIsDirectory)

@@ -18,7 +18,7 @@ public:
 
 	virtual bool LoadPakFile(const FString& InPakPath) = 0;
 	virtual int32 GetFileCount() const = 0;
-	virtual void GetFiles(const FString& InFilterText, TArray<FPakFileEntryPtr>& OutFiles) const = 0;
+	virtual void GetFiles(const FString& InFilterText, const TMap<FName, bool>& InClassFilterMap, TArray<FPakFileEntryPtr>& OutFiles) const = 0;
 	virtual FString GetLastLoadGuid() const = 0;
 	virtual bool IsLoadDirty(const FString& InGuid) const = 0;
 	virtual const FPakFileSumary& GetPakFileSumary() const = 0;

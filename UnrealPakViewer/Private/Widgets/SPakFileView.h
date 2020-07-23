@@ -60,6 +60,7 @@ protected:
 	bool IsShowAllClassesChecked() const;
 	void OnToggleClassesExecute(FName InClassName);
 	bool IsClassesFilterChecked(FName InClassName) const;
+	void FillClassesFilter();
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// File List View - Columns
