@@ -358,11 +358,13 @@ protected:
 
 SPakFileView::SPakFileView()
 {
-
+	FWidgetDelegates::GetOnLoadAssetRegistryFinishedDelegate().AddRaw(this, &SPakFileView::OnLoadAssetReigstryFinished);
 }
 
 SPakFileView::~SPakFileView()
 {
+	FWidgetDelegates::GetOnLoadAssetRegistryFinishedDelegate().RemoveAll(this);
+
 	if (SortAndFilterTask.IsValid())
 	{
 		SortAndFilterTask->Cancel();
@@ -1244,6 +1246,11 @@ void SPakFileView::ScrollToItem(const FString& InPath)
 			return;
 		}
 	}
+}
+
+void SPakFileView::OnLoadAssetReigstryFinished()
+{
+	MarkDirty(true);
 }
 
 #undef LOCTEXT_NAMESPACE

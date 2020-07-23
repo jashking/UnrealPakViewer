@@ -97,6 +97,8 @@ protected:
 
 	void ScrollToItem(const FString& InPath);
 
+	void OnLoadAssetReigstryFinished();
+
 protected:
 	/** External scrollbar used to synchronize file view position. */
 	TSharedPtr<class SScrollBar> ExternalScrollbar;

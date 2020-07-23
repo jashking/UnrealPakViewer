@@ -104,4 +104,6 @@ protected:
 	TSharedPtr<SKeyValueRow> ClassRow;
 
 	FString DelayHighlightItem;
+
+	bool bIsDirty = false;
 };

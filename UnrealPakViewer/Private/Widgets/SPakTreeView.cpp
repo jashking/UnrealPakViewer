@@ -171,8 +171,9 @@ void SPakTreeView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 {
 	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 
-	if (PakAnalyzer && PakAnalyzer->IsLoadDirty(LastLoadGuid))
+	if (PakAnalyzer && (bIsDirty || PakAnalyzer->IsLoadDirty(LastLoadGuid)))
 	{
+		bIsDirty = false;
 		LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
 
 		TreeNodes.Empty();
@@ -662,10 +663,11 @@ void SPakTreeView::RetriveFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileEntryPtr
 
 void SPakTreeView::OnLoadAssetReigstryFinished()
 {
-	if (CurrentSelectedItem.IsValid() && CurrentSelectedItem->bIsDirectory)
-	{
-		ClassView->Reload(CurrentSelectedItem);
-	}
+	bIsDirty = true;
+	//if (CurrentSelectedItem.IsValid() && CurrentSelectedItem->bIsDirectory)
+	//{
+	//	ClassView->Reload(CurrentSelectedItem);
+	//}
 }
 
 #undef LOCTEXT_NAMESPACE
