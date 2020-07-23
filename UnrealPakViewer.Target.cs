@@ -24,7 +24,7 @@ public class UnrealPakViewerTarget : TargetRules
         bCompileAgainstCoreUObject = true;
 
         bUseLoggingInShipping = true;
-        bCompileWithPluginSupport = true;
+        bCompileWithPluginSupport = false;
 
         bHasExports = false;
 
