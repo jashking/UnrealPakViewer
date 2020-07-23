@@ -179,16 +179,22 @@ bool SAboutWindow::LoadTexture(const TArray<uint8>& RawFileData, uint32& OutWidt
 		OutWidth = ImageWrapper->GetWidth();
 		OutHeight = ImageWrapper->GetHeight();
 
+#if ENGINE_MINOR_VERSION < 25
 		const TArray<uint8>* RawData = NULL;
 		if (ImageWrapper->GetRaw(ERGBFormat::RGBA, 8, RawData) == false)
+#else
+		if (ImageWrapper->GetRaw(ERGBFormat::RGBA, 8, OutDecodedImage) == false)
+#endif
 		{
 			//UE_LOG(LogSlateD3D, Log, TEXT("Invalid texture format for Slate resource only RGBA and RGB pngs are supported: %s"), *InBrush.GetResourceName().ToString());
 			bSucceeded = false;
 		}
+#if ENGINE_MINOR_VERSION < 25
 		else
 		{
 			OutDecodedImage = *RawData;
 		}
+#endif
 	}
 	else
 	{
