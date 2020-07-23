@@ -21,6 +21,7 @@ public:
 
 	static const FName NameColumnName;
 	static const FName PathColumnName;
+	static const FName ClassColumnName;
 	static const FName OffsetColumnName;
 	static const FName SizeColumnName;
 	static const FName CompressedSizeColumnName;

@@ -75,6 +75,13 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 			.AutoHeight()
 			.Padding(0.f, 2.f)
 			[
+				SAssignNew(ClassRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_Class", "Class:")).ValueText(this, &SPakTreeView::GetSelectionClass)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 2.f)
+			[
 				SAssignNew(OffsetRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_Offset", "Offset:")).ValueText(this, &SPakTreeView::GetSelectionOffset)
 			]
 
@@ -274,6 +281,7 @@ void SPakTreeView::OnSelectionChanged(FPakTreeEntryPtr SelectedItem, ESelectInfo
 	CompressionMethodRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 	SHA1Row->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 	IsEncryptedRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+	ClassRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 
 	FileCountRow->SetVisibility(bIsSelectionDirectory ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 	ClassView->SetVisibility(bIsSelectionDirectory ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
@@ -413,6 +421,11 @@ FORCEINLINE FText SPakTreeView::GetSelectionFileCount() const
 FORCEINLINE const FSlateBrush* SPakTreeView::GetFolderImage(FPakTreeEntryPtr InTreeNode) const
 {
 	return TreeView->IsItemExpanded(InTreeNode) ? FUnrealPakViewerStyle::Get().GetOptionalBrush("FolderOpen") : FUnrealPakViewerStyle::Get().GetOptionalBrush("FolderClosed");
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionClass() const
+{
+	return CurrentSelectedItem.IsValid() && !CurrentSelectedItem->bIsDirectory ? FText::FromName(CurrentSelectedItem->Class) : FText();
 }
 
 TSharedPtr<SWidget> SPakTreeView::OnGenerateContextMenu()

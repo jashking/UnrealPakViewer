@@ -66,6 +66,7 @@ protected:
 	FORCEINLINE FText GetSelectionIsEncrypted() const;
 	FORCEINLINE FText GetSelectionFileCount() const;
 	FORCEINLINE const FSlateBrush* GetFolderImage(FPakTreeEntryPtr InTreeNode) const;
+	FORCEINLINE FText GetSelectionClass() const;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Tree View - Context Menu
@@ -100,6 +101,7 @@ protected:
 	TSharedPtr<SKeyValueRow> IsEncryptedRow;
 	TSharedPtr<SKeyValueRow> FileCountRow;
 	TSharedPtr<class SPakClassView> ClassView;
+	TSharedPtr<SKeyValueRow> ClassRow;
 
 	FString DelayHighlightItem;
 };

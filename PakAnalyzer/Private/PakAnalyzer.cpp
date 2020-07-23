@@ -139,7 +139,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 #else
 			Child = InsertFileToTree(It.Filename(), PakEntry);
 #endif
-			if (Child.IsValid() && Child->Filename == TEXT("AssetRegistry.bin"))
+			if (Child.IsValid() && Child->Filename.ToString().EndsWith(TEXT("AssetRegistry.bin")))
 			{
 				LoadAssetRegistryFromPak(PakFile, Child);
 			}
@@ -292,6 +292,8 @@ bool FPakAnalyzer::ExportToJson(const FString& InOutputPath, const TArray<FPakFi
 	int64 TotalSize = 0;
 	int64 TotalCompressedSize = 0;
 
+	TMap<FName, FPakClassEntry> ExportedClassMap;
+
 	for (const FPakFileEntryPtr It : InFiles)
 	{
 		const FPakEntry& PakEntry = It->PakEntry;
@@ -307,17 +309,52 @@ bool FPakAnalyzer::ExportToJson(const FString& InOutputPath, const TArray<FPakFi
 		FileObject->SetNumberField(TEXT("Compressed Block Size"), PakEntry.CompressionBlockSize);
 		FileObject->SetStringField(TEXT("SHA1"), BytesToHex(PakEntry.Hash, sizeof(PakEntry.Hash)));
 		FileObject->SetStringField(TEXT("IsEncrypted"), PakEntry.IsEncrypted() ? TEXT("True") : TEXT("False"));
-		FileObject->SetStringField(TEXT("Class"), TEXT("Unknown")/*GetAssetClass(InAssetRegistryState, It.Filename())*/);
+		FileObject->SetStringField(TEXT("Class"), It->Class.ToString());
 
 		FileObjects.Add(MakeShareable(new FJsonValueObject(FileObject)));
 
 		TotalSize += PakEntry.UncompressedSize;
 		TotalCompressedSize += PakEntry.Size;
+
+		FPakClassEntry* ClassEntry = ExportedClassMap.Find(It->Class);
+		if (ClassEntry)
+		{
+			ClassEntry->FileCount += 1;
+			ClassEntry->CompressedSize += PakEntry.Size;
+			ClassEntry->Size += PakEntry.UncompressedSize;
+		}
+		else
+		{
+			ExportedClassMap.Add(It->Class, FPakClassEntry(It->Class, PakEntry.UncompressedSize, PakEntry.Size, 1));
+		}
 	}
 
 	RootObject->SetNumberField(TEXT("Exported File Count"), InFiles.Num());
 	RootObject->SetNumberField(TEXT("Exported Total Size"), TotalSize);
 	RootObject->SetNumberField(TEXT("Exported Total Compressed Size"), TotalCompressedSize);
+
+	ExportedClassMap.ValueSort(
+		[](const FPakClassEntry& A, const FPakClassEntry& B) -> bool
+		{
+			return A.CompressedSize > B.CompressedSize;
+		});
+
+	TArray<TSharedPtr<FJsonValue>> ClassObjects;
+	for (const auto& Pair : ExportedClassMap)
+	{
+		const FPakClassEntry& ClassEntry = Pair.Value;
+
+		TSharedRef<FJsonObject> ClassObject = MakeShareable(new FJsonObject);
+		ClassObject->SetStringField(TEXT("Class"), ClassEntry.Class.ToString());
+		ClassObject->SetNumberField(TEXT("File Count"), ClassEntry.FileCount);
+		ClassObject->SetNumberField(TEXT("Size"), ClassEntry.Size);
+		ClassObject->SetNumberField(TEXT("Compressed Size"), ClassEntry.CompressedSize);
+		ClassObject->SetNumberField(TEXT("Compressed Size Percent Of Exported"), TotalCompressedSize > 0 ? 100 * (float)ClassEntry.CompressedSize / TotalCompressedSize : 0.f);
+	
+		ClassObjects.Add(MakeShareable(new FJsonValueObject(ClassObject)));
+	}
+	
+	RootObject->SetArrayField(TEXT("Group By Class"), ClassObjects);
 	RootObject->SetArrayField(TEXT("Files"), FileObjects);
 
 	bool bExportResult = false;
@@ -353,7 +390,7 @@ bool FPakAnalyzer::ExportToCsv(const FString& InOutputPath, const TArray<FPakFil
 			*It->Filename.ToString(),
 			*It->Path,
 			PakEntry.Offset,
-			TEXT("Unknown")/**GetAssetClass(InAssetRegistryState, It.Filename())*/,
+			*It->Class.ToString(),
 			PakEntry.UncompressedSize,
 			PakEntry.Size,
 			PakEntry.CompressionBlocks.Num(),
@@ -511,6 +548,7 @@ void FPakAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilter
 				FPakFileEntryPtr FileEntryPtr = MakeShared<FPakFileEntry>(Child->Filename.ToString(), Child->Path);
 				if (!Child->bIsDirectory)
 				{
+					FileEntryPtr->Class = Child->Class;
 					FileEntryPtr->PakEntry = Child->PakEntry;
 					FileEntryPtr->CompressionMethod = Child->CompressionMethod;
 				}
@@ -523,9 +561,12 @@ void FPakAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilter
 
 void FPakAnalyzer::RefreshClassMap(FPakTreeEntryPtr InRoot)
 {
+	InRoot->FileClassMap.Empty();
+
 	for (auto& Pair : InRoot->ChildrenMap)
 	{
 		FPakTreeEntryPtr Child = Pair.Value;
+
 		if (Child->bIsDirectory)
 		{
 			RefreshClassMap(Child);
@@ -536,7 +577,9 @@ void FPakAnalyzer::RefreshClassMap(FPakTreeEntryPtr InRoot)
 		}
 		else
 		{
-			InsertClassInfo(InRoot, GetAssetClass(Child->Path), 1, Child->Size, Child->CompressedSize);
+			Child->Class = GetAssetClass(Child->Path);
+			InsertClassInfo(InRoot, Child->Class, 1, Child->Size, Child->CompressedSize);
+			
 		}
 	}
 }

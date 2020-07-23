@@ -78,6 +78,14 @@ public:
 					SNew(STextBlock).Text(this, &SPakFileRow::GetPath).ToolTipText(this, &SPakFileRow::GetPath).HighlightText(this, &SPakFileRow::GetSearchHighlightText)
 				];
 		}
+		else if (ColumnName == FFileColumn::ClassColumnName)
+		{
+			return
+				SNew(SBox).Padding(FMargin(4.0, 0.0))
+				[
+					SNew(STextBlock).Text(this, &SPakFileRow::GetClass)
+				];
+		}
 		else if (ColumnName == FFileColumn::OffsetColumnName)
 		{
 			return
@@ -176,6 +184,19 @@ protected:
 		if (PakFileItemPin.IsValid())
 		{
 			return FText::FromString(PakFileItemPin->Path);
+		}
+		else
+		{
+			return FText();
+		}
+	}
+
+	FText GetClass() const
+	{
+		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid())
+		{
+			return FText::FromName(PakFileItemPin->Class);
 		}
 		else
 		{
@@ -702,8 +723,23 @@ void SPakFileView::InitializeAndShowHeaderColumns()
 		}
 	);
 
+	// Class Column
+	FFileColumn& ClassColumn = FileColumns.Emplace(FFileColumn::ClassColumnName, FFileColumn(2, FFileColumn::ClassColumnName, LOCTEXT("ClassColumn", "Class"), LOCTEXT("ClassColumnTip", "Class name in asset registry or file extension if not found"), 100.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
+	ClassColumn.SetAscendingCompareDelegate(
+		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
+		{
+			return A->Class.LexicalLess(B->Class);
+		}
+	);
+	ClassColumn.SetDescendingCompareDelegate(
+		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
+		{
+			return B->Class.LexicalLess(A->Class);
+		}
+	);
+
 	// Offset Column
-	FFileColumn& OffsetColumn = FileColumns.Emplace(FFileColumn::OffsetColumnName, FFileColumn(2, FFileColumn::OffsetColumnName, LOCTEXT("OffsetColumn", "Offset"), LOCTEXT("OffsetColumnTip", "File offset in pak"), 110.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
+	FFileColumn& OffsetColumn = FileColumns.Emplace(FFileColumn::OffsetColumnName, FFileColumn(3, FFileColumn::OffsetColumnName, LOCTEXT("OffsetColumn", "Offset"), LOCTEXT("OffsetColumnTip", "File offset in pak"), 110.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
 	OffsetColumn.SetAscendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
@@ -718,7 +754,7 @@ void SPakFileView::InitializeAndShowHeaderColumns()
 	);
 
 	// Size Column
-	FFileColumn& SizeColumn = FileColumns.Emplace(FFileColumn::SizeColumnName, FFileColumn(3, FFileColumn::SizeColumnName, LOCTEXT("SizeColumn", "Size"), LOCTEXT("SizeColumnTip", "File original size"), 110.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
+	FFileColumn& SizeColumn = FileColumns.Emplace(FFileColumn::SizeColumnName, FFileColumn(4, FFileColumn::SizeColumnName, LOCTEXT("SizeColumn", "Size"), LOCTEXT("SizeColumnTip", "File original size"), 110.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
 	SizeColumn.SetAscendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
@@ -733,7 +769,7 @@ void SPakFileView::InitializeAndShowHeaderColumns()
 	);
 	
 	// Compressed Size Column
-	FFileColumn& CompressedSizeColumn = FileColumns.Emplace(FFileColumn::CompressedSizeColumnName, FFileColumn(4, FFileColumn::CompressedSizeColumnName, LOCTEXT("CompressedSizeColumn", "Compressed Size"), LOCTEXT("CompressedSizeColumnTip", "File compressed size"), 110.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
+	FFileColumn& CompressedSizeColumn = FileColumns.Emplace(FFileColumn::CompressedSizeColumnName, FFileColumn(5, FFileColumn::CompressedSizeColumnName, LOCTEXT("CompressedSizeColumn", "Compressed Size"), LOCTEXT("CompressedSizeColumnTip", "File compressed size"), 110.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
 	CompressedSizeColumn.SetAscendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
@@ -748,7 +784,7 @@ void SPakFileView::InitializeAndShowHeaderColumns()
 	);
 	
 	// Compressed Block Count
-	FFileColumn& CompressionBlockCountColumn = FileColumns.Emplace(FFileColumn::CompressionBlockCountColumnName, FFileColumn(5, FFileColumn::CompressionBlockCountColumnName, LOCTEXT("CompressionBlockCountColumn", "Compression Block Count"), LOCTEXT("CompressionBlockCountColumnTip", "File compression block count"), 155.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
+	FFileColumn& CompressionBlockCountColumn = FileColumns.Emplace(FFileColumn::CompressionBlockCountColumnName, FFileColumn(6, FFileColumn::CompressionBlockCountColumnName, LOCTEXT("CompressionBlockCountColumn", "Compression Block Count"), LOCTEXT("CompressionBlockCountColumnTip", "File compression block count"), 155.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeFiltered | EFileColumnFlags::CanBeHidden));
 	CompressionBlockCountColumn.SetAscendingCompareDelegate(
 		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
 		{
@@ -762,10 +798,10 @@ void SPakFileView::InitializeAndShowHeaderColumns()
 		}
 	);
 	
-	FileColumns.Emplace(FFileColumn::CompressionBlockSizeColumnName, FFileColumn(6, FFileColumn::CompressionBlockSizeColumnName, LOCTEXT("CompressionBlockSizeColumn", "Compression Block Size"), LOCTEXT("CompressionBlockSizeColumnTip", "File compression block size"), 155.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
-	FileColumns.Emplace(FFileColumn::CompressionMethodColumnName, FFileColumn(7, FFileColumn::CompressionMethodColumnName, LOCTEXT("CompressionMethod", "Compression Method"), LOCTEXT("CompressionMethodTip", "Compression method name used to compress this file"), 125.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
-	FileColumns.Emplace(FFileColumn::SHA1ColumnName, FFileColumn(8, FFileColumn::SHA1ColumnName, LOCTEXT("SHA1Column", "SHA1"), LOCTEXT("SHA1ColumnTip", "File sha1"), 315.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
-	FileColumns.Emplace(FFileColumn::IsEncryptedColumnName, FFileColumn(9, FFileColumn::IsEncryptedColumnName, LOCTEXT("IsEncryptedColumn", "IsEncrypted"), LOCTEXT("IsEncryptedColumnTip", "Is file encrypted in pak?"), 70.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(FFileColumn::CompressionBlockSizeColumnName, FFileColumn(7, FFileColumn::CompressionBlockSizeColumnName, LOCTEXT("CompressionBlockSizeColumn", "Compression Block Size"), LOCTEXT("CompressionBlockSizeColumnTip", "File compression block size"), 155.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(FFileColumn::CompressionMethodColumnName, FFileColumn(8, FFileColumn::CompressionMethodColumnName, LOCTEXT("CompressionMethod", "Compression Method"), LOCTEXT("CompressionMethodTip", "Compression method name used to compress this file"), 125.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(FFileColumn::SHA1ColumnName, FFileColumn(9, FFileColumn::SHA1ColumnName, LOCTEXT("SHA1Column", "SHA1"), LOCTEXT("SHA1ColumnTip", "File sha1"), 315.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	FileColumns.Emplace(FFileColumn::IsEncryptedColumnName, FFileColumn(10, FFileColumn::IsEncryptedColumnName, LOCTEXT("IsEncryptedColumn", "IsEncrypted"), LOCTEXT("IsEncryptedColumnTip", "Is file encrypted in pak?"), 70.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
 
 	// Show columns.
 	for (const auto& ColumnPair : FileColumns)
@@ -981,7 +1017,7 @@ void SPakFileView::OnCopyAllColumnsExecute()
 				FileObject->SetStringField(TEXT("Compression Method"), PakFileItem->CompressionMethod.ToString());
 				FileObject->SetStringField(TEXT("SHA1"), BytesToHex(PakEntry->Hash, sizeof(PakEntry->Hash)));
 				FileObject->SetStringField(TEXT("IsEncrypted"), PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False"));
-				//FileObject->SetStringField(TEXT("Class"), GetAssetClass(InAssetRegistryState, It.Filename()));
+				FileObject->SetStringField(TEXT("Class"), PakFileItem->Class.ToString());
 
 				FileObjects.Add(MakeShareable(new FJsonValueObject(FileObject)));
 			}
@@ -1012,6 +1048,10 @@ void SPakFileView::OnCopyColumnExecute(const FName ColumnId)
 			else if (ColumnId == FFileColumn::PathColumnName)
 			{
 				Values.Add(PakFileItem->Path);
+			}
+			else if (ColumnId == FFileColumn::ClassColumnName)
+			{
+				Values.Add(PakFileItem->Class.ToString());
 			}
 			else if (ColumnId == FFileColumn::OffsetColumnName)
 			{
