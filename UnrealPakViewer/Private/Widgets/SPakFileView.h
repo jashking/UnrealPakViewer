@@ -53,6 +53,15 @@ protected:
 	void OnBuildViewColumnMenu(FMenuBuilder& MenuBuilder);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
+	// File List View - Class Filter
+	TSharedRef<SWidget> OnBuildClassFilterMenu();
+
+	void OnShowAllClassesExecute();
+	bool IsShowAllClassesChecked() const;
+	void OnToggleClassesExecute(FName InClassName);
+	bool IsClassesFilterChecked(FName InClassName) const;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// File List View - Columns
 	void InitializeAndShowHeaderColumns();
 
@@ -131,4 +140,6 @@ protected:
 	FString LastLoadGuid;
 
 	FString DelayHighlightItem;
+
+	TMap<FName, bool> ClassFilterMap;
 };

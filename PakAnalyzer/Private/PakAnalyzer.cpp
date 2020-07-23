@@ -166,7 +166,10 @@ void FPakAnalyzer::GetFiles(const FString& InFilterText, TArray<FPakFileEntryPtr
 {
 	FScopeLock Lock(const_cast<FCriticalSection*>(&CriticalSection));
 
-	RetriveFiles(TreeRoot, InFilterText, OutFiles);
+	if (TreeRoot.IsValid())
+	{
+		RetriveFiles(TreeRoot, InFilterText, OutFiles);
+	}
 }
 
 FString FPakAnalyzer::GetLastLoadGuid() const

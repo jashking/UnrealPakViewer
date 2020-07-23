@@ -20,6 +20,7 @@
 
 #include "PakAnalyzerModule.h"
 #include "UnrealPakViewerStyle.h"
+#include "ViewModels/ClassColumn.h"
 #include "ViewModels/FileSortAndFilter.h"
 #include "ViewModels/WidgetDelegates.h"
 
@@ -83,7 +84,7 @@ public:
 			return
 				SNew(SBox).Padding(FMargin(4.0, 0.0))
 				[
-					SNew(STextBlock).Text(this, &SPakFileRow::GetClass)
+					SNew(STextBlock).Text(this, &SPakFileRow::GetClass).ColorAndOpacity(this, &SPakFileRow::GetClassColor)
 				];
 		}
 		else if (ColumnName == FFileColumn::OffsetColumnName)
@@ -201,6 +202,19 @@ protected:
 		else
 		{
 			return FText();
+		}
+	}
+
+	FSlateColor GetClassColor() const
+	{
+		FPakFileEntryPtr PakFileItemPin = WeakPakFileItem.Pin();
+		if (PakFileItemPin.IsValid())
+		{
+			return FSlateColor(FClassColumn::GetColorByClass(*PakFileItemPin->Class.ToString()));
+		}
+		else
+		{
+			return FLinearColor::White;
 		}
 	}
 
@@ -390,18 +404,46 @@ void SPakFileView::Construct(const FArguments& InArgs)
 				[
 					SNew(SHorizontalBox)
 
-					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f)
+					+ SHorizontalBox::Slot().Padding(0.f, 0.f, 5.f, 0.f).VAlign(VAlign_Center)
 					[
-						SAssignNew(SearchBox, SSearchBox)
-						.HintText(LOCTEXT("SearchBoxHint", "Search files"))
-						.OnTextChanged(this, &SPakFileView::OnSearchBoxTextChanged)
-						.IsEnabled(this, &SPakFileView::SearchBoxIsEnabled)
-						.ToolTipText(LOCTEXT("FilterSearchHint", "Type here to search files"))
+						SNew(SComboButton)
+						.ComboButtonStyle(FEditorStyle::Get(), "GenericFilters.ComboButtonStyle")
+						.ForegroundColor(FLinearColor::White)
+						.ContentPadding(0)
+						.ToolTipText(LOCTEXT("ClassFilterToolTip", "Filter files by class."))
+						.OnGetMenuContent(this, &SPakFileView::OnBuildClassFilterMenu)
+						.HasDownArrow(true)
+						.ContentPadding(FMargin(1.0f, 1.0f, 1.0f, 0.0f))
+						.ButtonContent()
+						[
+							SNew(SHorizontalBox)
+
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							[
+								SNew(STextBlock)
+								.Text(LOCTEXT("ClassFilter", "Class Filter")).ColorAndOpacity(FLinearColor::Green).ShadowOffset(FVector2D(1.f, 1.f))
+							]
+						]
 					]
 
-					+ SHorizontalBox::Slot().AutoWidth().Padding(4.f, 0.f, 0.f, 0.f).VAlign(VAlign_Center)
+					+ SHorizontalBox::Slot()
 					[
-						SNew(STextBlock).Text(this, &SPakFileView::GetFileCount)
+						SNew(SHorizontalBox)
+
+						+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f)
+						[
+							SAssignNew(SearchBox, SSearchBox)
+							.HintText(LOCTEXT("SearchBoxHint", "Search files"))
+							.OnTextChanged(this, &SPakFileView::OnSearchBoxTextChanged)
+							.IsEnabled(this, &SPakFileView::SearchBoxIsEnabled)
+							.ToolTipText(LOCTEXT("FilterSearchHint", "Type here to search files"))
+						]
+
+						+ SHorizontalBox::Slot().AutoWidth().Padding(4.f, 0.f, 0.f, 0.f).VAlign(VAlign_Center)
+						[
+							SNew(STextBlock).Text(this, &SPakFileView::GetFileCount)
+						]
 					]
 				]
 			]
@@ -689,6 +731,94 @@ void SPakFileView::OnBuildViewColumnMenu(FMenuBuilder& MenuBuilder)
 	}
 
 	MenuBuilder.EndSection();
+}
+
+TSharedRef<SWidget> SPakFileView::OnBuildClassFilterMenu()
+{
+	FMenuBuilder MenuBuilder(/*bInShouldCloseWindowAfterMenuSelection=*/true, nullptr);
+
+	if (ClassFilterMap.Num() > 0)
+	{
+		MenuBuilder.BeginSection("FileViewShowAllClasses", LOCTEXT("QuickFilterHeading", "Quick Filter"));
+		{
+			MenuBuilder.AddMenuEntry(
+				LOCTEXT("ShowAllClasses", "Show/Hide All"),
+				LOCTEXT("ShowAllClasses_Tooltip", "Change filtering to show/hide all classes"),
+				FSlateIcon(),
+				FUIAction(FExecuteAction::CreateSP(this, &SPakFileView::OnShowAllClassesExecute),
+					FCanExecuteAction(),
+					FIsActionChecked::CreateSP(this, &SPakFileView::IsShowAllClassesChecked)),
+				NAME_None,
+				EUserInterfaceActionType::ToggleButton
+			);
+		}
+		MenuBuilder.EndSection();
+	}
+
+	MenuBuilder.BeginSection("FileViewClassesEntries", LOCTEXT("ClassesHeading", "Classes"));
+	for (const auto& Pair : ClassFilterMap)
+	{
+		const FString ClassString = Pair.Key.ToString();
+		const FText ClassText(FText::AsCultureInvariant(ClassString));
+
+		const TSharedRef<SWidget> TextBlock = SNew(STextBlock)
+			.Text(ClassText)
+			.ShadowColorAndOpacity(FLinearColor(0.05f, 0.05f, 0.05f, 1.0f))
+			.ShadowOffset(FVector2D(1.0f, 1.0f))
+			.ColorAndOpacity(FSlateColor(FClassColumn::GetColorByClass(*ClassString)));
+
+		MenuBuilder.AddMenuEntry(
+			FUIAction(FExecuteAction::CreateSP(this, &SPakFileView::OnToggleClassesExecute, Pair.Key),
+				FCanExecuteAction(),
+				FIsActionChecked::CreateSP(this, &SPakFileView::IsClassesFilterChecked, Pair.Key)),
+			TextBlock,
+			NAME_None,
+			FText::Format(LOCTEXT("Class_Tooltip", "Filter the File View to show/hide class: {0}"), ClassText),
+			EUserInterfaceActionType::ToggleButton
+		);
+	}
+	MenuBuilder.EndSection();
+
+	return MenuBuilder.MakeWidget();
+}
+
+void SPakFileView::OnShowAllClassesExecute()
+{
+	const bool bIsShowAll = IsShowAllClassesChecked();
+	for (auto& Pair : ClassFilterMap)
+	{
+		Pair.Value = !bIsShowAll;
+	}
+
+	//MarkDirty(true);
+}
+
+bool SPakFileView::IsShowAllClassesChecked() const
+{
+	for (const auto& Pair : ClassFilterMap)
+	{
+		if (!Pair.Value)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void SPakFileView::OnToggleClassesExecute(FName InClassName)
+{
+	bool* bShow = ClassFilterMap.Find(InClassName);
+	if (bShow)
+	{
+		*bShow = !(*bShow);
+	}
+}
+
+bool SPakFileView::IsClassesFilterChecked(FName InClassName) const
+{
+	const bool* bShow = ClassFilterMap.Find(InClassName);
+	return bShow ? *bShow : false;
 }
 
 void SPakFileView::InitializeAndShowHeaderColumns()
@@ -1111,10 +1241,22 @@ void SPakFileView::OnSortAndFilterFinihed(const FName InSortedColumn, EColumnSor
 {
 	FFunctionGraphTask::CreateAndDispatchWhenReady([this, InLoadGuid, InSearchText]()
 		{
+			IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+			
+			ClassFilterMap.Empty();
+			FPakTreeEntryPtr TreeRoot = PakAnalyzer->GetPakTreeRootNode();
+			if (TreeRoot.IsValid())
+			{
+				for (const auto& Pair : TreeRoot->FileClassMap)
+				{
+					ClassFilterMap.Add(Pair.Key, true);
+				}
+			}
+
 			InnderTask->RetriveResult(FileCache);
 			FileListView->RebuildList();
 
-			if (IPakAnalyzerModule::Get().GetPakAnalyzer()->IsLoadDirty(InLoadGuid) || !InSearchText.Equals(CurrentSearchText, ESearchCase::IgnoreCase))
+			if (PakAnalyzer->IsLoadDirty(InLoadGuid) || !InSearchText.Equals(CurrentSearchText, ESearchCase::IgnoreCase))
 			{
 				// Load another pak during sort or filter
 				// Search text changed during sort or filter

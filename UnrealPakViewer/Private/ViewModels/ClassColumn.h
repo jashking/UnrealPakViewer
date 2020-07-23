@@ -31,6 +31,18 @@ public:
 
 	float GetInitialWidth() const { return InitialWidth; }
 
+	static FLinearColor GetColorByClass(const TCHAR* const InClassName)
+	{
+		uint32 Hash = 0;
+		for (const TCHAR* c = InClassName; *c; ++c)
+		{
+			Hash = (Hash + *c) * 0x2c2c57ed;
+		}
+
+		// Divided by 128.0 in order to force bright colors.
+		return FLinearColor(((Hash >> 16) & 0xFF) / 128.0f, ((Hash >> 8) & 0xFF) / 128.0f, (Hash & 0xFF) / 128.0f, 1.0f);
+	}
+
 protected:
 	int32 Index;
 	FName Id;

@@ -53,7 +53,7 @@ public:
 			return
 				SNew(SBox).Padding(FMargin(4.0, 0.0))
 				[
-					SNew(STextBlock).Text(this, &SPakClassRow::GetName).ToolTipText(this, &SPakClassRow::GetName)
+					SNew(STextBlock).Text(this, &SPakClassRow::GetName).ToolTipText(this, &SPakClassRow::GetName).ColorAndOpacity(this, &SPakClassRow::GetNameColor)
 				];
 		}
 		else if (ColumnName == FClassColumn::SizeColumnName)
@@ -133,6 +133,19 @@ protected:
 		else
 		{
 			return FText();
+		}
+	}
+
+	FSlateColor GetNameColor() const
+	{
+		FPakClassEntryPtr PakClassItemPin = WeakPakClassItem.Pin();
+		if (PakClassItemPin.IsValid())
+		{
+			return FSlateColor(FClassColumn::GetColorByClass(*PakClassItemPin->Class.ToString()));
+		}
+		else
+		{
+			return FLinearColor::White;
 		}
 	}
 
