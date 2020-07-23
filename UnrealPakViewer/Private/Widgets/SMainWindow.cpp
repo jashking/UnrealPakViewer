@@ -58,17 +58,17 @@ void SMainWindow::Construct(const FArguments& Args)
 
 	TabManager->RegisterTabSpawner(SummaryViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab_SummaryView))
 		.SetDisplayName(LOCTEXT("SummaryViewTabTitle", "Summary View"))
-		.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "UnrealPakViewer.Tabs.Tools"))
+		.SetIcon(FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Tab.Summary"))
 		.SetGroup(AppMenuGroup);
 
 	TabManager->RegisterTabSpawner(TreeViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab_TreeView))
 		.SetDisplayName(LOCTEXT("TreeViewTabTitle", "Tree View"))
-		.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "UnrealPakViewer.Tabs.Tools"))
+		.SetIcon(FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Tab.Tree"))
 		.SetGroup(AppMenuGroup);
 
 	TabManager->RegisterTabSpawner(FileViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab_FileView))
 		.SetDisplayName(LOCTEXT("FileViewTabTitle", "File View"))
-		.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "UnrealPakViewer.Tabs.Tools"))
+		.SetIcon(FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Tab.File"))
 		.SetGroup(AppMenuGroup);
 
 	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("UnrealPakViewer_v1.0")
