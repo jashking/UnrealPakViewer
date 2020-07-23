@@ -149,7 +149,7 @@ void SPakSummaryView::Construct(const FArguments& InArgs)
 
 			+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 0.f, 0.f).VAlign(VAlign_Center)
 			[
-				SNew(SButton).Text(LOCTEXT("LoadAssetRegistryText", "Load Asset Registry")).OnClicked(this, &SPakSummaryView::OnLoadAssetRegistry)
+				SNew(SButton).Text(LOCTEXT("LoadAssetRegistryText", "Load Asset Registry")).OnClicked(this, &SPakSummaryView::OnLoadAssetRegistry).ToolTipText(LOCTEXT("LoadAssetRegistryTipText", "Default in the path: [Your Project Path]/Saved/Cooked/[PLATFORM]/ProjectName"))
 			]
 		]
 	];
