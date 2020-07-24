@@ -2,8 +2,6 @@
 
 ![UnrealPakViewer.png](UnrealPakViewer.png)
 
-![FileList.png](FileList.png)
-
 ## 编译 ##
 
 将代码克隆到 *Engine\Source\Programs* 目录下，重新生成解决方案编译即可
