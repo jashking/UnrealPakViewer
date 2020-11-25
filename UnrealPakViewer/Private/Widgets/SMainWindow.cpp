@@ -17,6 +17,7 @@
 #include "CommonDefines.h"
 #include "PakAnalyzerModule.h"
 #include "SAboutWindow.h"
+#include "SAssetView.h"
 #include "SExtractProgressWindow.h"
 #include "SKeyInputWindow.h"
 #include "SOptionsWindow.h"
@@ -31,6 +32,7 @@
 static const FName SummaryViewTabId("UnrealPakViewerSummaryView");
 static const FName TreeViewTabId("UnrealPakViewerTreeView");
 static const FName FileViewTabId("UnrealPakViewerFileView");
+static const FName AssetViewTabId("UnrealPakViewerAssetView");
 
 SMainWindow::SMainWindow()
 {
@@ -71,6 +73,11 @@ void SMainWindow::Construct(const FArguments& Args)
 		.SetIcon(FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Tab.File"))
 		.SetGroup(AppMenuGroup);
 
+	TabManager->RegisterTabSpawner(AssetViewTabId, FOnSpawnTab::CreateRaw(this, &SMainWindow::OnSpawnTab_AssetView))
+		.SetDisplayName(LOCTEXT("AssetViewTabTitle", "Asset View"))
+		.SetIcon(FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "Tab.Asset"))
+		.SetGroup(AppMenuGroup);
+
 	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("UnrealPakViewer_v1.0")
 		->AddArea
 		(
@@ -87,6 +94,7 @@ void SMainWindow::Construct(const FArguments& Args)
 				FTabManager::NewStack()
 				->AddTab(TreeViewTabId, ETabState::OpenedTab)
 				->AddTab(FileViewTabId, ETabState::OpenedTab)
+				->AddTab(AssetViewTabId, ETabState::OpenedTab)
 				->SetForegroundTab(FTabId(TreeViewTabId))
 			)
 		);
@@ -251,6 +259,18 @@ TSharedRef<class SDockTab> SMainWindow::OnSpawnTab_FileView(const FSpawnTabArgs&
 		.TabRole(ETabRole::PanelTab)
 		[
 			SNew(SPakFileView)
+		];
+
+	return DockTab;
+}
+
+TSharedRef<class SDockTab> SMainWindow::OnSpawnTab_AssetView(const FSpawnTabArgs& Args)
+{
+	const TSharedRef<SDockTab> DockTab = SNew(SDockTab)
+		.ShouldAutosize(false)
+		.TabRole(ETabRole::PanelTab)
+		[
+			SNew(SAssetView)
 		];
 
 	return DockTab;

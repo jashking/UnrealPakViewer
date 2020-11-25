@@ -25,6 +25,7 @@ protected:
 	TSharedRef<class SDockTab> OnSpawnTab_SummaryView(const FSpawnTabArgs& Args);
 	TSharedRef<class SDockTab> OnSpawnTab_TreeView(const FSpawnTabArgs& Args);
 	TSharedRef<class SDockTab> OnSpawnTab_FileView(const FSpawnTabArgs& Args);
+	TSharedRef<class SDockTab> OnSpawnTab_AssetView(const FSpawnTabArgs& Args);
 
 	void OnExit(const TSharedRef<SWindow>& InWindow);
 	void OnLoadPakFile();
