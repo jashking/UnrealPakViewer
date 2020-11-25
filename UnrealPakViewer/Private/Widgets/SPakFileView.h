@@ -109,6 +109,9 @@ protected:
 
 	void OnLoadAssetReigstryFinished();
 
+	void FillFilesSummary();
+	bool GetSelectedItems(TArray<FPakFileEntryPtr>& OutSelectedItems) const;
+
 protected:
 	/** External scrollbar used to synchronize file view position. */
 	TSharedPtr<class SScrollBar> ExternalScrollbar;
@@ -143,4 +146,6 @@ protected:
 	FString DelayHighlightItem;
 
 	TMap<FName, bool> ClassFilterMap;
+
+	FPakFileEntryPtr FilesSummary;
 };
