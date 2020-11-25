@@ -955,9 +955,36 @@ void SPakFileView::InitializeAndShowHeaderColumns()
 	);
 	
 	FileColumns.Emplace(FFileColumn::CompressionBlockSizeColumnName, FFileColumn(7, FFileColumn::CompressionBlockSizeColumnName, LOCTEXT("CompressionBlockSizeColumn", "Compression Block Size"), LOCTEXT("CompressionBlockSizeColumnTip", "File compression block size"), 155.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
-	FileColumns.Emplace(FFileColumn::CompressionMethodColumnName, FFileColumn(8, FFileColumn::CompressionMethodColumnName, LOCTEXT("CompressionMethod", "Compression Method"), LOCTEXT("CompressionMethodTip", "Compression method name used to compress this file"), 125.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	
+	FFileColumn& CompressionMethodColumn = FileColumns.Emplace(FFileColumn::CompressionMethodColumnName, FFileColumn(8, FFileColumn::CompressionMethodColumnName, LOCTEXT("CompressionMethod", "Compression Method"), LOCTEXT("CompressionMethodTip", "Compression method name used to compress this file"), 125.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	CompressionMethodColumn.SetAscendingCompareDelegate(
+		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
+		{
+			return A->CompressionMethod.LexicalLess(B->CompressionMethod);
+		}
+	);
+	CompressionMethodColumn.SetDescendingCompareDelegate(
+		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
+		{
+			return B->CompressionMethod.LexicalLess(A->CompressionMethod);
+		}
+	);
+	
 	FileColumns.Emplace(FFileColumn::SHA1ColumnName, FFileColumn(9, FFileColumn::SHA1ColumnName, LOCTEXT("SHA1Column", "SHA1"), LOCTEXT("SHA1ColumnTip", "File sha1"), 315.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
-	FileColumns.Emplace(FFileColumn::IsEncryptedColumnName, FFileColumn(10, FFileColumn::IsEncryptedColumnName, LOCTEXT("IsEncryptedColumn", "IsEncrypted"), LOCTEXT("IsEncryptedColumnTip", "Is file encrypted in pak?"), 70.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	
+	FFileColumn& IsEncryptedColumn = FileColumns.Emplace(FFileColumn::IsEncryptedColumnName, FFileColumn(10, FFileColumn::IsEncryptedColumnName, LOCTEXT("IsEncryptedColumn", "IsEncrypted"), LOCTEXT("IsEncryptedColumnTip", "Is file encrypted in pak?"), 70.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	IsEncryptedColumn.SetAscendingCompareDelegate(
+		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
+		{
+			return A->PakEntry.IsEncrypted() < B->PakEntry.IsEncrypted();
+		}
+	);
+	IsEncryptedColumn.SetDescendingCompareDelegate(
+		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
+		{
+			return B->PakEntry.IsEncrypted() < A->PakEntry.IsEncrypted();
+		}
+	);
 
 	// Show columns.
 	for (const auto& ColumnPair : FileColumns)
