@@ -504,6 +504,8 @@ void SPakFileView::Construct(const FArguments& InArgs)
 	InnderTask->GetOnSortAndFilterFinishedDelegate().BindRaw(this, &SPakFileView::OnSortAndFilterFinihed);
 
 	LastLoadGuid = LexToString(FGuid());
+
+	FilesSummary = MakeShared<FPakFileEntry>(TEXT("Total"), TEXT("Total"));
 }
 
 void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
@@ -527,7 +529,7 @@ void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 		}
 	}
 
-	if (!DelayHighlightItem.IsEmpty() && FileCache.Num() > 0)
+	if (!DelayHighlightItem.IsEmpty() && !IsFileListEmpty())
 	{
 		ScrollToItem(DelayHighlightItem);
 		DelayHighlightItem = TEXT("");
@@ -953,9 +955,36 @@ void SPakFileView::InitializeAndShowHeaderColumns()
 	);
 	
 	FileColumns.Emplace(FFileColumn::CompressionBlockSizeColumnName, FFileColumn(7, FFileColumn::CompressionBlockSizeColumnName, LOCTEXT("CompressionBlockSizeColumn", "Compression Block Size"), LOCTEXT("CompressionBlockSizeColumnTip", "File compression block size"), 155.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
-	FileColumns.Emplace(FFileColumn::CompressionMethodColumnName, FFileColumn(8, FFileColumn::CompressionMethodColumnName, LOCTEXT("CompressionMethod", "Compression Method"), LOCTEXT("CompressionMethodTip", "Compression method name used to compress this file"), 125.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	
+	FFileColumn& CompressionMethodColumn = FileColumns.Emplace(FFileColumn::CompressionMethodColumnName, FFileColumn(8, FFileColumn::CompressionMethodColumnName, LOCTEXT("CompressionMethod", "Compression Method"), LOCTEXT("CompressionMethodTip", "Compression method name used to compress this file"), 125.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	CompressionMethodColumn.SetAscendingCompareDelegate(
+		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
+		{
+			return A->CompressionMethod.LexicalLess(B->CompressionMethod);
+		}
+	);
+	CompressionMethodColumn.SetDescendingCompareDelegate(
+		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
+		{
+			return B->CompressionMethod.LexicalLess(A->CompressionMethod);
+		}
+	);
+	
 	FileColumns.Emplace(FFileColumn::SHA1ColumnName, FFileColumn(9, FFileColumn::SHA1ColumnName, LOCTEXT("SHA1Column", "SHA1"), LOCTEXT("SHA1ColumnTip", "File sha1"), 315.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
-	FileColumns.Emplace(FFileColumn::IsEncryptedColumnName, FFileColumn(10, FFileColumn::IsEncryptedColumnName, LOCTEXT("IsEncryptedColumn", "IsEncrypted"), LOCTEXT("IsEncryptedColumnTip", "Is file encrypted in pak?"), 70.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	
+	FFileColumn& IsEncryptedColumn = FileColumns.Emplace(FFileColumn::IsEncryptedColumnName, FFileColumn(10, FFileColumn::IsEncryptedColumnName, LOCTEXT("IsEncryptedColumn", "IsEncrypted"), LOCTEXT("IsEncryptedColumnTip", "Is file encrypted in pak?"), 70.f, EFileColumnFlags::ShouldBeVisible | EFileColumnFlags::CanBeHidden));
+	IsEncryptedColumn.SetAscendingCompareDelegate(
+		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
+		{
+			return A->PakEntry.IsEncrypted() < B->PakEntry.IsEncrypted();
+		}
+	);
+	IsEncryptedColumn.SetDescendingCompareDelegate(
+		[](const FPakFileEntryPtr& A, const FPakFileEntryPtr& B) -> bool
+		{
+			return B->PakEntry.IsEncrypted() < A->PakEntry.IsEncrypted();
+		}
+	);
 
 	// Show columns.
 	for (const auto& ColumnPair : FileColumns)
@@ -1133,14 +1162,16 @@ void SPakFileView::OnShowAllColumnsExecute()
 
 bool SPakFileView::HasOneFileSelected() const
 {
-	TArray<FPakFileEntryPtr> SelectedItems = FileListView->GetSelectedItems();
+	TArray<FPakFileEntryPtr> SelectedItems;
+	GetSelectedItems(SelectedItems);
 
 	return SelectedItems.Num() == 1;
 }
 
 bool SPakFileView::HasFileSelected() const
 {
-	TArray<FPakFileEntryPtr> SelectedItems = FileListView->GetSelectedItems();
+	TArray<FPakFileEntryPtr> SelectedItems;
+	GetSelectedItems(SelectedItems);
 
 	return SelectedItems.Num() > 0;
 }
@@ -1149,7 +1180,9 @@ void SPakFileView::OnCopyAllColumnsExecute()
 {
 	FString Value;
 
-	TArray<FPakFileEntryPtr> SelectedItems = FileListView->GetSelectedItems();
+	TArray<FPakFileEntryPtr> SelectedItems;
+	GetSelectedItems(SelectedItems);
+
 	if (SelectedItems.Num() > 0)
 	{
 		TArray<TSharedPtr<FJsonValue>> FileObjects;
@@ -1188,7 +1221,8 @@ void SPakFileView::OnCopyAllColumnsExecute()
 void SPakFileView::OnCopyColumnExecute(const FName ColumnId)
 {
 	TArray<FString> Values;
-	TArray<FPakFileEntryPtr> SelectedItems = FileListView->GetSelectedItems();
+	TArray<FPakFileEntryPtr> SelectedItems;
+	GetSelectedItems(SelectedItems);
 
 	for (const FPakFileEntryPtr PakFileItem : SelectedItems)
 	{
@@ -1247,7 +1281,9 @@ void SPakFileView::OnCopyColumnExecute(const FName ColumnId)
 
 void SPakFileView::OnJumpToTreeViewExecute()
 {
-	TArray<FPakFileEntryPtr> SelectedItems = FileListView->GetSelectedItems();
+	TArray<FPakFileEntryPtr> SelectedItems;
+	GetSelectedItems(SelectedItems);
+
 	if (SelectedItems.Num() > 0 && SelectedItems[0].IsValid())
 	{
 		FWidgetDelegates::GetOnSwitchToTreeViewDelegate().Broadcast(SelectedItems[0]->Path);
@@ -1266,6 +1302,8 @@ void SPakFileView::OnSortAndFilterFinihed(const FName InSortedColumn, EColumnSor
 			IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 
 			InnderTask->RetriveResult(FileCache);
+			FillFilesSummary();
+
 			FileListView->RebuildList();
 
 			if (PakAnalyzer->IsLoadDirty(InLoadGuid) || !InSearchText.Equals(CurrentSearchText, ESearchCase::IgnoreCase))
@@ -1284,14 +1322,14 @@ void SPakFileView::OnSortAndFilterFinihed(const FName InSortedColumn, EColumnSor
 
 FText SPakFileView::GetFileCount() const
 {
-	const int32 CurrentFileCount = FileCache.Num();
+	const int32 CurrentFileCount = FMath::Clamp(FileCache.Num() - 1, 0, FileCache.Num());
 
 	return FText::Format(FTextFormat::FromString(TEXT("{0} / {1} files")), FText::AsNumber(CurrentFileCount), FText::AsNumber(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetFileCount()));
 }
 
 bool SPakFileView::IsFileListEmpty() const
 {
-	return FileCache.Num() > 0;
+	return FileCache.Num() - 1 > 0;
 }
 
 void SPakFileView::OnExportToJson()
@@ -1321,7 +1359,7 @@ void SPakFileView::OnExportToJson()
 	}
 
 	TArray<FPakFileEntryPtr> SelectedItems;
-	FileListView->GetSelectedItems(SelectedItems);
+	GetSelectedItems(SelectedItems);
 
 	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExportToJson(OutFileNames[0], SelectedItems);
 }
@@ -1353,7 +1391,7 @@ void SPakFileView::OnExportToCsv()
 	}
 
 	TArray<FPakFileEntryPtr> SelectedItems;
-	FileListView->GetSelectedItems(SelectedItems);
+	GetSelectedItems(SelectedItems);
 
 	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExportToCsv(OutFileNames[0], SelectedItems);
 }
@@ -1381,7 +1419,7 @@ void SPakFileView::OnExtract()
 	}
 
 	TArray<FPakFileEntryPtr> SelectedItems;
-	FileListView->GetSelectedItems(SelectedItems);
+	GetSelectedItems(SelectedItems);
 
 	const FString PakFileName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
 
@@ -1407,6 +1445,36 @@ void SPakFileView::OnLoadAssetReigstryFinished()
 	FillClassesFilter();
 
 	MarkDirty(true);
+}
+
+void SPakFileView::FillFilesSummary()
+{
+	FilesSummary->PakEntry.Offset = 0;
+	FilesSummary->PakEntry.UncompressedSize = 0;
+	FilesSummary->PakEntry.Size = 0;
+
+	if (FileCache.Num() > 0)
+	{
+		for (FPakFileEntryPtr PakFileEntryPtr : FileCache)
+		{
+			FilesSummary->PakEntry.UncompressedSize += PakFileEntryPtr->PakEntry.UncompressedSize;
+			FilesSummary->PakEntry.Size += PakFileEntryPtr->PakEntry.Size;
+		}
+
+		FileCache.Add(FilesSummary);
+	}
+}
+
+bool SPakFileView::GetSelectedItems(TArray<FPakFileEntryPtr>& OutSelectedItems) const
+{
+	if (FileListView.IsValid())
+	{
+		FileListView->GetSelectedItems(OutSelectedItems);
+		OutSelectedItems.Remove(FilesSummary);
+		return true;
+	}
+
+	return false;
 }
 
 #undef LOCTEXT_NAMESPACE
