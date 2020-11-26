@@ -28,6 +28,7 @@ public class UnrealPakViewer : ModuleRules
 				"PakAnalyzer",
 				"Json",
 				"ImageWrapper",
+				"Oodle",
 			}
 		);
 
