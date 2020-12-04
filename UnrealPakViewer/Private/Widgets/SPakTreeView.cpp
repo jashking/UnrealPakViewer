@@ -532,9 +532,9 @@ void SPakTreeView::OnExtractExecute()
 		RetriveFiles(PakTreeEntry, TargetFiles);
 	}
 
-	const FString PakFileName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
+	//const FString PakFileName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
 	
-	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExtractFiles(OutputPath / PakFileName, TargetFiles);
+	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExtractFiles(OutputPath/* / PakFileName*/, TargetFiles);
 }
 
 void SPakTreeView::OnJumpToFileViewExecute()

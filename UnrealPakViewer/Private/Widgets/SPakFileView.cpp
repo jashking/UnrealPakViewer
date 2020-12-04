@@ -1421,9 +1421,9 @@ void SPakFileView::OnExtract()
 	TArray<FPakFileEntryPtr> SelectedItems;
 	GetSelectedItems(SelectedItems);
 
-	const FString PakFileName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
+	//const FString PakFileName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
 
-	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExtractFiles(OutputPath / PakFileName, SelectedItems);
+	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExtractFiles(OutputPath/* / PakFileName*/, SelectedItems);
 }
 
 void SPakFileView::ScrollToItem(const FString& InPath)
