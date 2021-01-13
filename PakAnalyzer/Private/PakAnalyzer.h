@@ -49,7 +49,7 @@ protected:
 	void InsertClassInfo(FPakTreeEntryPtr InRoot, FName InClassName, int32 InFileCount, int64 InSize, int64 InCompressedSize);
 	FName GetAssetClass(const FString& InFilename);
 
-	bool LoadAssetRegistryFromPak(TSharedPtr<FPakFile> InPakFile, FPakFileEntryPtr InPakFileEntry);
+	bool LoadAssetRegistryFromPak(FPakFile* InPakFile, FPakFileEntryPtr InPakFileEntry);
 	bool LoadAssetRegistry(FArrayReader& InData);
 
 	bool PreLoadPak(const FString& InPakPath);

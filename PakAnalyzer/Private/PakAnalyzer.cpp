@@ -64,8 +64,14 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 		return false;
 	}
 
+#if ENGINE_MINOR_VERSION >= 27
+	TRefCountPtr<FPakFile> PakFile = new FPakFile(*InPakPath, false);
+	FPakFile* PakFilePtr = PakFile.GetReference();
+#else
 	TSharedPtr<FPakFile> PakFile = MakeShared<FPakFile>(*InPakPath, false);
-	if (!PakFile.IsValid())
+	FPakFile* PakFilePtr = PakFile.Get();
+#endif // ENGINE_MINOR_VERSION >= 27
+	if (!PakFilePtr)
 	{
 		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Load pak file failed! Create PakFile failed! Path: %s."), *InPakPath));
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Create PakFile failed! Path: %s."), *InPakPath);
@@ -73,7 +79,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 		return false;
 	}
 
-	if (!PakFile->IsValid())
+	if (!PakFilePtr->IsValid())
 	{
 		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Load pak file failed! Unable to open pak file! Path: %s."), *InPakPath));
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Unable to open pak file! Path: %s."), *InPakPath);
@@ -85,10 +91,10 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 	LoadGuid = FGuid::NewGuid();
 
 	// Save pak sumary
-	PakFileSumary.MountPoint = PakFile->GetMountPoint();
-	PakFileSumary.PakInfo = PakFile->GetInfo();
+	PakFileSumary.MountPoint = PakFilePtr->GetMountPoint();
+	PakFileSumary.PakInfo = PakFilePtr->GetInfo();
 	PakFileSumary.PakFilePath = InPakPath;
-	PakFileSumary.PakFileSize = PakFile->TotalSize();
+	PakFileSumary.PakFileSize = PakFilePtr->TotalSize();
 
 	TArray<FString> Methods;
 	for (const FName& Name : PakFileSumary.PakInfo.CompressionMethods)
@@ -104,7 +110,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 
 	// Iterate Files
 	TArray<RecordIterator> Records;
-	for (RecordIterator It(*PakFile, true); It; ++It)
+	for (RecordIterator It(*PakFilePtr, true); It; ++It)
 	{
 		Records.Add(It);
 	}
@@ -129,7 +135,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 			PakEntry = It.Info();
 
 #if ENGINE_MINOR_VERSION >= 26
-			PakFile->ReadHashFromPayload(PakEntry, PakEntry.Hash);
+			PakFilePtr->ReadHashFromPayload(PakEntry, PakEntry.Hash);
 
 			const FString* Filename = It.TryGetFilename();
 			if (Filename)
@@ -141,7 +147,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 #endif
 			if (Child.IsValid() && Child->Filename.ToString().EndsWith(TEXT("AssetRegistry.bin")))
 			{
-				LoadAssetRegistryFromPak(PakFile, Child);
+				LoadAssetRegistryFromPak(PakFilePtr, Child);
 			}
 		}
 
@@ -638,9 +644,9 @@ FName FPakAnalyzer::GetAssetClass(const FString& InFilename)
 	return AssetClass.IsNone() ? TEXT("Unknown") : AssetClass;
 }
 
-bool FPakAnalyzer::LoadAssetRegistryFromPak(TSharedPtr<FPakFile> InPakFile, FPakFileEntryPtr InPakFileEntry)
+bool FPakAnalyzer::LoadAssetRegistryFromPak(FPakFile* InPakFile, FPakFileEntryPtr InPakFileEntry)
 {
-	if (!InPakFile.IsValid() || !InPakFile->IsValid() || !InPakFileEntry.IsValid())
+	if (!InPakFile || !InPakFile->IsValid() || !InPakFileEntry.IsValid())
 	{
 		return false;
 	}
