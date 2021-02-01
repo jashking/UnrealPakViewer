@@ -633,7 +633,11 @@ FName FPakAnalyzer::GetAssetClass(const FString& InFilename)
 
 			const FString FullObjectPath = FPaths::SetExtension(bNotUseGamePrefix ? TEXT("/") / Prefix / Right : TEXT("/Game") / Right, TEXT(""));
 
+#if ENGINE_MINOR_VERSION >= 27
+			TArrayView<FAssetData const* const> AssetDataArray = AssetRegistryState->GetAssetsByPackageName(*FullObjectPath);
+#else
 			const TArray<const FAssetData*>& AssetDataArray = AssetRegistryState->GetAssetsByPackageName(*FullObjectPath);
+#endif
 			if (AssetDataArray.Num() > 0)
 			{
 				AssetClass = AssetDataArray[0]->AssetClass;
