@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "IPlatformFilePak.h"
+#include "UObject/ObjectResource.h"
+#include "UObject/PackageFileSummary.h"
 
 struct FPakClassEntry
 {
@@ -26,6 +28,22 @@ struct FPakClassEntry
 
 typedef TSharedPtr<FPakClassEntry> FPakClassEntryPtr;
 
+typedef TSharedPtr<FName> FNamePtrType;
+typedef TSharedPtr<FObjectExport> FObjectExportPtrType;
+typedef TSharedPtr<FObjectImport> FObjectImportPtrType;
+typedef TSharedPtr<FPackageIndex> FPackageIndexPtrType;
+
+struct FAssetSummary
+{
+	FPackageFileSummary PackageSummary;
+	TArray<FNamePtrType> Names;
+	TArray<FObjectExportPtrType> ObjectExports;
+	TArray<FObjectImportPtrType> ObjectImports;
+	TArray<FPackageIndexPtrType> PreloadDependency;
+};
+
+typedef TSharedPtr<FAssetSummary> FAssetSummaryPtr;
+
 struct FPakFileEntry : TSharedFromThis<FPakFileEntry>
 {
 	FPakFileEntry(const FString& InFilename, const FString& InPath)
@@ -40,6 +58,7 @@ struct FPakFileEntry : TSharedFromThis<FPakFileEntry>
 	FString Path;
 	FName CompressionMethod;
 	FName Class;
+	FAssetSummaryPtr AssetSummary;
 };
 
 typedef TSharedPtr<FPakFileEntry> FPakFileEntryPtr;

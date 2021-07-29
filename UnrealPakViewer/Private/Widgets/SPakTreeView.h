@@ -102,6 +102,7 @@ protected:
 	TSharedPtr<SKeyValueRow> FileCountRow;
 	TSharedPtr<class SPakClassView> ClassView;
 	TSharedPtr<SKeyValueRow> ClassRow;
+	TSharedPtr<class SAssetSummaryView> AssetSummaryView;
 
 	FString DelayHighlightItem;
 

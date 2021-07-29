@@ -20,6 +20,8 @@ public:
 	SLATE_ATTRIBUTE(FText, ValueText)
 	SLATE_ATTRIBUTE(FText, ValueToolTipText)
 	SLATE_ATTRIBUTE(float, KeyStretchCoefficient)
+	SLATE_NAMED_SLOT(FArguments, KeyContent)
+	SLATE_NAMED_SLOT(FArguments, ValueContent)
 	SLATE_END_ARGS()
 
 	/** Constructs this widget. */

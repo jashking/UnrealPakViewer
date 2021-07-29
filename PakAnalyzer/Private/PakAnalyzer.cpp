@@ -16,6 +16,7 @@
 #include "Serialization/Archive.h"
 #include "Serialization/MemoryWriter.h"
 
+#include "AssetParseThreadWorker.h"
 #include "CommonDefines.h"
 #include "ExtractThreadWorker.h"
 
@@ -30,10 +31,12 @@ FPakAnalyzer::FPakAnalyzer()
 {
 	Reset();
 	InitializeExtractWorker();
+	InitializeAssetParseWorker();
 }
 
 FPakAnalyzer::~FPakAnalyzer()
 {
+	ShutdownAssetParseWorker();
 	ShutdownAllExtractWorker();
 	Reset();
 }
@@ -103,58 +106,62 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 	}
 	PakFileSumary.CompressionMethods = FString::Join(Methods, TEXT(", "));
 
+	ShutdownAssetParseWorker();
+
 	// Make tree root
 	TreeRoot = MakeShared<FPakTreeEntry>(FPaths::GetCleanFilename(InPakPath), PakFileSumary.MountPoint, true);
 
 	UE_LOG(LogPakAnalyzer, Log, TEXT("Load all file info from pak."));
 
 	// Iterate Files
-	TArray<RecordIterator> Records;
+	struct FPakEntryWithFilename
+	{
+		FPakEntry Entry;
+		FString Filename;
+	};
+
+	TArray<FPakEntryWithFilename> Records;
 	for (RecordIterator It(*PakFilePtr, true); It; ++It)
 	{
-		Records.Add(It);
-	}
+#if ENGINE_MINOR_VERSION >= 26
+		const FString& Filename = *It.TryGetFilename();
+#else
+		const FString& Filename = It.Filename();
+#endif
 
-	struct FOffsetSort
-	{
-		FORCEINLINE bool operator()(const RecordIterator& A, const RecordIterator& B) const
-		{
-			return A.Info().Offset < B.Info().Offset;
-		}
-	};
-	Records.Sort(FOffsetSort());
+		Records.Add({ It.Info(), Filename });
+	}
 
 	{
 		FScopeLock Lock(&CriticalSection);
-		FPakEntry PakEntry;
 
-		for (auto It : Records)
+		for (FPakEntryWithFilename& Record : Records)
 		{
 			FPakTreeEntryPtr Child = nullptr;
 
-			PakEntry = It.Info();
+			FPakEntry& PakEntry = Record.Entry;
+
+			if (PakEntry.CompressionBlocks.Num() == 1)
+			{
+				PakEntry.CompressionBlockSize = PakEntry.UncompressedSize;
+			}
 
 #if ENGINE_MINOR_VERSION >= 26
 			PakFilePtr->ReadHashFromPayload(PakEntry, PakEntry.Hash);
-
-			const FString* Filename = It.TryGetFilename();
-			if (Filename)
-			{
-				Child = InsertFileToTree(*Filename, PakEntry);
-			}
-#else
-			Child = InsertFileToTree(It.Filename(), PakEntry);
 #endif
+
+			Child = InsertFileToTree(Record.Filename, PakEntry);
 			if (Child.IsValid() && Child->Filename.ToString().EndsWith(TEXT("AssetRegistry.bin")))
 			{
 				LoadAssetRegistryFromPak(PakFilePtr, Child);
 			}
 		}
-
-		RefreshTreeNode(TreeRoot);
-		RefreshTreeNodeSizePercent(TreeRoot);
-		RefreshClassMap(TreeRoot);
 	}
+
+	RefreshTreeNode(TreeRoot);
+	RefreshTreeNodeSizePercent(TreeRoot);
+	RefreshClassMap(TreeRoot);
+	ParseAssetFile(TreeRoot);
 
 	bHasPakLoaded = true;
 
@@ -571,6 +578,25 @@ void FPakAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilter
 	}
 }
 
+void FPakAnalyzer::RetriveUAssetFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileEntryPtr>& OutFiles) const
+{
+	for (auto& Pair : InRoot->ChildrenMap)
+	{
+		FPakTreeEntryPtr Child = Pair.Value;
+		if (Child->bIsDirectory)
+		{
+			RetriveUAssetFiles(Child, OutFiles);
+		}
+		else
+		{
+			if (Child->Filename.ToString().EndsWith(TEXT(".uasset")) || Child->Filename.ToString().EndsWith(TEXT(".umap")))
+			{
+				OutFiles.Add(Child);
+			}
+		}
+	}
+}
+
 void FPakAnalyzer::RefreshClassMap(FPakTreeEntryPtr InRoot)
 {
 	InRoot->FileClassMap.Empty();
@@ -889,6 +915,35 @@ void FPakAnalyzer::ShutdownAllExtractWorker()
 	for (TSharedPtr<FExtractThreadWorker> Worker : ExtractWorkers)
 	{
 		Worker->Shutdown();
+	}
+}
+
+void FPakAnalyzer::ParseAssetFile(FPakTreeEntryPtr InRoot)
+{
+	if (AssetParseWorker.IsValid())
+	{
+		TArray<FPakFileEntryPtr> UAssetFiles;
+		RetriveUAssetFiles(InRoot, UAssetFiles);
+
+		AssetParseWorker->StartParse(UAssetFiles, PakFileSumary.PakFilePath, PakFileSumary.PakInfo.Version, CachedAESKey);
+	}
+}
+
+void FPakAnalyzer::InitializeAssetParseWorker()
+{
+	UE_LOG(LogPakAnalyzer, Log, TEXT("Initialize asset parse worker."));
+
+	if (!AssetParseWorker.IsValid())
+	{
+		AssetParseWorker = MakeShared<FAssetParseThreadWorker>();
+	}
+}
+
+void FPakAnalyzer::ShutdownAssetParseWorker()
+{
+	if (AssetParseWorker.IsValid())
+	{
+		AssetParseWorker->Shutdown();
 	}
 }
 

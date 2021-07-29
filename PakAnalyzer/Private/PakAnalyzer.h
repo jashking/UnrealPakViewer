@@ -45,6 +45,7 @@ protected:
 	void RefreshTreeNode(FPakTreeEntryPtr InRoot);
 	void RefreshTreeNodeSizePercent(FPakTreeEntryPtr InRoot);
 	void RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, const TMap<FName, bool>& InClassFilterMap, TArray<FPakFileEntryPtr>& OutFiles) const;
+	void RetriveUAssetFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileEntryPtr>& OutFiles) const;
 	void RefreshClassMap(FPakTreeEntryPtr InRoot);
 	void InsertClassInfo(FPakTreeEntryPtr InRoot, FName InClassName, int32 InFileCount, int64 InSize, int64 InCompressedSize);
 	FName GetAssetClass(const FString& InFilename);
@@ -57,6 +58,10 @@ protected:
 
 	void InitializeExtractWorker();
 	void ShutdownAllExtractWorker();
+
+	void ParseAssetFile(FPakTreeEntryPtr InRoot);
+	void InitializeAssetParseWorker();
+	void ShutdownAssetParseWorker();
 
 	// Extract progress
 	void OnUpdateExtractProgress(const FGuid& WorkerGuid, int32 CompleteCount, int32 ErrorCount, int32 TotalCount);
@@ -82,6 +87,8 @@ protected:
 	int32 ExtractWorkerCount;
 	TArray<TSharedPtr<class FExtractThreadWorker>> ExtractWorkers;
 	TMap<FGuid, FExtractProgress> ExtractWorkerProgresses;
+
+	TSharedPtr<class FAssetParseThreadWorker> AssetParseWorker;
 
 	FAES::FAESKey CachedAESKey;
 
