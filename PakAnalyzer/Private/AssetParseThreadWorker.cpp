@@ -195,7 +195,7 @@ uint32 FAssetParseThreadWorker::Run()
 
 		ReaderArchive->Close();
 		delete ReaderArchive;
-	}, true);
+	}, false);
 
 	StopTaskCounter.Reset();
 	return 0;
