@@ -310,7 +310,7 @@ void SPakClassView::Construct(const FArguments& InArgs)
 							.SelectionMode(ESelectionMode::Multi)
 							.ListItemsSource(&ClassCache)
 							.OnGenerateRow(this, &SPakClassView::OnGenerateClassRow)
-							.ConsumeMouseWheel(EConsumeMouseWheel::Always)
+							//.ConsumeMouseWheel(EConsumeMouseWheel::WhenScrollingPossible)
 							.HeaderRow
 							(
 								SAssignNew(ClassListHeaderRow, SHeaderRow).Visibility(EVisibility::Visible)
