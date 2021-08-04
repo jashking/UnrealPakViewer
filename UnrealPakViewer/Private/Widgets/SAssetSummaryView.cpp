@@ -46,36 +46,42 @@ public:
 
 	virtual TSharedRef<SWidget> GenerateWidgetForColumn(const FName& ColumnName) override
 	{
+		static const float LeftMargin = 4.f;
+
 		FObjectImportPtrType Object = WeakObject.Pin();
 		if (!Object.IsValid())
 		{
-			return SNew(STextBlock).Text(LOCTEXT("NullColumn", "Null"));
+			return SNew(STextBlock).Text(LOCTEXT("NullColumn", "Null")).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 
-		if (ColumnName == "ClassPackage")
+		if (ColumnName == "Index")
 		{
-			return SNew(STextBlock).Text(FText::FromName(Object->ClassPackage)).ToolTipText(FText::FromName(Object->ClassPackage));;
+			return SNew(STextBlock).Text(FText::AsNumber(Object->Index));
+		}
+		else if (ColumnName == "ClassPackage")
+		{
+			return SNew(STextBlock).Text(FText::FromName(Object->ClassPackage)).ToolTipText(FText::FromName(Object->ClassPackage)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 		else if (ColumnName == "ClassName")
 		{
-			return SNew(STextBlock).Text(FText::FromName(Object->ClassName)).ToolTipText(FText::FromName(Object->ClassName));;
+			return SNew(STextBlock).Text(FText::FromName(Object->ClassName)).ToolTipText(FText::FromName(Object->ClassName)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 		else if (ColumnName == "ObjectName")
 		{
-			return SNew(STextBlock).Text(FText::FromName(Object->ObjectName)).ToolTipText(FText::FromName(Object->ObjectName));;
+			return SNew(STextBlock).Text(FText::FromName(Object->ObjectName)).ToolTipText(FText::FromName(Object->ObjectName)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
-		else if (ColumnName == "OuterIndex")
+		else if (ColumnName == "FullPath")
 		{
-			return SNew(STextBlock).Text(FText::AsNumber(Object->OuterIndex.ForDebugging())).Justification(ETextJustify::Center);;
+			return SNew(STextBlock).Text(FText::FromString(Object->ObjectPath)).ToolTipText(FText::FromString(Object->ObjectPath)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 		else
 		{
-			return SNew(STextBlock).Text(LOCTEXT("UnknownColumn", "Unknown Column"));
+			return SNew(STextBlock).Text(LOCTEXT("UnknownColumn", "Unknown Column")).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 	}
 
 protected:
-	TWeakPtr<FObjectImport> WeakObject;
+	TWeakPtr<FObjectImportEx> WeakObject;
 };
 
 class SExportObjectRow : public SMultiColumnTableRow<FObjectExportPtrType>
@@ -98,15 +104,21 @@ public:
 
 	virtual TSharedRef<SWidget> GenerateWidgetForColumn(const FName& ColumnName) override
 	{
+		static const float LeftMargin = 4.f;
+
 		FObjectExportPtrType Object = WeakObject.Pin();
 		if (!Object.IsValid())
 		{
-			return SNew(STextBlock).Text(LOCTEXT("NullColumn", "Null"));
+			return SNew(STextBlock).Text(LOCTEXT("NullColumn", "Null")).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 
-		if (ColumnName == "ObjectName")
+		if (ColumnName == "Index")
 		{
-			return SNew(STextBlock).Text(FText::FromName(Object->ObjectName)).ToolTipText(FText::FromName(Object->ObjectName));
+			return SNew(STextBlock).Text(FText::AsNumber(Object->Index));
+		}
+		else if (ColumnName == "ObjectName")
+		{
+			return SNew(STextBlock).Text(FText::FromName(Object->ObjectName)).ToolTipText(FText::FromName(Object->ObjectName)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 		else if (ColumnName == "SerialSize")
 		{
@@ -130,28 +142,28 @@ public:
 		}
 		else if (ColumnName == "ClassIndex")
 		{
-			return SNew(STextBlock).Text(FText::AsNumber(Object->ClassIndex.ForDebugging())).Justification(ETextJustify::Center);
+			return SNew(STextBlock).Text(FText::FromString(Object->ClassName)).ToolTipText(FText::FromString(Object->ClassName)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 		else if (ColumnName == "SuperIndex")
 		{
-			return SNew(STextBlock).Text(FText::AsNumber(Object->SuperIndex.ForDebugging())).Justification(ETextJustify::Center);
+			return SNew(STextBlock).Text(FText::FromString(Object->Super)).ToolTipText(FText::FromString(Object->Super)).Justification(ETextJustify::Right).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 		else if (ColumnName == "TemplateIndex")
 		{
-			return SNew(STextBlock).Text(FText::AsNumber(Object->TemplateIndex.ForDebugging())).Justification(ETextJustify::Center);
+			return SNew(STextBlock).Text(FText::FromString(Object->TemplateObject)).ToolTipText(FText::FromString(Object->TemplateObject)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
-		else if (ColumnName == "OuterIndex")
+		else if (ColumnName == "FullPath")
 		{
-			return SNew(STextBlock).Text(FText::AsNumber(Object->OuterIndex.ForDebugging())).Justification(ETextJustify::Center);
+			return SNew(STextBlock).Text(FText::FromString(Object->ObjectPath)).ToolTipText(FText::FromString(Object->ObjectPath)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 		else
 		{
-			return SNew(STextBlock).Text(LOCTEXT("UnknownColumn", "Unknown Column"));
+			return SNew(STextBlock).Text(LOCTEXT("UnknownColumn", "Unknown Column")).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 	}
 
 protected:
-	TWeakPtr<FObjectExport> WeakObject;
+	TWeakPtr<FObjectExportEx> WeakObject;
 };
 
 SAssetSummaryView::SAssetSummaryView()
@@ -463,21 +475,23 @@ void SAssetSummaryView::Construct(const FArguments& InArgs)
 		]
 	];
 
+	InsertColumn(ImportObjectHeaderRow, "Index");
 	InsertColumn(ImportObjectHeaderRow, "ObjectName");
 	InsertColumn(ImportObjectHeaderRow, "ClassName");
 	InsertColumn(ImportObjectHeaderRow, "ClassPackage");
-	InsertColumn(ImportObjectHeaderRow, "OuterIndex");
+	InsertColumn(ImportObjectHeaderRow, "FullPath");
 
+	InsertColumn(ExportObjectHeaderRow, "Index");
 	InsertColumn(ExportObjectHeaderRow, "ObjectName");
+	InsertColumn(ExportObjectHeaderRow, "ClassIndex", TEXT("ClassName"));
 	InsertSortableColumn(ExportObjectHeaderRow, "SerialSize");
 	InsertSortableColumn(ExportObjectHeaderRow, "SerialOffset");
+	InsertColumn(ExportObjectHeaderRow, "FullPath");
 	InsertColumn(ExportObjectHeaderRow, "bIsAsset");
 	InsertColumn(ExportObjectHeaderRow, "bNotForClient");
 	InsertColumn(ExportObjectHeaderRow, "bNotForServer");
-	InsertColumn(ExportObjectHeaderRow, "ClassIndex");
-	InsertColumn(ExportObjectHeaderRow, "SuperIndex");
-	InsertColumn(ExportObjectHeaderRow, "TemplateIndex");
-	InsertColumn(ExportObjectHeaderRow, "OuterIndex");
+	InsertColumn(ExportObjectHeaderRow, "TemplateIndex", TEXT("TemplateObject"));
+	InsertColumn(ExportObjectHeaderRow, "SuperIndex", TEXT("Super"));
 }
 
 void SAssetSummaryView::SetViewingPackage(FPakFileEntryPtr InPackage)
@@ -532,12 +546,12 @@ TSharedRef<ITableRow> SAssetSummaryView::OnGeneratePreloadDependencyRow(FPackage
 		];
 }
 
-void SAssetSummaryView::InsertColumn(TSharedPtr<SHeaderRow> InHeader, FName InId)
+void SAssetSummaryView::InsertColumn(TSharedPtr<SHeaderRow> InHeader, FName InId, const FString& InCloumnName)
 {
 	SHeaderRow::FColumn::FArguments ColumnArgs;
 	ColumnArgs
 		.ColumnId(InId)
-		.DefaultLabel(FText::FromName(InId))
+		.DefaultLabel(InCloumnName.IsEmpty() ? FText::FromName(InId) : FText::FromString(InCloumnName))
 		.HAlignHeader(HAlign_Fill)
 		.VAlignHeader(VAlign_Fill)
 		.HeaderContentPadding(FMargin(2.f))
@@ -547,12 +561,12 @@ void SAssetSummaryView::InsertColumn(TSharedPtr<SHeaderRow> InHeader, FName InId
 	InHeader->AddColumn(ColumnArgs);
 }
 
-void SAssetSummaryView::InsertSortableColumn(TSharedPtr<SHeaderRow> InHeader, FName InId)
+void SAssetSummaryView::InsertSortableColumn(TSharedPtr<SHeaderRow> InHeader, FName InId, const FString& InCloumnName)
 {
 	SHeaderRow::FColumn::FArguments ColumnArgs;
 	ColumnArgs
 		.ColumnId(InId)
-		.DefaultLabel(FText::FromName(InId))
+		.DefaultLabel(InCloumnName.IsEmpty() ? FText::FromName(InId) : FText::FromString(InCloumnName))
 		.HAlignHeader(HAlign_Fill)
 		.VAlignHeader(VAlign_Fill)
 		.HeaderContentPadding(FMargin(2.f))

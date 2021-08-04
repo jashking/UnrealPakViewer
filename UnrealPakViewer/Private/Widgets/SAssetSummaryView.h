@@ -61,8 +61,8 @@ protected:
 	TSharedRef<ITableRow> OnGenerateExportObjectRow(FObjectExportPtrType InObject, const TSharedRef<class STableViewBase>& OwnerTable);
 	TSharedRef<ITableRow> OnGeneratePreloadDependencyRow(FPackageIndexPtrType InPackageIndex, const TSharedRef<class STableViewBase>& OwnerTable);
 
-	void InsertColumn(TSharedPtr<SHeaderRow> InHeader, FName InId);
-	void InsertSortableColumn(TSharedPtr<SHeaderRow> InHeader, FName InId);
+	void InsertColumn(TSharedPtr<SHeaderRow> InHeader, FName InId, const FString& InCloumnName = TEXT(""));
+	void InsertSortableColumn(TSharedPtr<SHeaderRow> InHeader, FName InId, const FString& InCloumnName = TEXT(""));
 	void OnSortModeChanged(const EColumnSortPriority::Type SortPriority, const FName& ColumnId, const EColumnSortMode::Type SortMode);
 	EColumnSortMode::Type GetSortModeForColumn(const FName ColumnId) const;
 	void OnSortExportObjects();

@@ -5,6 +5,15 @@
 #include "UObject/ObjectResource.h"
 #include "UObject/PackageFileSummary.h"
 
+typedef TSharedPtr<struct FPakClassEntry> FPakClassEntryPtr;
+typedef TSharedPtr<FName> FNamePtrType;
+typedef TSharedPtr<struct FObjectExportEx> FObjectExportPtrType;
+typedef TSharedPtr<struct FObjectImportEx> FObjectImportPtrType;
+typedef TSharedPtr<class FPackageIndex> FPackageIndexPtrType;
+typedef TSharedPtr<struct FAssetSummary> FAssetSummaryPtr;
+typedef TSharedPtr<struct FPakFileEntry> FPakFileEntryPtr;
+typedef TSharedPtr<struct FPakTreeEntry> FPakTreeEntryPtr;
+
 struct FPakClassEntry
 {
 	FPakClassEntry(FName InClassName, int64 InSize, int64 InCompressedSize, int32 InFileCount)
@@ -26,12 +35,20 @@ struct FPakClassEntry
 	float PercentOfParent;
 };
 
-typedef TSharedPtr<FPakClassEntry> FPakClassEntryPtr;
+struct FObjectExportEx : public FObjectExport
+{
+	int32 Index = 0;
+	FString ObjectPath;
+	FString ClassName;
+	FString TemplateObject;
+	FString Super;
+};
 
-typedef TSharedPtr<FName> FNamePtrType;
-typedef TSharedPtr<FObjectExport> FObjectExportPtrType;
-typedef TSharedPtr<FObjectImport> FObjectImportPtrType;
-typedef TSharedPtr<FPackageIndex> FPackageIndexPtrType;
+struct FObjectImportEx : public FObjectImport
+{
+	int32 Index = 0;
+	FString ObjectPath;
+};
 
 struct FAssetSummary
 {
@@ -41,8 +58,6 @@ struct FAssetSummary
 	TArray<FObjectImportPtrType> ObjectImports;
 	TArray<FPackageIndexPtrType> PreloadDependency;
 };
-
-typedef TSharedPtr<FAssetSummary> FAssetSummaryPtr;
 
 struct FPakFileEntry : TSharedFromThis<FPakFileEntry>
 {
@@ -60,8 +75,6 @@ struct FPakFileEntry : TSharedFromThis<FPakFileEntry>
 	FName Class;
 	FAssetSummaryPtr AssetSummary;
 };
-
-typedef TSharedPtr<FPakFileEntry> FPakFileEntryPtr;
 
 struct FPakTreeEntry : public FPakFileEntry
 {
@@ -87,8 +100,6 @@ struct FPakTreeEntry : public FPakFileEntry
 
 	}
 };
-
-typedef TSharedPtr<FPakTreeEntry> FPakTreeEntryPtr;
 
 struct FPakFileSumary
 {

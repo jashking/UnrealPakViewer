@@ -49,6 +49,26 @@ protected:
 	const TArray<FNameEntryId>& NameMap;
 };
 
+template<class T>
+FString FindFullPath(const TArray<T>& InMaps, int32 Index, const FString& InPathSpliter = TEXT("/"))
+{
+	if (!InMaps.IsValidIndex(Index))
+	{
+		return TEXT("Invalid");
+	}
+
+	const T& Object = InMaps[Index];
+	FString ObjectPath = Object->ObjectName.ToString();
+
+	if (!Object->OuterIndex.IsNull())
+	{
+		const FString ParentObjectPath = FindFullPath(InMaps, Object->OuterIndex.IsImport() ? Object->OuterIndex.ToImport() : Object->OuterIndex.ToExport(), InPathSpliter);
+		ObjectPath = ParentObjectPath + InPathSpliter + ObjectPath;
+	}
+
+	return ObjectPath;
+}
+
 FAssetParseThreadWorker::FAssetParseThreadWorker()
 	: Thread(nullptr)
 	, PakVersion(FPakInfo::PakFile_Version_Latest)
@@ -165,8 +185,10 @@ uint32 FAssetParseThreadWorker::Run()
 				Reader.Seek(File->AssetSummary->PackageSummary.ExportOffset);
 				for (int32 i = 0; i < File->AssetSummary->PackageSummary.ExportCount; ++i)
 				{
-					FObjectExportPtrType Export = MakeShared<FObjectExport>();
+					FObjectExportPtrType Export = MakeShared<FObjectExportEx>();
 					Reader << *(Export.Get());
+
+					Export->Index = i;
 
 					File->AssetSummary->ObjectExports.Add(Export);
 				}
@@ -175,10 +197,75 @@ uint32 FAssetParseThreadWorker::Run()
 				Reader.Seek(File->AssetSummary->PackageSummary.ImportOffset);
 				for (int32 i = 0; i < File->AssetSummary->PackageSummary.ImportCount; ++i)
 				{
-					FObjectImportPtrType Import = MakeShared<FObjectImport>();
+					FObjectImportPtrType Import = MakeShared<FObjectImportEx>();
 					Reader << *(Import.Get());
 
+					Import->Index = i;
+
 					File->AssetSummary->ObjectImports.Add(Import);
+				}
+
+				// Parse Export Object Path
+				for (int32 i = 0; i < File->AssetSummary->ObjectExports.Num(); ++i)
+				{
+					FObjectExportPtrType& Export = File->AssetSummary->ObjectExports[i];
+					Export->ObjectPath = FindFullPath(File->AssetSummary->ObjectExports, i, TEXT("."));
+
+					if (Export->ClassIndex.IsImport())
+					{
+						const int32 ClassIndex = Export->ClassIndex.ToImport();
+						if (File->AssetSummary->ObjectImports.IsValidIndex(ClassIndex))
+						{
+							Export->ClassName = File->AssetSummary->ObjectImports[ClassIndex]->ObjectName.ToString();
+						}
+					}
+					else if (Export->ClassIndex.IsExport())
+					{
+						const int32 ClassIndex = Export->ClassIndex.ToExport();
+						if (File->AssetSummary->ObjectExports.IsValidIndex(ClassIndex))
+						{
+							Export->ClassName = File->AssetSummary->ObjectExports[ClassIndex]->ObjectName.ToString();
+						}
+					}
+
+					if (Export->TemplateIndex.IsImport())
+					{
+						const int32 TemplateIndex = Export->TemplateIndex.ToImport();
+						if (File->AssetSummary->ObjectImports.IsValidIndex(TemplateIndex))
+						{
+							Export->TemplateObject = File->AssetSummary->ObjectImports[TemplateIndex]->ObjectName.ToString();
+						}
+					}
+					else if (Export->TemplateIndex.IsExport())
+					{
+						const int32 TemplateIndex = Export->TemplateIndex.ToExport();
+						if (File->AssetSummary->ObjectExports.IsValidIndex(TemplateIndex))
+						{
+							Export->TemplateObject = File->AssetSummary->ObjectExports[TemplateIndex]->ObjectName.ToString();
+						}
+					}
+
+					if (Export->SuperIndex.IsImport())
+					{
+						const int32 SuperIndex = Export->SuperIndex.ToImport();
+						if (File->AssetSummary->ObjectImports.IsValidIndex(SuperIndex))
+						{
+							Export->Super = File->AssetSummary->ObjectImports[SuperIndex]->ObjectName.ToString();
+						}
+					}
+					else if (Export->SuperIndex.IsExport())
+					{
+						const int32 SuperIndex = Export->SuperIndex.ToExport();
+						if (File->AssetSummary->ObjectExports.IsValidIndex(SuperIndex))
+						{
+							Export->Super = File->AssetSummary->ObjectExports[SuperIndex]->ObjectName.ToString();
+						}
+					}
+				}
+
+				for (int32 i = 0; i < File->AssetSummary->ObjectImports.Num(); ++i)
+				{
+					File->AssetSummary->ObjectImports[i]->ObjectPath = FindFullPath(File->AssetSummary->ObjectImports, i);
 				}
 
 				// Serialize Preload Dependency
