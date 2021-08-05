@@ -114,6 +114,10 @@ Cook 完成后都会在 *Saved/Cooked/[Platform]/[Project]/Metadata/DevelopmentA
     * Create Before Serialization: 序列化前要完成创建的对象
     * Serialization Before Create: 创建前要完成序列化的对象
     * Create Before Create: 创建前要完成创建的对象
+* Dependency packages: 该资源依赖的资源
+  ![DependencyPackages.png](Resources/Images/DependencyPackages.png)
+* Dependent packages: 依赖该资源的资源，这个是在当前 Pak 内搜索，如果分包了则结果可能会缺失
+  ![DependentPackages.png](Resources/Images/DependentPackages.png)
 * Names: 该资源相关联的所有 FName 信息
   ![Names.png](Resources/Images/Names.png)
 
