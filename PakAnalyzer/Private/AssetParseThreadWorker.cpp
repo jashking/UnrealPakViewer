@@ -87,9 +87,13 @@ bool FAssetParseThreadWorker::Init()
 
 uint32 FAssetParseThreadWorker::Run()
 {
+	const static bool bForceSingleThread = true;
 	const int32 TotalCount = Files.Num();
+	
+	TMultiMap<FString, FString> DependsMap;
 
-	ParallelFor(TotalCount, [this](int32 InIndex){
+	// Parse assets
+	ParallelFor(TotalCount, [this, &DependsMap](int32 InIndex){
 		if (StopTaskCounter.GetValue() > 0)
 		{
 			return;
@@ -265,7 +269,18 @@ uint32 FAssetParseThreadWorker::Run()
 
 				for (int32 i = 0; i < File->AssetSummary->ObjectImports.Num(); ++i)
 				{
-					File->AssetSummary->ObjectImports[i]->ObjectPath = FindFullPath(File->AssetSummary->ObjectImports, i);
+					FObjectImportPtrType& Import = File->AssetSummary->ObjectImports[i];
+
+					Import->ObjectPath = FindFullPath(File->AssetSummary->ObjectImports, i);
+
+					if (Import->ClassName == "Package" && !Import->ObjectPath.StartsWith(TEXT("/Script")))
+					{
+						FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
+						Depends->PackageName = Import->ObjectPath;
+						File->AssetSummary->DependencyList.Add(Depends);
+
+						DependsMap.Add(Import->ObjectPath.ToLower(), File->PackagePath);
+					}
 				}
 
 				// Serialize Preload Dependency
@@ -282,7 +297,27 @@ uint32 FAssetParseThreadWorker::Run()
 
 		ReaderArchive->Close();
 		delete ReaderArchive;
-	}, false);
+	}, bForceSingleThread);
+
+	// Parse depends
+	ParallelFor(TotalCount, [this, &DependsMap](int32 InIndex) {
+		if (StopTaskCounter.GetValue() > 0)
+		{
+			return;
+		}
+
+		FPakFileEntryPtr File = Files[InIndex];
+
+		TArray<FString> Assets;
+		DependsMap.MultiFind(File->PackagePath.ToLower(), Assets);
+
+		for (const FString& Asset : Assets)
+		{
+			FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
+			Depends->PackageName = Asset;
+			File->AssetSummary->DependentList.Add(Depends);
+		}
+	}, bForceSingleThread);
 
 	StopTaskCounter.Reset();
 	return 0;

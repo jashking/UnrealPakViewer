@@ -13,6 +13,7 @@ typedef TSharedPtr<class FPackageIndex> FPackageIndexPtrType;
 typedef TSharedPtr<struct FAssetSummary> FAssetSummaryPtr;
 typedef TSharedPtr<struct FPakFileEntry> FPakFileEntryPtr;
 typedef TSharedPtr<struct FPakTreeEntry> FPakTreeEntryPtr;
+typedef TSharedPtr<struct FPackageInfo> FPackageInfoPtr;
 
 struct FPakClassEntry
 {
@@ -50,6 +51,11 @@ struct FObjectImportEx : public FObjectImport
 	FString ObjectPath;
 };
 
+struct FPackageInfo
+{
+	FString PackageName;
+};
+
 struct FAssetSummary
 {
 	FPackageFileSummary PackageSummary;
@@ -57,6 +63,8 @@ struct FAssetSummary
 	TArray<FObjectExportPtrType> ObjectExports;
 	TArray<FObjectImportPtrType> ObjectImports;
 	TArray<FPackageIndexPtrType> PreloadDependency;
+	TArray<FPackageInfoPtr> DependencyList; // this asset depends on
+	TArray<FPackageInfoPtr> DependentList; // assets depends on this
 };
 
 struct FPakFileEntry : TSharedFromThis<FPakFileEntry>
@@ -73,6 +81,7 @@ struct FPakFileEntry : TSharedFromThis<FPakFileEntry>
 	FString Path;
 	FName CompressionMethod;
 	FName Class;
+	FString PackagePath;
 	FAssetSummaryPtr AssetSummary;
 };
 

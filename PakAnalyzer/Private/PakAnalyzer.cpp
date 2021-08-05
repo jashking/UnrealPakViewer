@@ -491,6 +491,7 @@ FPakTreeEntryPtr FPakAnalyzer::InsertFileToTree(const FString& InFullPath, const
 			{
 				NewChild->PakEntry = InPakEntry;
 				NewChild->CompressionMethod = *ResolveCompressionMethod(&InPakEntry);
+				NewChild->PackagePath = GetPackagePath(PakFileSumary.MountPoint / CurrentPath);
 			}
 
 			Parent->ChildrenMap.Add(*PathItems[i], NewChild);
@@ -570,6 +571,7 @@ void FPakAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilter
 					FileEntryPtr->Class = Child->Class;
 					FileEntryPtr->PakEntry = Child->PakEntry;
 					FileEntryPtr->CompressionMethod = Child->CompressionMethod;
+					FileEntryPtr->PackagePath = Child->PackagePath;
 				}
 
 				OutFiles.Add(FileEntryPtr);
@@ -615,7 +617,7 @@ void FPakAnalyzer::RefreshClassMap(FPakTreeEntryPtr InRoot)
 		}
 		else
 		{
-			Child->Class = GetAssetClass(Child->Path);
+			Child->Class = GetAssetClass(Child->Path, Child->PackagePath);
 			InsertClassInfo(InRoot, Child->Class, 1, Child->Size, Child->CompressedSize);
 
 		}
@@ -645,29 +647,19 @@ void FPakAnalyzer::InsertClassInfo(FPakTreeEntryPtr InRoot, FName InClassName, i
 	ClassEntry->PercentOfParent = InRoot->CompressedSize > 0 ? (float)ClassEntry->CompressedSize / InRoot->CompressedSize : 0.f;
 }
 
-FName FPakAnalyzer::GetAssetClass(const FString& InFilename)
+FName FPakAnalyzer::GetAssetClass(const FString& InFilename, const FString& InPackagePath)
 {
 	FName AssetClass = *FPaths::GetExtension(InFilename);
 	if (AssetRegistryState.IsValid())
 	{
-		const FString FullPath = PakFileSumary.MountPoint / InFilename;
-		FString Left, Right;
-		if (FullPath.Split(TEXT("Content"), &Left, &Right))
-		{
-			const FString Prefix = FPaths::GetPathLeaf(Left);
-			const bool bNotUseGamePrefix = Prefix == TEXT("Engine") || FullPath.Contains(TEXT("Plugin"));
-
-			const FString FullObjectPath = FPaths::SetExtension(bNotUseGamePrefix ? TEXT("/") / Prefix / Right : TEXT("/Game") / Right, TEXT(""));
-
 #if ENGINE_MINOR_VERSION >= 27
-			TArrayView<FAssetData const* const> AssetDataArray = AssetRegistryState->GetAssetsByPackageName(*FullObjectPath);
+		TArrayView<FAssetData const* const> AssetDataArray = AssetRegistryState->GetAssetsByPackageName(*InPackagePath);
 #else
-			const TArray<const FAssetData*>& AssetDataArray = AssetRegistryState->GetAssetsByPackageName(*FullObjectPath);
+		const TArray<const FAssetData*>& AssetDataArray = AssetRegistryState->GetAssetsByPackageName(*InPackagePath);
 #endif
-			if (AssetDataArray.Num() > 0)
-			{
-				AssetClass = AssetDataArray[0]->AssetClass;
-			}
+		if (AssetDataArray.Num() > 0)
+		{
+			AssetClass = AssetDataArray[0]->AssetClass;
 		}
 	}
 
@@ -975,4 +967,18 @@ void FPakAnalyzer::OnUpdateExtractProgress(const FGuid& WorkerGuid, int32 Comple
 void FPakAnalyzer::ResetProgress()
 {
 	ExtractWorkerProgresses.Empty(ExtractWorkers.Num());
+}
+
+FString FPakAnalyzer::GetPackagePath(const FString& InFilePath)
+{
+	FString Left, Right;
+	if (InFilePath.Split(TEXT("/Content/"), &Left, &Right))
+	{
+		const FString Prefix = FPaths::GetPathLeaf(Left);
+		const bool bNotUseGamePrefix = Prefix == TEXT("Engine") || InFilePath.Contains(TEXT("Plugin"));
+
+		return FPaths::SetExtension(bNotUseGamePrefix ? TEXT("/") / Prefix / Right : TEXT("/Game") / Right, TEXT(""));
+	}
+
+	return InFilePath;
 }

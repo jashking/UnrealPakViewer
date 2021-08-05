@@ -55,11 +55,14 @@ protected:
 	DECLARE_GET_MEMBER_FUNCTION(WorldTileInfoDataOffset);
 	DECLARE_GET_MEMBER_FUNCTION(PreloadDependencyCount);
 	DECLARE_GET_MEMBER_FUNCTION(PreloadDependencyOffset);
+	DECLARE_GET_MEMBER_FUNCTION(DependencyCount);
+	DECLARE_GET_MEMBER_FUNCTION(DependentCount);
 
 	TSharedRef<ITableRow> OnGenerateNameRow(FNamePtrType InName, const TSharedRef<class STableViewBase>& OwnerTable);
 	TSharedRef<ITableRow> OnGenerateImportObjectRow(FObjectImportPtrType InObject, const TSharedRef<class STableViewBase>& OwnerTable);
 	TSharedRef<ITableRow> OnGenerateExportObjectRow(FObjectExportPtrType InObject, const TSharedRef<class STableViewBase>& OwnerTable);
 	TSharedRef<ITableRow> OnGeneratePreloadDependencyRow(FPackageIndexPtrType InPackageIndex, const TSharedRef<class STableViewBase>& OwnerTable);
+	TSharedRef<ITableRow> OnGenerateDependsRow(FPackageInfoPtr InDepends, const TSharedRef<class STableViewBase>& OwnerTable);
 
 	void InsertColumn(TSharedPtr<SHeaderRow> InHeader, FName InId, const FString& InCloumnName = TEXT(""));
 	void InsertSortableColumn(TSharedPtr<SHeaderRow> InHeader, FName InId, const FString& InCloumnName = TEXT(""));
@@ -87,4 +90,9 @@ protected:
 
 	TSharedPtr<SListView<FPackageIndexPtrType>> PreloadDependencyListView;
 	TArray<FPackageIndexPtrType> PreloadDependency;
+
+	TSharedPtr<SListView<FPackageInfoPtr>> DependencyListView;
+	TSharedPtr<SListView<FPackageInfoPtr>> DependentListView;
+	TArray<FPackageInfoPtr> DependencyList;
+	TArray<FPackageInfoPtr> DependentList;
 };

@@ -391,6 +391,82 @@ void SAssetSummaryView::Construct(const FArguments& InArgs)
 		.Padding(0.f, 2.f)
 		[
 			SNew(SExpandableArea)
+			.InitiallyCollapsed(false)
+			.HeaderContent()
+			[
+				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_Dependency", "Dependency packages:")).KeyToolTipText(LOCTEXT("Tree_View_Summary_DependencyTip", "Packages that this package depends on"))
+				.ValueContent()
+				[
+					SNew(SHorizontalBox)
+
+					+ SHorizontalBox::Slot()
+					.FillWidth(1.f)
+					[
+						SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_Count", "Count:")).ValueText(this, &SAssetSummaryView::GetDependencyCount)
+					]
+				]
+			]
+			.BodyContent()
+			[
+				SAssignNew(DependencyListView, SListView<FPackageInfoPtr>)
+				.ItemHeight(25.f)
+				.SelectionMode(ESelectionMode::Multi)
+				.ListItemsSource(&DependencyList)
+				.OnGenerateRow(this, &SAssetSummaryView::OnGenerateDependsRow)
+				.HeaderRow
+				(
+					SNew(SHeaderRow).Visibility(EVisibility::Visible)
+
+					+ SHeaderRow::Column(FName("Package"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Tree_View_Summary_Package", "Package"))
+				)
+			]
+		]
+
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(0.f, 2.f)
+		[
+			SNew(SExpandableArea)
+			.InitiallyCollapsed(false)
+			.HeaderContent()
+			[
+				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_Dependent", "Dependent packages:")).KeyToolTipText(LOCTEXT("Tree_View_Summary_DependentTip", "Packages that depends on this package. May be incorrect due to multi paks!"))
+				.ValueContent()
+				[
+					SNew(SHorizontalBox)
+
+					+ SHorizontalBox::Slot()
+					.FillWidth(1.f)
+					[
+						SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_Count", "Count:")).ValueText(this, &SAssetSummaryView::GetDependentCount)
+					]
+				]
+			]
+			.BodyContent()
+			[
+				SAssignNew(DependentListView, SListView<FPackageInfoPtr>)
+				.ItemHeight(25.f)
+				.SelectionMode(ESelectionMode::Multi)
+				.ListItemsSource(&DependentList)
+				.OnGenerateRow(this, &SAssetSummaryView::OnGenerateDependsRow)
+				.HeaderRow
+				(
+					SNew(SHeaderRow).Visibility(EVisibility::Visible)
+
+					+ SHeaderRow::Column(FName("Package"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Tree_View_Summary_Package", "Package"))
+				)
+			]
+		]
+
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(0.f, 2.f)
+		[
+			SNew(SExpandableArea)
 			.InitiallyCollapsed(true)
 			.HeaderContent()
 			[
@@ -502,6 +578,8 @@ void SAssetSummaryView::SetViewingPackage(FPakFileEntryPtr InPackage)
 	ImportObjects = InPackage->AssetSummary->ObjectImports;
 	ExportObjects = InPackage->AssetSummary->ObjectExports;
 	PreloadDependency = InPackage->AssetSummary->PreloadDependency;
+	DependencyList = InPackage->AssetSummary->DependencyList;
+	DependentList = InPackage->AssetSummary->DependentList;
 
 	TotalExportSize = 0;
 	for (FObjectExportPtrType ExportObject : ExportObjects)
@@ -518,6 +596,8 @@ void SAssetSummaryView::SetViewingPackage(FPakFileEntryPtr InPackage)
 	ImportObjectListView->RebuildList();
 	ExportObjectListView->RebuildList();
 	PreloadDependencyListView->RebuildList();
+	DependencyListView->RebuildList();
+	DependentListView->RebuildList();
 }
 
 TSharedRef<ITableRow> SAssetSummaryView::OnGenerateNameRow(FNamePtrType InName, const TSharedRef<class STableViewBase>& OwnerTable)
@@ -543,6 +623,14 @@ TSharedRef<ITableRow> SAssetSummaryView::OnGeneratePreloadDependencyRow(FPackage
 	return SNew(STableRow<FNamePtrType>, OwnerTable).Padding(FMargin(0.f, 2.f))
 		[
 			SNew(STextBlock).Text(FText::AsNumber(InPackageIndex->ForDebugging()))
+		];
+}
+
+TSharedRef<ITableRow> SAssetSummaryView::OnGenerateDependsRow(FPackageInfoPtr InDepends, const TSharedRef<class STableViewBase>& OwnerTable)
+{
+	return SNew(STableRow<FPackageInfoPtr>, OwnerTable).Padding(FMargin(0.f, 2.f))
+		[
+			SNew(STextBlock).Text(FText::FromString(InDepends->PackageName)).ToolTipText(FText::FromString(InDepends->PackageName))
 		];
 }
 
@@ -673,6 +761,16 @@ FORCEINLINE FText SAssetSummaryView::GetExportSize() const
 FORCEINLINE FText SAssetSummaryView::GetExportSizeTooltip() const
 {
 	return FText::AsNumber(TotalExportSize);
+}
+
+FORCEINLINE FText SAssetSummaryView::GetDependencyCount() const
+{
+	return ViewingPackage.IsValid() ? FText::AsNumber(ViewingPackage->AssetSummary->DependencyList.Num()) : FText();
+}
+
+FORCEINLINE FText SAssetSummaryView::GetDependentCount() const
+{
+	return ViewingPackage.IsValid() ? FText::AsNumber(ViewingPackage->AssetSummary->DependentList.Num()) : FText();
 }
 
 DEFINE_GET_MEMBER_FUNCTION_NUMBER(TotalHeaderSize)

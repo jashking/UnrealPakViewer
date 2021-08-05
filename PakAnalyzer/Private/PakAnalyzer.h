@@ -48,7 +48,7 @@ protected:
 	void RetriveUAssetFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileEntryPtr>& OutFiles) const;
 	void RefreshClassMap(FPakTreeEntryPtr InRoot);
 	void InsertClassInfo(FPakTreeEntryPtr InRoot, FName InClassName, int32 InFileCount, int64 InSize, int64 InCompressedSize);
-	FName GetAssetClass(const FString& InFilename);
+	FName GetAssetClass(const FString& InFilename, const FString& InPackagePath);
 
 	bool LoadAssetRegistryFromPak(FPakFile* InPakFile, FPakFileEntryPtr InPakFileEntry);
 	bool LoadAssetRegistry(FArrayReader& InData);
@@ -74,6 +74,8 @@ protected:
 	};
 
 	void ResetProgress();
+
+	FString GetPackagePath(const FString& InFilePath);
 
 protected:
 	FCriticalSection CriticalSection;
