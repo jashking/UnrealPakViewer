@@ -88,14 +88,34 @@ Cook 完成后都会在 *Saved/Cooked/[Platform]/[Project]/Metadata/DevelopmentA
 * FileVersionLicenseeUE4: 文件格式版本号(授权)
 * TotalHeaderSize: uasset 的文件头大小
 * PackageFlags: uasset 包标志
-* ImportObjects: 导入表信息(引用的外部对象)
+* ImportObjects: 导入表信息(引用的外部对象信息)
   ![ImportObjects.png](Resources/Images/ImportObjects.png)
+  * Index: 对象在导入表中的索引
+  * ObjectName: 对象名称
+  * ClassName: 对象类型
+  * ClassPackage: 对象类型所在的包
+  * FullPath: 对象完整路径
 * ExportObjects: 导出表信息(该资源内部有哪些对象)，导出表的序列化大小即是对应的 .uexp 文件大小，可点击 SerialSize 和 SerialOffset 列进行排序
   ![ExportObjects.png](Resources/Images/ExportObjects.png)
+  * Index: 对象在导出表中的索引
+  * ObjectName: 对象名称
+  * ClassName: 对象类型
+  * SerialSize: 对象的序列化大小
+  * SerialOffset: 对象的序列化偏移
+  * FullPath: 对象在包内的完整路径
+  * bIsAsset:
+  * bNotForClient: 非客户端资源
+  * bNotForServer: 非服务器资源
+  * TemplateObject: 该对象的模板对象
+  * Super: 父类对象
+  * Dependencies: 该对象引用的具体对象信息，冒号前为引用类型，后为引用的具体对象路径
+    ![ObjectDependencies.png](Resources/Images/ObjectDependencies.png)
+    * Serialization Before Serialization: 序列化前要完成序列化的对象
+    * Create Before Serialization: 序列化前要完成创建的对象
+    * Serialization Before Create: 创建前要完成序列化的对象
+    * Create Before Create: 创建前要完成创建的对象
 * Names: 该资源相关联的所有 FName 信息
   ![Names.png](Resources/Images/Names.png)
-* PreloadDependency: 依赖资源包索引信息
-  ![PreloadDependency.png](Resources/Images/PreloadDependency.png)
 
 #### 右键菜单 ####
 
