@@ -1,12 +1,14 @@
 #include "AssetParseThreadWorker.h"
 
 #include "Async/ParallelFor.h"
+#include "HAL/CriticalSection.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformProcess.h"
 #include "HAL/RunnableThread.h"
 #include "IPlatformFilePak.h"
 #include "Misc/Compression.h"
 #include "Misc/Paths.h"
+#include "Misc/ScopeLock.h"
 #include "Serialization/Archive.h"
 #include "Serialization/MemoryWriter.h"
 #include "Serialization/MemoryReader.h"
@@ -87,13 +89,14 @@ bool FAssetParseThreadWorker::Init()
 
 uint32 FAssetParseThreadWorker::Run()
 {
-	const static bool bForceSingleThread = true;
+	FCriticalSection Mutex;
+	const static bool bForceSingleThread = false;
 	const int32 TotalCount = Files.Num();
 	
 	TMultiMap<FString, FString> DependsMap;
 
 	// Parse assets
-	ParallelFor(TotalCount, [this, &DependsMap](int32 InIndex){
+	ParallelFor(TotalCount, [this, &DependsMap, &Mutex](int32 InIndex){
 		if (StopTaskCounter.GetValue() > 0)
 		{
 			return;
@@ -215,56 +218,9 @@ uint32 FAssetParseThreadWorker::Run()
 					FObjectExportPtrType& Export = File->AssetSummary->ObjectExports[i];
 					Export->ObjectPath = FindFullPath(File->AssetSummary->ObjectExports, i, TEXT("."));
 
-					if (Export->ClassIndex.IsImport())
-					{
-						const int32 ClassIndex = Export->ClassIndex.ToImport();
-						if (File->AssetSummary->ObjectImports.IsValidIndex(ClassIndex))
-						{
-							Export->ClassName = File->AssetSummary->ObjectImports[ClassIndex]->ObjectName.ToString();
-						}
-					}
-					else if (Export->ClassIndex.IsExport())
-					{
-						const int32 ClassIndex = Export->ClassIndex.ToExport();
-						if (File->AssetSummary->ObjectExports.IsValidIndex(ClassIndex))
-						{
-							Export->ClassName = File->AssetSummary->ObjectExports[ClassIndex]->ObjectName.ToString();
-						}
-					}
-
-					if (Export->TemplateIndex.IsImport())
-					{
-						const int32 TemplateIndex = Export->TemplateIndex.ToImport();
-						if (File->AssetSummary->ObjectImports.IsValidIndex(TemplateIndex))
-						{
-							Export->TemplateObject = File->AssetSummary->ObjectImports[TemplateIndex]->ObjectName.ToString();
-						}
-					}
-					else if (Export->TemplateIndex.IsExport())
-					{
-						const int32 TemplateIndex = Export->TemplateIndex.ToExport();
-						if (File->AssetSummary->ObjectExports.IsValidIndex(TemplateIndex))
-						{
-							Export->TemplateObject = File->AssetSummary->ObjectExports[TemplateIndex]->ObjectName.ToString();
-						}
-					}
-
-					if (Export->SuperIndex.IsImport())
-					{
-						const int32 SuperIndex = Export->SuperIndex.ToImport();
-						if (File->AssetSummary->ObjectImports.IsValidIndex(SuperIndex))
-						{
-							Export->Super = File->AssetSummary->ObjectImports[SuperIndex]->ObjectName.ToString();
-						}
-					}
-					else if (Export->SuperIndex.IsExport())
-					{
-						const int32 SuperIndex = Export->SuperIndex.ToExport();
-						if (File->AssetSummary->ObjectExports.IsValidIndex(SuperIndex))
-						{
-							Export->Super = File->AssetSummary->ObjectExports[SuperIndex]->ObjectName.ToString();
-						}
-					}
+					ParseObjectName(File->AssetSummary, Export->ClassIndex, Export->ClassName);
+					ParseObjectName(File->AssetSummary, Export->TemplateIndex, Export->TemplateObject);
+					ParseObjectName(File->AssetSummary, Export->SuperIndex, Export->Super);
 				}
 
 				for (int32 i = 0; i < File->AssetSummary->ObjectImports.Num(); ++i)
@@ -279,6 +235,7 @@ uint32 FAssetParseThreadWorker::Run()
 						Depends->PackageName = Import->ObjectPath;
 						File->AssetSummary->DependencyList.Add(Depends);
 
+						FScopeLock ScopeLock(&Mutex);
 						DependsMap.Add(Import->ObjectPath.ToLower(), File->PackagePath);
 					}
 				}
@@ -291,6 +248,74 @@ uint32 FAssetParseThreadWorker::Run()
 					Reader << *(Dependency.Get());
 
 					File->AssetSummary->PreloadDependency.Add(Dependency);
+				}
+
+				// Parse Preload Dependency
+				for (int32 i = 0; i < File->AssetSummary->ObjectExports.Num(); ++i)
+				{
+					FObjectExportPtrType& Export = File->AssetSummary->ObjectExports[i];
+					TArray<FPackageIndexPtrType>& PreloadDependencies = File->AssetSummary->PreloadDependency;
+
+					if (Export->FirstExportDependency >= 0)
+					{
+						FString ObjectName;
+						int32 RunningIndex = Export->FirstExportDependency;
+						for (int32 Index = Export->SerializationBeforeSerializationDependencies; Index > 0; Index--)
+						{
+							FPackageIndexPtrType Dep = PreloadDependencies[RunningIndex++];
+
+							if (ParseObjectPath(File->AssetSummary, *Dep, ObjectName))
+							{
+								FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
+								Depends->PackageName = ObjectName;
+								Depends->ExtraInfo = TEXT("Serialization Before Serialization");
+
+								Export->DependencyList.Add(Depends);
+							}
+						}
+
+						for (int32 Index = Export->CreateBeforeSerializationDependencies; Index > 0; Index--)
+						{
+							FPackageIndexPtrType Dep = PreloadDependencies[RunningIndex++];
+
+							if (ParseObjectPath(File->AssetSummary, *Dep, ObjectName))
+							{
+								FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
+								Depends->PackageName = ObjectName;
+								Depends->ExtraInfo = TEXT("Create Before Serialization");
+
+								Export->DependencyList.Add(Depends);
+							}
+						}
+
+						for (int32 Index = Export->SerializationBeforeCreateDependencies; Index > 0; Index--)
+						{
+							FPackageIndexPtrType Dep = PreloadDependencies[RunningIndex++];
+
+							if (ParseObjectPath(File->AssetSummary, *Dep, ObjectName))
+							{
+								FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
+								Depends->PackageName = ObjectName;
+								Depends->ExtraInfo = TEXT("Serialization Before Create");
+
+								Export->DependencyList.Add(Depends);
+							}
+						}
+
+						for (int32 Index = Export->CreateBeforeCreateDependencies; Index > 0; Index--)
+						{
+							FPackageIndexPtrType Dep = PreloadDependencies[RunningIndex++];
+
+							if (ParseObjectPath(File->AssetSummary, *Dep, ObjectName))
+							{
+								FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
+								Depends->PackageName = ObjectName;
+								Depends->ExtraInfo = TEXT("Create Before Create");
+
+								Export->DependencyList.Add(Depends);
+							}
+						}
+					}
 				}
 			}
 		}
@@ -368,4 +393,52 @@ void FAssetParseThreadWorker::StartParse(TArray<FPakFileEntryPtr>& InFiles, cons
 	AESKey = InKey;
 
 	Thread = FRunnableThread::Create(this, TEXT("AssetParseThreadWorker"), 0, EThreadPriority::TPri_Highest);
+}
+
+bool FAssetParseThreadWorker::ParseObjectName(FAssetSummaryPtr InSummary, FPackageIndex Index, FString& OutObjectName)
+{
+	if (Index.IsImport())
+	{
+		const int32 RawIndex = Index.ToImport();
+		if (InSummary->ObjectImports.IsValidIndex(RawIndex))
+		{
+			OutObjectName = InSummary->ObjectImports[RawIndex]->ObjectName.ToString();
+			return true;
+		}
+	}
+	else if (Index.IsExport())
+	{
+		const int32 RawIndex = Index.ToExport();
+		if (InSummary->ObjectExports.IsValidIndex(RawIndex))
+		{
+			OutObjectName = InSummary->ObjectExports[RawIndex]->ObjectName.ToString();
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool FAssetParseThreadWorker::ParseObjectPath(FAssetSummaryPtr InSummary, FPackageIndex Index, FString& OutFullPath)
+{
+	if (Index.IsImport())
+	{
+		const int32 RawIndex = Index.ToImport();
+		if (InSummary->ObjectImports.IsValidIndex(RawIndex))
+		{
+			OutFullPath = InSummary->ObjectImports[RawIndex]->ObjectPath;
+			return true;
+		}
+	}
+	else if (Index.IsExport())
+	{
+		const int32 RawIndex = Index.ToExport();
+		if (InSummary->ObjectExports.IsValidIndex(RawIndex))
+		{
+			OutFullPath = InSummary->ObjectExports[RawIndex]->ObjectPath;
+			return true;
+		}
+	}
+
+	return false;
 }

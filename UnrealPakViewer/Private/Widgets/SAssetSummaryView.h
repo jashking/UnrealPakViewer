@@ -88,8 +88,8 @@ protected:
 	FName LastSortColumn = "SerialOffset";
 	EColumnSortMode::Type LastSortMode = EColumnSortMode::Ascending;
 
-	TSharedPtr<SListView<FPackageIndexPtrType>> PreloadDependencyListView;
-	TArray<FPackageIndexPtrType> PreloadDependency;
+	//TSharedPtr<SListView<FPackageIndexPtrType>> PreloadDependencyListView;
+	//TArray<FPackageIndexPtrType> PreloadDependency;
 
 	TSharedPtr<SListView<FPackageInfoPtr>> DependencyListView;
 	TSharedPtr<SListView<FPackageInfoPtr>> DependentListView;

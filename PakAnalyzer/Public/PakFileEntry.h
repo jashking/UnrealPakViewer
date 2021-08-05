@@ -43,6 +43,7 @@ struct FObjectExportEx : public FObjectExport
 	FString ClassName;
 	FString TemplateObject;
 	FString Super;
+	TArray<FPackageInfoPtr> DependencyList;
 };
 
 struct FObjectImportEx : public FObjectImport
@@ -54,6 +55,7 @@ struct FObjectImportEx : public FObjectImport
 struct FPackageInfo
 {
 	FString PackageName;
+	FString ExtraInfo;
 };
 
 struct FAssetSummary

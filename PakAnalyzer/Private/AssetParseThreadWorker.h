@@ -23,6 +23,10 @@ public:
 	void StartParse(TArray<FPakFileEntryPtr>& InFiles, const FString& InPakFile, int32 InPakVersion, const FAES::FAESKey& InKey);
 
 protected:
+	bool ParseObjectName(FAssetSummaryPtr InSummary, FPackageIndex Index, FString& OutObjectName);
+	bool ParseObjectPath(FAssetSummaryPtr InSummary, FPackageIndex Index, FString& OutFullPath);
+
+protected:
 	class FRunnableThread* Thread;
 	FThreadSafeCounter StopTaskCounter;
 
