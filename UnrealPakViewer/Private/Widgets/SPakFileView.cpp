@@ -511,28 +511,31 @@ void SPakFileView::Construct(const FArguments& InArgs)
 void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 {
 	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const bool bLoadDirty = PakAnalyzer->IsLoadDirty(LastLoadGuid);
-
-	if (bIsDirty || bLoadDirty)
+	if (PakAnalyzer)
 	{
-		if (SortAndFilterTask->IsDone())
+		const bool bLoadDirty = PakAnalyzer->IsLoadDirty(LastLoadGuid);
+
+		if (bIsDirty || bLoadDirty)
 		{
-			if (bLoadDirty)
+			if (SortAndFilterTask->IsDone())
 			{
-				FillClassesFilter();
+				if (bLoadDirty)
+				{
+					FillClassesFilter();
+				}
+
+				LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
+
+				InnderTask->SetWorkInfo(CurrentSortedColumn, CurrentSortMode, CurrentSearchText, LastLoadGuid, ClassFilterMap);
+				SortAndFilterTask->StartBackgroundTask();
 			}
-
-			LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
-
-			InnderTask->SetWorkInfo(CurrentSortedColumn, CurrentSortMode, CurrentSearchText, LastLoadGuid, ClassFilterMap);
-			SortAndFilterTask->StartBackgroundTask();
 		}
-	}
 
-	if (!DelayHighlightItem.IsEmpty() && !IsFileListEmpty())
-	{
-		ScrollToItem(DelayHighlightItem);
-		DelayHighlightItem = TEXT("");
+		if (!DelayHighlightItem.IsEmpty() && !IsFileListEmpty())
+		{
+			ScrollToItem(DelayHighlightItem);
+			DelayHighlightItem = TEXT("");
+		}
 	}
 
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
@@ -1322,9 +1325,10 @@ void SPakFileView::OnSortAndFilterFinihed(const FName InSortedColumn, EColumnSor
 
 FText SPakFileView::GetFileCount() const
 {
+	IPakAnalyzer* Analyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 	const int32 CurrentFileCount = FMath::Clamp(FileCache.Num() - 1, 0, FileCache.Num());
 
-	return FText::Format(FTextFormat::FromString(TEXT("{0} / {1} files")), FText::AsNumber(CurrentFileCount), FText::AsNumber(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetFileCount()));
+	return FText::Format(FTextFormat::FromString(TEXT("{0} / {1} files")), FText::AsNumber(CurrentFileCount), FText::AsNumber(Analyzer ? Analyzer->GetFileCount() : 0));
 }
 
 bool SPakFileView::IsFileListEmpty() const

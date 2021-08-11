@@ -276,7 +276,11 @@ void SMainWindow::OnLoadPakFile()
 			LOCTEXT("LoadPak_FileDesc", "Open pak file...").ToString(),
 			TEXT(""),
 			TEXT(""),
+#if ENABLE_IO_STORE_ANALYZER
+			LOCTEXT("LoadPak_FileFilter", "Pak files (*.pak, *.ucas)|*.pak;*.ucas|All files (*.*)|*.*").ToString(),
+#else
 			LOCTEXT("LoadPak_FileFilter", "Pak files (*.pak)|*.pak|All files (*.*)|*.*").ToString(),
+#endif
 			EFileDialogFlags::None,
 			OutFiles
 		);
@@ -383,8 +387,12 @@ FReply SMainWindow::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& Dr
 			const TArray<FString>& Files = DragDropOp->GetFiles();
 			if (Files.Num() == 1)
 			{
-				const FString DraggedFileExtension = FPaths::GetExtension(Files[0], true);
+				const FString DraggedFileExtension = FPaths::GetExtension(Files[0], true).ToLower();
+#if ENABLE_IO_STORE_ANALYZER
+				if (DraggedFileExtension == TEXT(".pak") || DraggedFileExtension == TEXT(".ucas"))
+#else
 				if (DraggedFileExtension == TEXT(".pak"))
+#endif
 				{
 					LoadPakFile(Files[0]);
 					return FReply::Handled();
@@ -406,8 +414,12 @@ FReply SMainWindow::OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent
 			const TArray<FString>& Files = DragDropOp->GetFiles();
 			if (Files.Num() == 1)
 			{
-				const FString DraggedFileExtension = FPaths::GetExtension(Files[0], true);
+				const FString DraggedFileExtension = FPaths::GetExtension(Files[0], true).ToLower();
+#if ENABLE_IO_STORE_ANALYZER
+				if (DraggedFileExtension == TEXT(".pak") || DraggedFileExtension == TEXT(".ucas"))
+#else
 				if (DraggedFileExtension == TEXT(".pak"))
+#endif
 				{
 					return FReply::Handled();
 				}
@@ -423,6 +435,8 @@ void SMainWindow::LoadPakFile(const FString& PakFilePath)
 	static const int32 MAX_RECENT_FILE_COUNT = 5;
 
 	const FString FullPath = FPaths::ConvertRelativePathToFull(PakFilePath);
+
+	IPakAnalyzerModule::Get().InitializeAnalyzerBackend(FPaths::GetExtension(PakFilePath));
 
 	const bool bLoadResult = IPakAnalyzerModule::Get().GetPakAnalyzer()->LoadPakFile(FullPath);
 	if (bLoadResult)

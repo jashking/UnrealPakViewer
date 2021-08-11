@@ -34,5 +34,7 @@ public:
 		return FModuleManager::Get().IsModuleLoaded("PakAnalyzer");
 	}
 
+	virtual void InitializeAnalyzerBackend(const FString& InType = TEXT("pak")) = 0;
+
 	virtual IPakAnalyzer* GetPakAnalyzer() = 0;
 };
