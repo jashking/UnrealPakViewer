@@ -387,7 +387,7 @@ FName FBaseAnalyzer::GetAssetClass(const FString& InFilename, const FString& InP
 	FName AssetClass = *FPaths::GetExtension(InFilename);
 	if (AssetRegistryState.IsValid())
 	{
-#if ENGINE_MINOR_VERSION >= 27
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
 		TArrayView<FAssetData const* const> AssetDataArray = AssetRegistryState->GetAssetsByPackageName(*InPackagePath);
 #else
 		const TArray<const FAssetData*>& AssetDataArray = AssetRegistryState->GetAssetsByPackageName(*InPackagePath);
@@ -436,7 +436,7 @@ void FBaseAnalyzer::Reset()
 
 FString FBaseAnalyzer::ResolveCompressionMethod(const FPakEntry* InPakEntry) const
 {
-#if ENGINE_MINOR_VERSION >= 22
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 22
 	if (InPakEntry->CompressionMethodIndex >= 0 && InPakEntry->CompressionMethodIndex < (uint32)PakFileSumary.PakInfo.CompressionMethods.Num())
 	{
 		return PakFileSumary.PakInfo.CompressionMethods[InPakEntry->CompressionMethodIndex].ToString();

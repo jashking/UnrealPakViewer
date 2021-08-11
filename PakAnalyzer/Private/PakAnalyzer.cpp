@@ -20,7 +20,7 @@
 #include "CommonDefines.h"
 #include "ExtractThreadWorker.h"
 
-#if ENGINE_MINOR_VERSION >= 26
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 typedef FPakFile::FPakEntryIterator RecordIterator;
 #else
 typedef FPakFile::FFileIterator RecordIterator;
@@ -67,13 +67,13 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 		return false;
 	}
 
-#if ENGINE_MINOR_VERSION >= 27
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
 	TRefCountPtr<FPakFile> PakFile = new FPakFile(*InPakPath, false);
 	FPakFile* PakFilePtr = PakFile.GetReference();
 #else
 	TSharedPtr<FPakFile> PakFile = MakeShared<FPakFile>(*InPakPath, false);
 	FPakFile* PakFilePtr = PakFile.Get();
-#endif // ENGINE_MINOR_VERSION >= 27
+#endif // ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
 	if (!PakFilePtr)
 	{
 		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Load pak file failed! Create PakFile failed! Path: %s."), *InPakPath));
@@ -123,7 +123,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 	TArray<FPakEntryWithFilename> Records;
 	for (RecordIterator It(*PakFilePtr, true); It; ++It)
 	{
-#if ENGINE_MINOR_VERSION >= 26
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 		const FString& Filename = *It.TryGetFilename();
 #else
 		const FString& Filename = It.Filename();
@@ -146,7 +146,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 				PakEntry.CompressionBlockSize = PakEntry.UncompressedSize;
 			}
 
-#if ENGINE_MINOR_VERSION >= 26
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 			PakFilePtr->ReadHashFromPayload(PakEntry, PakEntry.Hash);
 #endif
 
@@ -389,7 +389,7 @@ bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
 
 				if (Info.EncryptionKeyGuid.IsValid())
 				{
-#if ENGINE_MINOR_VERSION >= 26
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 					FCoreDelegates::GetRegisterEncryptionKeyMulticastDelegate().Broadcast(Info.EncryptionKeyGuid, AESKey);
 #else
 					FCoreDelegates::GetRegisterEncryptionKeyDelegate().ExecuteIfBound(Info.EncryptionKeyGuid, AESKey);

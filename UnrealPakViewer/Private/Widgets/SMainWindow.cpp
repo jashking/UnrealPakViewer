@@ -312,7 +312,7 @@ FString SMainWindow::OnGetAESKey()
 
 void SMainWindow::OnSwitchToTreeView(const FString& InPath)
 {
-#if ENGINE_MINOR_VERSION >= 26
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 	TSharedPtr<SDockTab> TreeViewTab = TabManager->TryInvokeTab(TreeViewTabId);
 #else
 	TSharedPtr<SDockTab> TreeViewTab = TabManager->InvokeTab(TreeViewTabId);
@@ -326,7 +326,7 @@ void SMainWindow::OnSwitchToTreeView(const FString& InPath)
 
 void SMainWindow::OnSwitchToFileView(const FString& InPath)
 {
-#if ENGINE_MINOR_VERSION >= 26
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 	TSharedPtr<SDockTab> FileViewTab = TabManager->TryInvokeTab(FileViewTabId);
 #else
 	TSharedPtr<SDockTab> FileViewTab = TabManager->InvokeTab(FileViewTabId);
