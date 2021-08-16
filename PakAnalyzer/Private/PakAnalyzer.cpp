@@ -41,7 +41,7 @@ FPakAnalyzer::~FPakAnalyzer()
 	Reset();
 }
 
-bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
+bool FPakAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAESKey)
 {
 	if (InPakPath.IsEmpty())
 	{
@@ -61,6 +61,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath)
 
 	Reset();
 
+	DefaultAESKey = InAESKey;
 	if (!PreLoadPak(InPakPath))
 	{
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Pre load pak file failed! Path: %s."), *InPakPath);
@@ -237,6 +238,13 @@ void FPakAnalyzer::SetExtractThreadCount(int32 InThreadCount)
 	}
 }
 
+void FPakAnalyzer::Reset()
+{
+	FBaseAnalyzer::Reset();
+
+	DefaultAESKey = TEXT("");
+}
+
 bool FPakAnalyzer::LoadAssetRegistryFromPak(FPakFile* InPakFile, FPakFileEntryPtr InPakFileEntry)
 {
 	if (!InPakFile || !InPakFile->IsValid() || !InPakFileEntry.IsValid())
@@ -341,60 +349,25 @@ bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
 
 	if (Info.EncryptionKeyGuid.IsValid() || Info.bEncryptedIndex)
 	{
-		const FString KeyString = FPakAnalyzerDelegates::OnGetAESKey.IsBound() ? FPakAnalyzerDelegates::OnGetAESKey.Execute() : TEXT("");
+		bShouldLoad = DefaultAESKey.IsEmpty() ? false : TryDecryptPak(Reader, Info, DefaultAESKey, false);
 
-		FAES::FAESKey AESKey;
-
-		TArray<uint8> DecodedBuffer;
-		if (!FBase64::Decode(KeyString, DecodedBuffer))
+		if (!bShouldLoad)
 		{
-			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] is not base64 format!"), *KeyString);
-			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key[%s] is not base64 format!"), *KeyString));
-			bShouldLoad = false;
-		}
-
-		// Error checking
-		if (bShouldLoad && DecodedBuffer.Num() != FAES::FAESKey::KeySize)
-		{
-			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] can not decode to %d bytes long!"), *KeyString, FAES::FAESKey::KeySize);
-			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key base64[%s] can not decode to %d bytes long!"), *KeyString, FAES::FAESKey::KeySize));
-			bShouldLoad = false;
-		}
-
-		if (bShouldLoad)
-		{
-			FMemory::Memcpy(AESKey.Key, DecodedBuffer.GetData(), FAES::FAESKey::KeySize);
-
-			TArray<uint8> PrimaryIndexData;
-			Reader->Seek(Info.IndexOffset);
-			PrimaryIndexData.SetNum(Info.IndexSize);
-			Reader->Serialize(PrimaryIndexData.GetData(), Info.IndexSize);
-
-			if (!ValidateEncryptionKey(PrimaryIndexData, Info.IndexHash, AESKey))
+			if (FPakAnalyzerDelegates::OnGetAESKey.IsBound())
 			{
-				UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] is not correct!"), *KeyString);
-				FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key base64[%s] is not correct!"), *KeyString));
-				bShouldLoad = false;
+				bool bCancel = true;
+				do
+				{
+					const FString KeyString = FPakAnalyzerDelegates::OnGetAESKey.Execute(bCancel);
+
+					bShouldLoad = !bCancel ? TryDecryptPak(Reader, Info, KeyString, true) : false;
+				} while (!bShouldLoad && !bCancel);
 			}
 			else
 			{
-				CachedAESKey = AESKey;
-
-				UE_LOG(LogPakAnalyzer, Log, TEXT("Use AES encryption key base64[%s] for %s."), *KeyString, *InPakPath);
-				FCoreDelegates::GetPakEncryptionKeyDelegate().BindLambda(
-					[AESKey](uint8 OutKey[32])
-					{
-						FMemory::Memcpy(OutKey, AESKey.Key, 32);
-					});
-
-				if (Info.EncryptionKeyGuid.IsValid())
-				{
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
-					FCoreDelegates::GetRegisterEncryptionKeyMulticastDelegate().Broadcast(Info.EncryptionKeyGuid, AESKey);
-#else
-					FCoreDelegates::GetRegisterEncryptionKeyDelegate().ExecuteIfBound(Info.EncryptionKeyGuid, AESKey);
-#endif
-				}
+				UE_LOG(LogPakAnalyzer, Error, TEXT("Can't open encrypt pak without OnGetAESKey bound!"));
+				FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Can't open encrypt pak without OnGetAESKey bound!")));
+				bShouldLoad = false;
 			}
 		}
 	}
@@ -413,6 +386,84 @@ bool FPakAnalyzer::ValidateEncryptionKey(TArray<uint8>& IndexData, const FSHAHas
 	FSHAHash ActualHash;
 	FSHA1::HashBuffer(IndexData.GetData(), IndexData.Num(), ActualHash.Hash);
 	return InExpectedHash == ActualHash;
+}
+
+bool FPakAnalyzer::TryDecryptPak(FArchive* InReader, const FPakInfo& InPakInfo, const FString& InKey, bool bShowWarning)
+{
+	const FString KeyString = InKey;
+	bool bShouldLoad = true;
+
+	FAES::FAESKey AESKey;
+
+	TArray<uint8> DecodedBuffer;
+	if (!FBase64::Decode(KeyString, DecodedBuffer))
+	{
+		UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] is not base64 format!"), *KeyString);
+
+		if (bShowWarning)
+		{
+			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key[%s] is not base64 format!"), *KeyString));
+		}
+		
+		bShouldLoad = false;
+	}
+
+	// Error checking
+	if (bShouldLoad && DecodedBuffer.Num() != FAES::FAESKey::KeySize)
+	{
+		UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] can not decode to %d bytes long!"), *KeyString, FAES::FAESKey::KeySize);
+
+		if (bShowWarning)
+		{
+			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key base64[%s] can not decode to %d bytes long!"), *KeyString, FAES::FAESKey::KeySize));
+		}
+		
+		bShouldLoad = false;
+	}
+
+	if (bShouldLoad)
+	{
+		FMemory::Memcpy(AESKey.Key, DecodedBuffer.GetData(), FAES::FAESKey::KeySize);
+
+		TArray<uint8> PrimaryIndexData;
+		InReader->Seek(InPakInfo.IndexOffset);
+		PrimaryIndexData.SetNum(InPakInfo.IndexSize);
+		InReader->Serialize(PrimaryIndexData.GetData(), InPakInfo.IndexSize);
+
+		if (!ValidateEncryptionKey(PrimaryIndexData, InPakInfo.IndexHash, AESKey))
+		{
+			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] is not correct!"), *KeyString);
+
+			if (bShowWarning)
+			{
+				FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key base64[%s] is not correct!"), *KeyString));
+			}
+
+			bShouldLoad = false;
+		}
+		else
+		{
+			CachedAESKey = AESKey;
+
+			UE_LOG(LogPakAnalyzer, Log, TEXT("Use AES encryption key base64[%s]."), *KeyString);
+			FCoreDelegates::GetPakEncryptionKeyDelegate().BindLambda(
+				[AESKey](uint8 OutKey[32])
+				{
+					FMemory::Memcpy(OutKey, AESKey.Key, 32);
+				});
+
+			if (InPakInfo.EncryptionKeyGuid.IsValid())
+			{
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
+				FCoreDelegates::GetRegisterEncryptionKeyMulticastDelegate().Broadcast(InPakInfo.EncryptionKeyGuid, AESKey);
+#else
+				FCoreDelegates::GetRegisterEncryptionKeyDelegate().ExecuteIfBound(InPakInfo.EncryptionKeyGuid, AESKey);
+#endif
+			}
+		}
+	}
+
+	return bShouldLoad;
 }
 
 void FPakAnalyzer::InitializeExtractWorker()

@@ -29,6 +29,7 @@ public:
 	virtual bool LoadAssetRegistry(const FString& InRegristryPath) override;
 	virtual bool ExportToJson(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) override;
 	virtual bool ExportToCsv(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles) override;
+	virtual FString GetDecriptionAESKey() const override;
 
 protected:
 	virtual void Reset();

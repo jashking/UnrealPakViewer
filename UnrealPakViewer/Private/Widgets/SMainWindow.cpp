@@ -47,7 +47,7 @@ SMainWindow::~SMainWindow()
 
 void SMainWindow::Construct(const FArguments& Args)
 {
-	GConfig->GetArray(TEXT("UnrealPakViewer"), TEXT("RecentFiles"), RecentFiles, GEngineIni);
+	LoadRecentFile();
 
 	const float DPIScaleFactor = FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(10.0f, 10.0f);
 
@@ -185,19 +185,33 @@ void SMainWindow::FillFileMenu(class FMenuBuilder& MenuBuilder)
 			NAME_None,
 			EUserInterfaceActionType::Button
 		);
+
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("OpenFolder", "Open folder..."),
+			LOCTEXT("OpenFolder_ToolTip", "Open an cooked output folder."),
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "FolderClosed"),
+			FUIAction(
+				FExecuteAction::CreateSP(this, &SMainWindow::OnLoadFolder),
+				FCanExecuteAction()
+			),
+			NAME_None,
+			EUserInterfaceActionType::Button
+		);
 	}
 	MenuBuilder.EndSection();
 
 	MenuBuilder.BeginSection("Recent files", LOCTEXT("RecentFilesText", "Recent files"));
-	for (const FString& File : RecentFiles)
+	for (int32 i = 0; i < RecentFiles.Num(); ++i)
 	{
+		const FRecentPakInfo& RecentInfo = RecentFiles[i];
+
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(FPaths::GetCleanFilename(File)),
-			FText::FromString(File),
+			FText::FromString(FPaths::GetCleanFilename(RecentInfo.FullPath)),
+			FText::FromString(FString::Printf(TEXT("IsFolder: %d, DecriptionKey: %s"), RecentInfo.bIsFolder, *RecentInfo.DescriptionAES)),
 			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "LoadPak"),
 			FUIAction(
-				FExecuteAction::CreateSP(this, &SMainWindow::OnLoadRecentFile, File),
-				FCanExecuteAction::CreateSP(this, &SMainWindow::OnLoadRecentFileCanExecute, File)
+				FExecuteAction::CreateSP(this, &SMainWindow::OnLoadRecentFile, i),
+				FCanExecuteAction::CreateSP(this, &SMainWindow::OnLoadRecentFileCanExecute, i)
 			),
 			NAME_None,
 			EUserInterfaceActionType::Button
@@ -292,18 +306,44 @@ void SMainWindow::OnLoadPakFile()
 	}
 }
 
+void SMainWindow::OnLoadFolder()
+{
+	FString OutFolder;
+	bool bOpened = false;
+
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (DesktopPlatform)
+	{
+		FSlateApplication::Get().CloseToolTip();
+
+		bOpened = DesktopPlatform->OpenDirectoryDialog
+		(
+			FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr),
+			LOCTEXT("LoadPak_FolderDesc", "Open cooked folder...").ToString(),
+			TEXT(""),
+			OutFolder
+		);
+	}
+
+	if (bOpened)
+	{
+		LoadPakFile(OutFolder, true);
+	}
+}
+
 void SMainWindow::OnLoadPakFailed(const FString& InReason)
 {
 	FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(InReason));
 }
 
-FString SMainWindow::OnGetAESKey()
+FString SMainWindow::OnGetAESKey(bool& bCancel)
 {
 	FString EncryptionKey = TEXT("");
+	bCancel = true;
 
 	TSharedPtr<SKeyInputWindow> KeyInputWindow =
 		SNew(SKeyInputWindow)
-		.OnConfirm_Lambda([&EncryptionKey](const FString& InEncryptionKey) { EncryptionKey = InEncryptionKey; });
+		.OnConfirm_Lambda([&EncryptionKey, &bCancel](const FString& InEncryptionKey) { EncryptionKey = InEncryptionKey; bCancel = false; });
 
 	FSlateApplication::Get().AddModalWindow(KeyInputWindow.ToSharedRef(), SharedThis(this), false);
 
@@ -350,14 +390,22 @@ void SMainWindow::OnExtractStart()
 		TStatId(), nullptr, ENamedThreads::GameThread);
 }
 
-void SMainWindow::OnLoadRecentFile(FString InPath)
+void SMainWindow::OnLoadRecentFile(int32 InIndex)
 {
-	LoadPakFile(InPath);
+	if (RecentFiles.IsValidIndex(InIndex))
+	{
+		LoadPakFile(RecentFiles[InIndex].FullPath, RecentFiles[InIndex].bIsFolder);
+	}
 }
 
-bool SMainWindow::OnLoadRecentFileCanExecute(FString InPath) const
+bool SMainWindow::OnLoadRecentFileCanExecute(int32 InIndex) const
 {
-	return FPaths::FileExists(InPath);
+	if (!RecentFiles.IsValidIndex(InIndex))
+	{
+		return false;
+	}
+
+	return RecentFiles[InIndex].bIsFolder ? FPaths::DirectoryExists(RecentFiles[InIndex].FullPath) : FPaths::FileExists(RecentFiles[InIndex].FullPath);
 }
 
 void SMainWindow::OnOpenOptionsDialog()
@@ -430,27 +478,111 @@ FReply SMainWindow::OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent
 	return SCompoundWidget::OnDragOver(MyGeometry, DragDropEvent);
 }
 
-void SMainWindow::LoadPakFile(const FString& PakFilePath)
+void SMainWindow::LoadPakFile(const FString& PakFilePath, bool bFolder)
 {
-	static const int32 MAX_RECENT_FILE_COUNT = 5;
+	static const int32 MAX_RECENT_FILE_COUNT = 10;
 
 	const FString FullPath = FPaths::ConvertRelativePathToFull(PakFilePath);
 
-	IPakAnalyzerModule::Get().InitializeAnalyzerBackend(FPaths::GetExtension(PakFilePath));
+	if (bFolder)
+	{
+		IPakAnalyzerModule::Get().InitializeAnalyzerBackend(TEXT("folder"));
+	}
+	else
+	{
+		IPakAnalyzerModule::Get().InitializeAnalyzerBackend(FPaths::GetExtension(PakFilePath));
+	}
 
-	const bool bLoadResult = IPakAnalyzerModule::Get().GetPakAnalyzer()->LoadPakFile(FullPath);
+	const FString ExistingAESKey = FindExistingAESKey(FullPath);
+
+	const bool bLoadResult = IPakAnalyzerModule::Get().GetPakAnalyzer()->LoadPakFile(FullPath, ExistingAESKey);
 	if (bLoadResult)
 	{
-		RecentFiles.Remove(FullPath);
-		RecentFiles.Insert(FullPath, 0);
+		RemoveRecentFile(FullPath);
+
+		FRecentPakInfo RecentFileInfo;
+		RecentFileInfo.FullPath = FullPath;
+		RecentFileInfo.bIsFolder = bFolder;
+		RecentFileInfo.DescriptionAES = IPakAnalyzerModule::Get().GetPakAnalyzer()->GetDecriptionAESKey();
+
+		RecentFiles.Insert(RecentFileInfo, 0);
 		if (RecentFiles.Num() > MAX_RECENT_FILE_COUNT)
 		{
 			RecentFiles.SetNum(MAX_RECENT_FILE_COUNT); // keep max 5 recent files
 		}
-		
-		GConfig->SetArray(TEXT("UnrealPakViewer"), TEXT("RecentFiles"), RecentFiles, GEngineIni);
-		GConfig->Flush(false, GEngineIni);
+	
+		SaveRecentFile();
 	}
+}
+
+void SMainWindow::RemoveRecentFile(const FString& InFullPath)
+{
+	RecentFiles.RemoveAll([&InFullPath](const FRecentPakInfo& InRecentInfo){
+		return InRecentInfo.FullPath.Equals(InFullPath, ESearchCase::IgnoreCase);
+	});
+}
+
+void SMainWindow::SaveRecentFile()
+{
+	TArray<FString> FormatedRecentInfo;
+	for (const FRecentPakInfo& RecentInfo : RecentFiles)
+	{
+		FormatedRecentInfo.Add(FString::Printf(TEXT("%s*%d*%s"), *RecentInfo.FullPath, RecentInfo.bIsFolder, *RecentInfo.DescriptionAES));
+	}
+
+	GConfig->SetArray(TEXT("UnrealPakViewer"), TEXT("RecentFiles"), FormatedRecentInfo, GGameIni);
+	GConfig->Flush(false, GGameIni);
+}
+
+void SMainWindow::LoadRecentFile()
+{
+	TArray<FString> FormatedRecentInfos;
+	GConfig->GetArray(TEXT("UnrealPakViewer"), TEXT("RecentFiles"), FormatedRecentInfos, GGameIni);
+
+	RecentFiles.Empty();
+
+	for (const FString& FormatedRecentInfo : FormatedRecentInfos)
+	{
+		TArray<FString> Components;
+		FormatedRecentInfo.ParseIntoArray(Components, TEXT("*"));
+
+		if (Components.Num() <= 0)
+		{
+			continue;
+		}
+
+		FRecentPakInfo RecentInfo;
+		RecentInfo.FullPath = Components[0];
+
+		if (Components.Num() > 1)
+		{
+			RecentInfo.bIsFolder = FCString::ToBool(*Components[1]);
+		}
+		else
+		{
+			RecentInfo.bIsFolder = false;
+		}
+
+		if (Components.Num() > 2)
+		{
+			RecentInfo.DescriptionAES = Components[2];
+		}
+
+		RecentFiles.Add(RecentInfo);
+	}
+}
+
+FString SMainWindow::FindExistingAESKey(const FString& InFullPath)
+{
+	for (const FRecentPakInfo& RecentInfo : RecentFiles)
+	{
+		if (RecentInfo.FullPath.Equals(InFullPath, ESearchCase::IgnoreCase))
+		{
+			return RecentInfo.DescriptionAES;
+		}
+	}
+
+	return TEXT("");
 }
 
 #undef LOCTEXT_NAMESPACE

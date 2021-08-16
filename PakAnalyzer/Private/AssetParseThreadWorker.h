@@ -7,6 +7,8 @@
 #include "Misc/Guid.h"
 #include "PakFileEntry.h"
 
+DECLARE_DELEGATE_ThreeParams(FOnReadAssetContent, FPakFileEntryPtr /*InFile*/, bool& /*bOutSuccess*/, TArray<uint8>& /*OutContent*/);
+
 class FAssetParseThreadWorker : public FRunnable
 {
 public:
@@ -21,6 +23,8 @@ public:
 	void Shutdown();
 	void EnsureCompletion();
 	void StartParse(TArray<FPakFileEntryPtr>& InFiles, const FString& InPakFile, int32 InPakVersion, const FAES::FAESKey& InKey);
+
+	FOnReadAssetContent OnReadAssetContent;
 
 protected:
 	bool ParseObjectName(FAssetSummaryPtr InSummary, FPackageIndex Index, FString& OutObjectName);

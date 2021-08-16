@@ -4,6 +4,7 @@
 #include "Modules/ModuleManager.h"
 
 #include "CommonDefines.h"
+#include "FolderAnalyzer.h"
 #include "PakAnalyzer.h"
 #include "IoStoreAnalyzer.h"
 
@@ -43,7 +44,7 @@ void FPakAnalyzerModule::InitializeAnalyzerBackend(const FString& InType)
 {
 	if (InType.Equals(TEXT("folder")))
 	{
-		AnalyzerInstance = MakeShared<FPakAnalyzer>();
+		AnalyzerInstance = MakeShared<FFolderAnalyzer>();
 	}
 #if ENABLE_IO_STORE_ANALYZER
 	else if (InType.Equals(TEXT("ucas")) || InType.Equals(TEXT("utoc")))

@@ -334,7 +334,7 @@ void SAssetSummaryView::Construct(const FArguments& InArgs)
 		.Padding(0.f, 2.f)
 		[
 			SNew(SExpandableArea)
-			.InitiallyCollapsed(false)
+			.InitiallyCollapsed(true)
 			.HeaderContent()
 			[
 				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_ImportObjects", "ImportObjects:"))
@@ -374,7 +374,7 @@ void SAssetSummaryView::Construct(const FArguments& InArgs)
 		.Padding(0.f, 2.f)
 		[
 			SNew(SExpandableArea)
-			.InitiallyCollapsed(false)
+			.InitiallyCollapsed(true)
 			.HeaderContent()
 			[
 				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_ExportObjects", "ExportObjects:"))
@@ -420,7 +420,7 @@ void SAssetSummaryView::Construct(const FArguments& InArgs)
 		.Padding(0.f, 2.f)
 		[
 			SNew(SExpandableArea)
-			.InitiallyCollapsed(false)
+			.InitiallyCollapsed(true)
 			.HeaderContent()
 			[
 				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_Dependency", "Dependency packages:")).KeyToolTipText(LOCTEXT("Tree_View_Summary_DependencyTip", "Packages that this package depends on"))
@@ -458,7 +458,7 @@ void SAssetSummaryView::Construct(const FArguments& InArgs)
 		.Padding(0.f, 2.f)
 		[
 			SNew(SExpandableArea)
-			.InitiallyCollapsed(false)
+			.InitiallyCollapsed(true)
 			.HeaderContent()
 			[
 				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_Dependent", "Dependent packages:")).KeyToolTipText(LOCTEXT("Tree_View_Summary_DependentTip", "Packages that depends on this package. May be incorrect due to multi paks!"))

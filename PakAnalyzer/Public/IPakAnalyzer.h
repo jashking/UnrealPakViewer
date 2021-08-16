@@ -16,7 +16,7 @@ public:
 	IPakAnalyzer() {}
 	virtual ~IPakAnalyzer() {}
 
-	virtual bool LoadPakFile(const FString& InPakPath) = 0;
+	virtual bool LoadPakFile(const FString& InPakPath, const FString& InAESKey = TEXT("")) = 0;
 	virtual int32 GetFileCount() const = 0;
 	virtual void GetFiles(const FString& InFilterText, const TMap<FName, bool>& InClassFilterMap, TArray<FPakFileEntryPtr>& OutFiles) const = 0;
 	virtual FString GetLastLoadGuid() const = 0;
@@ -30,4 +30,5 @@ public:
 	virtual bool HasPakLoaded() const = 0;
 	virtual void SetExtractThreadCount(int32 InThreadCount) = 0;
 	virtual bool LoadAssetRegistry(const FString& InRegristryPath) = 0;
+	virtual FString GetDecriptionAESKey() const = 0;
 };

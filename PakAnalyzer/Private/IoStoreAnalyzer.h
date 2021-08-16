@@ -23,7 +23,7 @@ public:
 	FIoStoreAnalyzer();
 	virtual ~FIoStoreAnalyzer();
 
-	virtual bool LoadPakFile(const FString& InPakPath) override;
+	virtual bool LoadPakFile(const FString& InPakPath, const FString& InAESKey = TEXT("")) override;
 	virtual void ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles) override;
 	virtual void CancelExtract() override;
 	virtual void SetExtractThreadCount(int32 InThreadCount) override;
@@ -66,6 +66,8 @@ protected:
 
 	TArray<FContainerInfo> StoreContainers;
 	TArray<FStorePackageInfo> PackageInfos;
+
+	FString DefaultAESKey;
 };
 
 #endif // ENABLE_IO_STORE_ANALYZER

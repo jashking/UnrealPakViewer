@@ -67,7 +67,7 @@ FIoStoreAnalyzer::~FIoStoreAnalyzer()
 
 }
 
-bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath)
+bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAESKey)
 {
 	if (InPakPath.IsEmpty())
 	{
@@ -86,6 +86,8 @@ bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath)
 	}
 
 	Reset();
+
+	DefaultAESKey = InAESKey;
 
 	// Make tree root
 	TreeRoot = MakeShared<FPakTreeEntry>(FPaths::GetCleanFilename(InPakPath), TEXT(""), true);
@@ -171,6 +173,8 @@ void FIoStoreAnalyzer::Reset()
 
 	StoreContainers.Empty();
 	PackageInfos.Empty();
+
+	DefaultAESKey = TEXT("");
 }
 
 TSharedPtr<FIoStoreReader> FIoStoreAnalyzer::CreateIoStoreReader(const FString& InPath)
@@ -448,7 +452,13 @@ bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, TMap<FGuid, FAES
 
 	if (Header.EncryptionKeyGuid.IsValid() || EnumHasAnyFlags(Header.ContainerFlags, EIoContainerFlags::Encrypted))
 	{
-		const FString KeyString = TEXT("zf/sDPuWNj/tpAtoXw0ar1SJtT9MOjxqB8Za1P/r91M=");// FPakAnalyzerDelegates::OnGetAESKey.IsBound() ? FPakAnalyzerDelegates::OnGetAESKey.Execute() : TEXT("");
+		bool bCancel = true;
+		const FString KeyString = FPakAnalyzerDelegates::OnGetAESKey.IsBound() ? FPakAnalyzerDelegates::OnGetAESKey.Execute(bCancel) : TEXT("");
+
+		if (bCancel)
+		{
+			return false;
+		}
 
 		FAES::FAESKey AESKey;
 
@@ -472,6 +482,8 @@ bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, TMap<FGuid, FAES
 
 		OutKeys.Add(Header.EncryptionKeyGuid, AESKey);
 		CachedAESKey = AESKey;
+
+		//TODO: AES key check
 	}
 
 	return true;

@@ -3,6 +3,7 @@
 #include "AssetRegistryState.h"
 #include "Json.h"
 #include "Launch/Resources/Version.h"
+#include "Misc/Base64.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Serialization/ArrayReader.h"
@@ -235,6 +236,11 @@ bool FBaseAnalyzer::ExportToCsv(const FString& InOutputPath, const TArray<FPakFi
 	UE_LOG(LogPakAnalyzer, Log, TEXT("Export to csv: %s finished, file count: %d, result: %d."), *InOutputPath, InFiles.Num(), bExportResult);
 
 	return bExportResult;
+}
+
+FString FBaseAnalyzer::GetDecriptionAESKey() const
+{
+	return CachedAESKey.IsValid() ? FBase64::Encode(CachedAESKey.Key, FAES::FAESKey::KeySize) : TEXT("");
 }
 
 void FBaseAnalyzer::RefreshClassMap(FPakTreeEntryPtr InRoot)

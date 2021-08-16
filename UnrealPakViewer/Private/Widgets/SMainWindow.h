@@ -28,13 +28,14 @@ protected:
 
 	void OnExit(const TSharedRef<SWindow>& InWindow);
 	void OnLoadPakFile();
+	void OnLoadFolder();
 	void OnLoadPakFailed(const FString& InReason);
-	FString OnGetAESKey();
+	FString OnGetAESKey(bool& bCancel);
 	void OnSwitchToTreeView(const FString& InPath);
 	void OnSwitchToFileView(const FString& InPath);
 	void OnExtractStart();
-	void OnLoadRecentFile(FString InPath);
-	bool OnLoadRecentFileCanExecute(FString InPath) const;
+	void OnLoadRecentFile(int32 InIndex);
+	bool OnLoadRecentFileCanExecute(int32 InIndex) const;
 
 	void OnOpenOptionsDialog();
 	void OnOpenAboutDialog();
@@ -59,7 +60,11 @@ protected:
 	 */
 	virtual FReply OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)  override;
 
-	void LoadPakFile(const FString& PakFilePath);
+	void LoadPakFile(const FString& PakFilePath, bool bFolder = false);
+	void RemoveRecentFile(const FString& InFullPath);
+	void SaveRecentFile();
+	void LoadRecentFile();
+	FString FindExistingAESKey(const FString& InFullPath);
 
 protected:
 	static const int32 WINDOW_WIDTH = 1200;
@@ -68,5 +73,12 @@ protected:
 	/** Holds the tab manager that manages the front-end's tabs. */
 	TSharedPtr<class FTabManager> TabManager;
 
-	TArray<FString> RecentFiles;
+	struct FRecentPakInfo
+	{
+		FString FullPath;
+		bool bIsFolder;
+		FString DescriptionAES;
+	};
+
+	TArray<FRecentPakInfo> RecentFiles;
 };
