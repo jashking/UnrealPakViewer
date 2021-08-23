@@ -60,10 +60,10 @@ protected:
 	 */
 	virtual FReply OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)  override;
 
-	void LoadPakFile(const FString& PakFilePath, bool bFolder = false);
+	void LoadPakFile(const FString& PakFilePath);
 	void RemoveRecentFile(const FString& InFullPath);
-	void SaveRecentFile();
-	void LoadRecentFile();
+	void SaveConfig();
+	void LoadConfig();
 	FString FindExistingAESKey(const FString& InFullPath);
 
 protected:
@@ -73,12 +73,6 @@ protected:
 	/** Holds the tab manager that manages the front-end's tabs. */
 	TSharedPtr<class FTabManager> TabManager;
 
-	struct FRecentPakInfo
-	{
-		FString FullPath;
-		bool bIsFolder;
-		FString DescriptionAES;
-	};
-
-	TArray<FRecentPakInfo> RecentFiles;
+	TArray<FString> RecentFiles;
+	TMap<FString, FString> AESKeyCaches;
 };

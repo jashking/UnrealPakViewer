@@ -1,6 +1,9 @@
 // Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #include "PakAnalyzerModule.h"
+
+#include "HAL/PlatformFile.h"
+#include "Misc/Paths.h"
 #include "Modules/ModuleManager.h"
 
 #include "CommonDefines.h"
@@ -22,7 +25,7 @@ public:
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
 
-	virtual void InitializeAnalyzerBackend(const FString& InType = TEXT("pak")) override;
+	virtual void InitializeAnalyzerBackend(const FString& InFullPath) override;
 	virtual IPakAnalyzer* GetPakAnalyzer() override;
 
 protected:
@@ -40,14 +43,18 @@ void FPakAnalyzerModule::ShutdownModule()
 	AnalyzerInstance.Reset();
 }
 
-void FPakAnalyzerModule::InitializeAnalyzerBackend(const FString& InType)
+void FPakAnalyzerModule::InitializeAnalyzerBackend(const FString& InFullPath)
 {
-	if (InType.Equals(TEXT("folder")))
+	IPlatformFile& PlatformFile = IPlatformFile::GetPlatformPhysical();
+
+	const FString Extension = FPaths::GetExtension(InFullPath);
+
+	if (PlatformFile.DirectoryExists(*InFullPath))
 	{
 		AnalyzerInstance = MakeShared<FFolderAnalyzer>();
 	}
 #if ENABLE_IO_STORE_ANALYZER
-	else if (InType.Equals(TEXT("ucas")) || InType.Equals(TEXT("utoc")))
+	else if (Extension.Equals(TEXT("ucas")) || Extension.Equals(TEXT("utoc")))
 	{
 		AnalyzerInstance = MakeShared<FIoStoreAnalyzer>();
 	}

@@ -7,6 +7,7 @@
 #include "Framework/Docking/TabManager.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "HAL/PlatformApplicationMisc.h"
+#include "HAL/PlatformFile.h"
 #include "Launch/Resources/Version.h"
 #include "Misc/DateTime.h"
 #include "Misc/MessageDialog.h"
@@ -47,7 +48,7 @@ SMainWindow::~SMainWindow()
 
 void SMainWindow::Construct(const FArguments& Args)
 {
-	LoadRecentFile();
+	LoadConfig();
 
 	const float DPIScaleFactor = FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(10.0f, 10.0f);
 
@@ -203,11 +204,11 @@ void SMainWindow::FillFileMenu(class FMenuBuilder& MenuBuilder)
 	MenuBuilder.BeginSection("Recent files", LOCTEXT("RecentFilesText", "Recent files"));
 	for (int32 i = 0; i < RecentFiles.Num(); ++i)
 	{
-		const FRecentPakInfo& RecentInfo = RecentFiles[i];
+		const FString& RecentInfo = RecentFiles[i];
 
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(FPaths::GetCleanFilename(RecentInfo.FullPath)),
-			FText::FromString(FString::Printf(TEXT("IsFolder: %d, DecriptionKey: %s"), RecentInfo.bIsFolder, *RecentInfo.DescriptionAES)),
+			FText::FromString(FPaths::GetCleanFilename(RecentInfo)),
+			FText::FromString(RecentInfo),
 			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "LoadPak"),
 			FUIAction(
 				FExecuteAction::CreateSP(this, &SMainWindow::OnLoadRecentFile, i),
@@ -327,7 +328,7 @@ void SMainWindow::OnLoadFolder()
 
 	if (bOpened)
 	{
-		LoadPakFile(OutFolder, true);
+		LoadPakFile(OutFolder);
 	}
 }
 
@@ -394,7 +395,7 @@ void SMainWindow::OnLoadRecentFile(int32 InIndex)
 {
 	if (RecentFiles.IsValidIndex(InIndex))
 	{
-		LoadPakFile(RecentFiles[InIndex].FullPath, RecentFiles[InIndex].bIsFolder);
+		LoadPakFile(RecentFiles[InIndex]);
 	}
 }
 
@@ -405,7 +406,8 @@ bool SMainWindow::OnLoadRecentFileCanExecute(int32 InIndex) const
 		return false;
 	}
 
-	return RecentFiles[InIndex].bIsFolder ? FPaths::DirectoryExists(RecentFiles[InIndex].FullPath) : FPaths::FileExists(RecentFiles[InIndex].FullPath);
+	IPlatformFile& PlatformFile = IPlatformFile::GetPlatformPhysical();
+	return PlatformFile.FileExists(*RecentFiles[InIndex]) || PlatformFile.DirectoryExists(*RecentFiles[InIndex]);
 }
 
 void SMainWindow::OnOpenOptionsDialog()
@@ -478,20 +480,13 @@ FReply SMainWindow::OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent
 	return SCompoundWidget::OnDragOver(MyGeometry, DragDropEvent);
 }
 
-void SMainWindow::LoadPakFile(const FString& PakFilePath, bool bFolder)
+void SMainWindow::LoadPakFile(const FString& PakFilePath)
 {
 	static const int32 MAX_RECENT_FILE_COUNT = 10;
 
 	const FString FullPath = FPaths::ConvertRelativePathToFull(PakFilePath);
 
-	if (bFolder)
-	{
-		IPakAnalyzerModule::Get().InitializeAnalyzerBackend(TEXT("folder"));
-	}
-	else
-	{
-		IPakAnalyzerModule::Get().InitializeAnalyzerBackend(FPaths::GetExtension(PakFilePath));
-	}
+	IPakAnalyzerModule::Get().InitializeAnalyzerBackend(FullPath);
 
 	const FString ExistingAESKey = FindExistingAESKey(FullPath);
 
@@ -499,87 +494,70 @@ void SMainWindow::LoadPakFile(const FString& PakFilePath, bool bFolder)
 	if (bLoadResult)
 	{
 		RemoveRecentFile(FullPath);
+		const FString DescriptionAES = IPakAnalyzerModule::Get().GetPakAnalyzer()->GetDecriptionAESKey();
+		if (!DescriptionAES.IsEmpty())
+		{
+			AESKeyCaches.Add(FullPath, DescriptionAES);
+		}
 
-		FRecentPakInfo RecentFileInfo;
-		RecentFileInfo.FullPath = FullPath;
-		RecentFileInfo.bIsFolder = bFolder;
-		RecentFileInfo.DescriptionAES = IPakAnalyzerModule::Get().GetPakAnalyzer()->GetDecriptionAESKey();
-
-		RecentFiles.Insert(RecentFileInfo, 0);
+		RecentFiles.Insert(FullPath, 0);
 		if (RecentFiles.Num() > MAX_RECENT_FILE_COUNT)
 		{
 			RecentFiles.SetNum(MAX_RECENT_FILE_COUNT); // keep max 5 recent files
 		}
 	
-		SaveRecentFile();
+		SaveConfig();
 	}
 }
 
 void SMainWindow::RemoveRecentFile(const FString& InFullPath)
 {
-	RecentFiles.RemoveAll([&InFullPath](const FRecentPakInfo& InRecentInfo){
-		return InRecentInfo.FullPath.Equals(InFullPath, ESearchCase::IgnoreCase);
+	RecentFiles.RemoveAll([&InFullPath](const FString& RecentFile){
+		return RecentFile.Equals(InFullPath, ESearchCase::IgnoreCase);
 	});
 }
 
-void SMainWindow::SaveRecentFile()
+void SMainWindow::SaveConfig()
 {
-	TArray<FString> FormatedRecentInfo;
-	for (const FRecentPakInfo& RecentInfo : RecentFiles)
+	GConfig->SetArray(TEXT("UnrealPakViewer"), TEXT("RecentFiles"), RecentFiles, GGameIni);
+
+	TArray<FString> KeyCaches;
+	for (const TPair<FString, FString> KeyCache : AESKeyCaches)
 	{
-		FormatedRecentInfo.Add(FString::Printf(TEXT("%s*%d*%s"), *RecentInfo.FullPath, RecentInfo.bIsFolder, *RecentInfo.DescriptionAES));
+		KeyCaches.Add(FString::Printf(TEXT("%s %s"), *KeyCache.Value, *KeyCache.Key));
 	}
 
-	GConfig->SetArray(TEXT("UnrealPakViewer"), TEXT("RecentFiles"), FormatedRecentInfo, GGameIni);
+	GConfig->SetArray(TEXT("UnrealPakViewer"), TEXT("KeyCaches"), KeyCaches, GGameIni);
+
 	GConfig->Flush(false, GGameIni);
 }
 
-void SMainWindow::LoadRecentFile()
+void SMainWindow::LoadConfig()
 {
-	TArray<FString> FormatedRecentInfos;
-	GConfig->GetArray(TEXT("UnrealPakViewer"), TEXT("RecentFiles"), FormatedRecentInfos, GGameIni);
-
 	RecentFiles.Empty();
+	GConfig->GetArray(TEXT("UnrealPakViewer"), TEXT("RecentFiles"), RecentFiles, GGameIni);
 
-	for (const FString& FormatedRecentInfo : FormatedRecentInfos)
+	AESKeyCaches.Empty();
+
+	TArray<FString> KeyCaches;
+	GConfig->GetArray(TEXT("UnrealPakViewer"), TEXT("KeyCaches"), KeyCaches, GGameIni);
+	for (const FString KeyCache : KeyCaches)
 	{
 		TArray<FString> Components;
-		FormatedRecentInfo.ParseIntoArray(Components, TEXT("*"));
-
-		if (Components.Num() <= 0)
+		KeyCache.ParseIntoArray(Components, TEXT(" "));
+		if (Components.Num() >= 2)
 		{
-			continue;
+			AESKeyCaches.Add(Components[1], Components[0]);
 		}
-
-		FRecentPakInfo RecentInfo;
-		RecentInfo.FullPath = Components[0];
-
-		if (Components.Num() > 1)
-		{
-			RecentInfo.bIsFolder = FCString::ToBool(*Components[1]);
-		}
-		else
-		{
-			RecentInfo.bIsFolder = false;
-		}
-
-		if (Components.Num() > 2)
-		{
-			RecentInfo.DescriptionAES = Components[2];
-		}
-
-		RecentFiles.Add(RecentInfo);
 	}
 }
 
 FString SMainWindow::FindExistingAESKey(const FString& InFullPath)
 {
-	for (const FRecentPakInfo& RecentInfo : RecentFiles)
+	FString* ExistingKey = AESKeyCaches.Find(InFullPath);
+	if (ExistingKey)
 	{
-		if (RecentInfo.FullPath.Equals(InFullPath, ESearchCase::IgnoreCase))
-		{
-			return RecentInfo.DescriptionAES;
-		}
+		return *ExistingKey;
 	}
 
 	return TEXT("");

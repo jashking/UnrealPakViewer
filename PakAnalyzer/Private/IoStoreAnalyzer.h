@@ -16,6 +16,7 @@
 #include "Templates/SharedPointer.h"
 
 #include "BaseAnalyzer.h"
+#include "IoStoreDefines.h"
 
 class FIoStoreAnalyzer : public FBaseAnalyzer, public TSharedFromThis<FIoStoreAnalyzer>
 {
@@ -35,12 +36,10 @@ protected:
 
 	bool InitializeGlobalReader(const FString& InPakPath);
 	bool InitializeReaders(const TArray<FString>& InPaks);
-	bool PreLoadIoStore(const FString& InTocPath, TMap<FGuid, FAES::FAESKey>& OutKeys);
+	bool PreLoadIoStore(const FString& InTocPath, const FString& InCasPath, TMap<FGuid, FAES::FAESKey>& OutKeys);
+	bool TryDecryptIoStore(const FIoStoreTocResourceInfo& TocResource, const FIoOffsetAndLength& OffsetAndLength, const FIoStoreTocEntryMeta& Meta, const FString& InCasPath, const FString& InKey, FAES::FAESKey& OutAESKey);
 
 protected:
-	TSharedPtr<FIoStoreReader> GlobalIoStoreReader;
-	TArray<FNameEntryId> GlobalNameMap;
-
 	struct FContainerInfo
 	{
 		FIoContainerId Id;
@@ -62,8 +61,18 @@ protected:
 		FIoChunkId ChunkId;
 		EIoChunkType ChunkType;
 		FIoStoreTocChunkInfo ChunkInfo;
+		uint32 SerializeSize = 0;
+		uint32 CompressionBlockSize = 0;
+		uint32 CompressionBlockCount = 0;
+		FName CompressionMethod;
+		FString ChunkHash;
 	};
 
+	bool FillPackageInfo(uint64 ContainerId, FStorePackageInfo& OutPackageInfo);
+
+protected:
+	TSharedPtr<FIoStoreReader> GlobalIoStoreReader;
+	TArray<FNameEntryId> GlobalNameMap;
 	TArray<FContainerInfo> StoreContainers;
 	TArray<FStorePackageInfo> PackageInfos;
 

@@ -3,11 +3,13 @@
 #if ENABLE_IO_STORE_ANALYZER
 
 #include "Algo/Sort.h"
+#include "Async/AsyncFileHandle.h"
 #include "Async/ParallelFor.h"
 #include "Containers/ArrayView.h"
 #include "HAL/CriticalSection.h"
 #include "HAL/PlatformFile.h"
 #include "Misc/Base64.h"
+#include "Misc/Compression.h"
 #include "Misc/Paths.h"
 #include "Misc/ScopeLock.h"
 #include "Serialization/AsyncLoading2.h"
@@ -17,45 +19,8 @@
 
 #include "CommonDefines.h"
 
-struct FIoStoreTocHeader
-{
-	static constexpr char TocMagicImg[] = "-==--==--==--==-";
-
-	uint8	TocMagic[16];
-	uint8	Version;
-	uint32	TocHeaderSize;
-	uint32	TocEntryCount;
-	uint32	TocCompressedBlockEntryCount;
-	uint32	TocCompressedBlockEntrySize;	// For sanity checking
-	uint32	CompressionMethodNameCount;
-	uint32	CompressionMethodNameLength;
-	uint32	CompressionBlockSize;
-	uint32	DirectoryIndexSize;
-	FIoContainerId ContainerId;
-	FGuid	EncryptionKeyGuid;
-	EIoContainerFlags ContainerFlags;
-	uint8	Pad[60];
-
-	void MakeMagic()
-	{
-		FMemory::Memcpy(TocMagic, TocMagicImg, sizeof TocMagic);
-	}
-
-	bool CheckMagic() const
-	{
-		return FMemory::Memcmp(TocMagic, TocMagicImg, sizeof TocMagic) == 0;
-	}
-};
-
-struct FScriptObjectDesc
-{
-	FName Name;
-	FName FullName;
-	FPackageObjectIndex GlobalImportIndex;
-	FPackageObjectIndex OuterIndex;
-};
-
 static TMap<FPackageObjectIndex, FScriptObjectDesc> ScriptObjectByGlobalIdMap;
+static TMap<uint64, FIoStoreTocResourceInfo> TocResources;
 
 FIoStoreAnalyzer::FIoStoreAnalyzer()
 {
@@ -64,7 +29,7 @@ FIoStoreAnalyzer::FIoStoreAnalyzer()
 
 FIoStoreAnalyzer::~FIoStoreAnalyzer()
 {
-
+	Reset();
 }
 
 bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAESKey)
@@ -113,6 +78,11 @@ bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAE
 			FPakEntry Entry;
 			Entry.Offset = Package.ChunkInfo.Offset;
 			Entry.UncompressedSize = Package.ChunkInfo.Size;
+			Entry.Size = Package.SerializeSize;
+			Entry.CompressionBlockSize = Package.CompressionBlockSize;
+			Entry.CompressionBlocks.AddZeroed(Package.CompressionBlockCount);
+			HexToBytes(Package.ChunkHash, Entry.Hash);
+			Entry.SetEncrypted(StoreContainers[Package.ContainerIndex].bEncrypted);
 
 			FString Extension;
 			switch (Package.ChunkType)
@@ -124,7 +94,11 @@ bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAE
 			default: Extension = TEXT("");
 			}
 
-			InsertFileToTree(Package.PackageName.ToString() + Extension, Entry);
+			FPakTreeEntryPtr ResultEntry = InsertFileToTree(Package.PackageName.ToString() + Extension, Entry);
+			if (ResultEntry.IsValid())
+			{
+				ResultEntry->CompressionMethod = Package.CompressionMethod;
+			}
 		}
 	}
 
@@ -170,6 +144,12 @@ void FIoStoreAnalyzer::Reset()
 	GlobalNameMap.Empty();
 
 	ScriptObjectByGlobalIdMap.Empty();
+	TocResources.Empty();
+
+	for (FContainerInfo& Container : StoreContainers)
+	{
+		Container.Reader.Reset();
+	}
 
 	StoreContainers.Empty();
 	PackageInfos.Empty();
@@ -183,7 +163,7 @@ TSharedPtr<FIoStoreReader> FIoStoreAnalyzer::CreateIoStoreReader(const FString& 
 	IoEnvironment.InitializeFileEnvironment(FPaths::SetExtension(InPath, TEXT("")));
 
 	TMap<FGuid, FAES::FAESKey> DecryptionKeys;
-	if (!PreLoadIoStore(FPaths::SetExtension(InPath, TEXT("utoc")), DecryptionKeys))
+	if (!PreLoadIoStore(FPaths::SetExtension(InPath, TEXT("utoc")), FPaths::SetExtension(InPath, TEXT("ucas")), DecryptionKeys))
 	{
 		return nullptr;
 	}
@@ -289,7 +269,7 @@ bool FIoStoreAnalyzer::InitializeGlobalReader(const FString& InPakPath)
 
 bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 {
-	static const EParallelForFlags ParallelForFlags = EParallelForFlags::Unbalanced | EParallelForFlags::ForceSingleThread;
+	static const EParallelForFlags ParallelForFlags = EParallelForFlags::Unbalanced /*| EParallelForFlags::ForceSingleThread*/;
 	FCriticalSection Mutex;
 
 	for (const FString& ContainerFilePath : InPaks)
@@ -304,8 +284,6 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 		FContainerInfo Info;
 		Info.Reader = Reader;
 		Info.Summary.PakFilePath = ContainerFilePath;
-		Info.Summary.PakFileSize = IPlatformFile::GetPlatformPhysical().FileSize(*ContainerFilePath);
-		Info.Summary.PakInfo.IndexOffset = Info.Summary.PakFileSize;
 
 		StoreContainers.Add(Info);
 	}
@@ -322,6 +300,23 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 		ContainerInfo.bEncrypted = bool(Flags & EIoContainerFlags::Encrypted);
 		ContainerInfo.bSigned = bool(Flags & EIoContainerFlags::Signed);
 		ContainerInfo.bIndexed = bool(Flags & EIoContainerFlags::Indexed);
+		ContainerInfo.Summary.PakInfo.bEncryptedIndex = ContainerInfo.bEncrypted;
+		ContainerInfo.Summary.PakInfo.EncryptionKeyGuid = ContainerInfo.EncryptionKeyGuid;
+
+		FIoStoreTocResourceInfo* TocResource = TocResources.Find(ContainerInfo.Id.Value());
+		if (TocResource)
+		{
+			TArray<FString> CompressionMethods;
+			for (FName CompressionName : TocResource->CompressionMethods)
+			{
+				CompressionMethods.Add(CompressionName.ToString());
+			}
+			ContainerInfo.Summary.CompressionMethods = FString::Join(CompressionMethods, TEXT(", "));
+
+			const int64 CasFileSize = IPlatformFile::GetPlatformPhysical().FileSize(*ContainerInfo.Summary.PakFilePath);
+			ContainerInfo.Summary.PakFileSize = CasFileSize + TocResource->TocFileSize;
+			ContainerInfo.Summary.PakInfo.IndexOffset = CasFileSize;
+		}
 
 		TIoStatusOr<FIoBuffer> IoBuffer = ContainerInfo.Reader->Read(CreateIoChunkId(ContainerInfo.Reader->GetContainerId().Value(), 0, EIoChunkType::ContainerHeader), FIoReadOptions());
 		if (IoBuffer.IsOk())
@@ -350,11 +345,11 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 	{
 		FStorePackageInfo& PackageInfo = PackageInfos[Index];
 		TSharedPtr<FIoStoreReader> Reader = StoreContainers[PackageInfo.ContainerIndex].Reader;
+		const uint64 ContainerId = StoreContainers[PackageInfo.ContainerIndex].Id.Value();
 
 		PackageInfo.ChunkId = CreateIoChunkId(PackageInfo.PackageId.Value(), 0, EIoChunkType::ExportBundleData);
 
 		FIoReadOptions ReadOptions;
-		ReadOptions.SetRange(0, 16 << 10); // no include export hashes
 
 		TIoStatusOr<FIoBuffer> IoBuffer = Reader->Read(PackageInfo.ChunkId, ReadOptions);
 		if (!IoBuffer.IsOk())
@@ -390,6 +385,7 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 		if (ChunkInfo.IsOk())
 		{
 			PackageInfo.ChunkInfo = ChunkInfo.ValueOrDie();
+			FillPackageInfo(ContainerId, PackageInfo);
 		}
 
 		// Bulk
@@ -408,6 +404,8 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 				BulkPackageInfo.ChunkType = Type;
 				BulkPackageInfo.ChunkInfo = BulkChunkInfo.ValueOrDie();
 
+				FillPackageInfo(ContainerId, BulkPackageInfo);
+
 				FScopeLock ScopeLock(&Mutex);
 				BulkPackageInfos.Add(BulkPackageInfo);
 			}
@@ -419,7 +417,7 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 	return true;
 }
 
-bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, TMap<FGuid, FAES::FAESKey>& OutKeys)
+bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, const FString& InCasPath, TMap<FGuid, FAES::FAESKey>& OutKeys)
 {
 	IPlatformFile& PlatformFile = IPlatformFile::GetPlatformPhysical();
 
@@ -450,40 +448,252 @@ bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, TMap<FGuid, FAES
 		return false;
 	}
 
+	if (Header.TocCompressedBlockEntrySize != sizeof(FIoStoreTocCompressedBlockEntry))
+	{
+		UE_LOG(LogPakAnalyzer, Error, TEXT("Preload toc file failed! TOC compressed block entry size mismatch! Path: %s."), *InTocPath);
+		return false;
+	}
+
+	const uint64 TotalTocSize = TocFileHandle->Size() - sizeof(FIoStoreTocHeader);
+	TUniquePtr<uint8[]> TocBuffer = MakeUnique<uint8[]>(TotalTocSize);
+	if (!TocFileHandle->Read(TocBuffer.Get(), TotalTocSize))
+	{
+		UE_LOG(LogPakAnalyzer, Error, TEXT("Preload toc file failed! Failed to read IoStore TOC file! Path: %s."), *InTocPath);
+		return false;
+	}
+
+	FIoStoreTocResourceInfo TocResource;
+	TocResource.TocFileSize = TocFileHandle->Size();
+	TocResource.Header = Header;
+
+	// Chunk IDs
+	TArray<FIoChunkId> ChunkIdsArray;
+	const FIoChunkId* ChunkIds = reinterpret_cast<const FIoChunkId*>(TocBuffer.Get());
+	ChunkIdsArray = MakeArrayView<FIoChunkId const>(ChunkIds, Header.TocEntryCount);
+	if (ChunkIdsArray.Num() <= 0)
+	{
+		return false;
+	}
+
+	for (int32 ChunkIndex = 0; ChunkIndex < ChunkIdsArray.Num(); ++ChunkIndex)
+	{
+		TocResource.ChunkIdToIndex.Add(ChunkIdsArray[ChunkIndex], ChunkIndex);
+	}
+
+	// Chunk offsets
+	TArray<FIoOffsetAndLength> ChunkOffsetLengthsArray;
+	const FIoOffsetAndLength* ChunkOffsetLengths = reinterpret_cast<const FIoOffsetAndLength*>(ChunkIds + Header.TocEntryCount);
+	ChunkOffsetLengthsArray = MakeArrayView<FIoOffsetAndLength const>(ChunkOffsetLengths, Header.TocEntryCount);
+
+	// Compression blocks
+	const FIoStoreTocCompressedBlockEntry* CompressionBlocks = reinterpret_cast<const FIoStoreTocCompressedBlockEntry*>(ChunkOffsetLengths + Header.TocEntryCount);
+	TocResource.CompressionBlocks = MakeArrayView<FIoStoreTocCompressedBlockEntry const>(CompressionBlocks, Header.TocCompressedBlockEntryCount);
+
+	// Compression methods
+	TocResource.CompressionMethods.Reserve(Header.CompressionMethodNameCount + 1);
+	TocResource.CompressionMethods.Add(NAME_None);
+
+	const ANSICHAR* AnsiCompressionMethodNames = reinterpret_cast<const ANSICHAR*>(CompressionBlocks + Header.TocCompressedBlockEntryCount);
+	for (uint32 CompressonNameIndex = 0; CompressonNameIndex < Header.CompressionMethodNameCount; CompressonNameIndex++)
+	{
+		const ANSICHAR* AnsiCompressionMethodName = AnsiCompressionMethodNames + CompressonNameIndex * Header.CompressionMethodNameLength;
+		TocResource.CompressionMethods.Add(FName(AnsiCompressionMethodName));
+	}
+
+	// Chunk block signatures
+	const uint8* SignatureBuffer = reinterpret_cast<const uint8*>(AnsiCompressionMethodNames + Header.CompressionMethodNameCount * Header.CompressionMethodNameLength);
+	const uint8* DirectoryIndexBuffer = SignatureBuffer;
+
+	const bool bIsSigned = EnumHasAnyFlags(Header.ContainerFlags, EIoContainerFlags::Signed);
+	if (bIsSigned)
+	{
+		const int32* HashSize = reinterpret_cast<const int32*>(SignatureBuffer);
+		TArrayView<const uint8> TocSignature = MakeArrayView<const uint8>(reinterpret_cast<const uint8*>(HashSize + 1), *HashSize);
+		TArrayView<const uint8> BlockSignature = MakeArrayView<const uint8>(TocSignature.GetData() + *HashSize, *HashSize);
+		TArrayView<const FSHAHash> ChunkBlockSignatures = MakeArrayView<const FSHAHash>(reinterpret_cast<const FSHAHash*>(BlockSignature.GetData() + *HashSize), Header.TocCompressedBlockEntryCount);
+
+		// Adjust address to meta data
+		DirectoryIndexBuffer = reinterpret_cast<const uint8*>(ChunkBlockSignatures.GetData() + ChunkBlockSignatures.Num());
+	}
+
+	// Meta
+	const uint8* TocMeta = DirectoryIndexBuffer + Header.DirectoryIndexSize;
+	const FIoStoreTocEntryMeta* ChunkMetas = reinterpret_cast<const FIoStoreTocEntryMeta*>(TocMeta);
+	TocResource.ChunkMetas = MakeArrayView<FIoStoreTocEntryMeta const>(ChunkMetas, Header.TocEntryCount);
+
+	bool bShouldLoad = true;
 	if (Header.EncryptionKeyGuid.IsValid() || EnumHasAnyFlags(Header.ContainerFlags, EIoContainerFlags::Encrypted))
 	{
-		bool bCancel = true;
-		const FString KeyString = FPakAnalyzerDelegates::OnGetAESKey.IsBound() ? FPakAnalyzerDelegates::OnGetAESKey.Execute(bCancel) : TEXT("");
-
-		if (bCancel)
-		{
-			return false;
-		}
-
 		FAES::FAESKey AESKey;
 
-		TArray<uint8> DecodedBuffer;
-		if (!FBase64::Decode(KeyString, DecodedBuffer))
+		bShouldLoad = DefaultAESKey.IsEmpty() ? false : TryDecryptIoStore(TocResource, ChunkOffsetLengthsArray[0], TocResource.ChunkMetas[0], InCasPath, DefaultAESKey, AESKey);
+
+		if (!bShouldLoad)
 		{
-			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] is not base64 format!"), *KeyString);
-			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key[%s] is not base64 format!"), *KeyString));
-			return false;
+			if (FPakAnalyzerDelegates::OnGetAESKey.IsBound())
+			{
+				bool bCancel = true;
+				do
+				{
+					const FString KeyString = FPakAnalyzerDelegates::OnGetAESKey.Execute(bCancel);
+
+					bShouldLoad = !bCancel ? TryDecryptIoStore(TocResource, ChunkOffsetLengthsArray[0], TocResource.ChunkMetas[0], InCasPath, KeyString, AESKey) : false;
+				} while (!bShouldLoad && !bCancel);
+			}
+			else
+			{
+				UE_LOG(LogPakAnalyzer, Error, TEXT("Can't open encrypt iostore without OnGetAESKey bound!"));
+				FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Can't open encrypt iostore without OnGetAESKey bound!")));
+				bShouldLoad = false;
+			}
 		}
 
-		// Error checking
-		if (DecodedBuffer.Num() != FAES::FAESKey::KeySize)
+		if (!bShouldLoad)
 		{
-			UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] can not decode to %d bytes long!"), *KeyString, FAES::FAESKey::KeySize);
-			FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key base64[%s] can not decode to %d bytes long!"), *KeyString, FAES::FAESKey::KeySize));
 			return false;
 		}
-
-		FMemory::Memcpy(AESKey.Key, DecodedBuffer.GetData(), FAES::FAESKey::KeySize);
 
 		OutKeys.Add(Header.EncryptionKeyGuid, AESKey);
 		CachedAESKey = AESKey;
+	}
 
-		//TODO: AES key check
+	TocResources.Add(Header.ContainerId.Value(), TocResource);
+
+	return true;
+}
+
+bool FIoStoreAnalyzer::TryDecryptIoStore(const FIoStoreTocResourceInfo& TocResource, const FIoOffsetAndLength& OffsetAndLength, const FIoStoreTocEntryMeta& Meta, const FString& InCasPath, const FString& InKey, FAES::FAESKey& OutAESKey)
+{
+	FAES::FAESKey AESKey;
+
+	TArray<uint8> DecodedBuffer;
+	if (!FBase64::Decode(InKey, DecodedBuffer))
+	{
+		UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] is not base64 format!"), *InKey);
+		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key[%s] is not base64 format!"), *InKey));
+		return false;
+	}
+
+	// Error checking
+	if (DecodedBuffer.Num() != FAES::FAESKey::KeySize)
+	{
+		UE_LOG(LogPakAnalyzer, Error, TEXT("AES encryption key base64[%s] can not decode to %d bytes long!"), *InKey, FAES::FAESKey::KeySize);
+		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("AES encryption key base64[%s] can not decode to %d bytes long!"), *InKey, FAES::FAESKey::KeySize));
+		return false;
+	}
+
+	FMemory::Memcpy(AESKey.Key, DecodedBuffer.GetData(), FAES::FAESKey::KeySize);
+
+	IPlatformFile& PlatformFile = IPlatformFile::GetPlatformPhysical();
+	TUniquePtr<IAsyncReadFileHandle> CasFileHandle(PlatformFile.OpenAsyncRead(*InCasPath));
+	if (!CasFileHandle.IsValid())
+	{
+		UE_LOG(LogPakAnalyzer, Error, TEXT("Preload toc file failed! Open ucas failed! Path: %s."), *InCasPath);
+		return false;
+	}
+
+	TArray<uint8> CompressedBuffer;
+	TArray<uint8> UncompressedBuffer;
+
+	const uint64 CompressionBlockSize = TocResource.Header.CompressionBlockSize;
+
+	TArray<uint8> RawData;
+	RawData.AddZeroed(OffsetAndLength.GetLength());
+	int32 FirstBlockIndex = int32(OffsetAndLength.GetOffset() / CompressionBlockSize);
+	int32 LastBlockIndex = int32((Align(OffsetAndLength.GetOffset() + OffsetAndLength.GetLength(), CompressionBlockSize) - 1) / CompressionBlockSize);
+	uint64 OffsetInBlock = OffsetAndLength.GetOffset() % CompressionBlockSize;
+	uint8* Dst = RawData.GetData();
+	uint8* Src = nullptr;
+	uint64 RemainingSize = OffsetAndLength.GetLength();
+	for (int32 BlockIndex = FirstBlockIndex; BlockIndex <= LastBlockIndex; ++BlockIndex)
+	{
+		const FIoStoreTocCompressedBlockEntry& CompressionBlock = TocResource.CompressionBlocks[BlockIndex];
+		uint32 RawSize = Align(CompressionBlock.GetCompressedSize(), FAES::AESBlockSize);
+		if (uint32(CompressedBuffer.Num()) < RawSize)
+		{
+			CompressedBuffer.SetNumUninitialized(RawSize);
+		}
+		uint32 UncompressedSize = CompressionBlock.GetUncompressedSize();
+		if (uint32(UncompressedBuffer.Num()) < UncompressedSize)
+		{
+			UncompressedBuffer.SetNumUninitialized(UncompressedSize);
+		}
+
+		TUniquePtr<IAsyncReadRequest> ReadRequest(CasFileHandle->ReadRequest(CompressionBlock.GetOffset(), RawSize, AIOP_Normal, nullptr, CompressedBuffer.GetData()));
+		{
+			ReadRequest->WaitCompletion();
+		}
+
+		FAES::DecryptData(CompressedBuffer.GetData(), RawSize, AESKey);
+
+		if (CompressionBlock.GetCompressionMethodIndex() == 0)
+		{
+			Src = CompressedBuffer.GetData();
+		}
+		else
+		{
+			FName CompressionMethod = TocResource.CompressionMethods[CompressionBlock.GetCompressionMethodIndex()];
+			bool bUncompressed = FCompression::UncompressMemory(CompressionMethod, UncompressedBuffer.GetData(), UncompressedSize, CompressedBuffer.GetData(), CompressionBlock.GetCompressedSize());
+			if (!bUncompressed)
+			{
+				return false;
+			}
+			Src = UncompressedBuffer.GetData();
+		}
+		uint64 SizeInBlock = FMath::Min(CompressionBlockSize - OffsetInBlock, RemainingSize);
+		FMemory::Memcpy(Dst, Src + OffsetInBlock, SizeInBlock);
+		OffsetInBlock = 0;
+		RemainingSize -= SizeInBlock;
+		Dst += SizeInBlock;
+	}
+
+	FIoChunkHash ChunkHash = FIoChunkHash::HashBuffer(RawData.GetData(), RawData.Num());
+	if (ChunkHash != Meta.ChunkHash)
+	{
+		return false;
+	}
+
+	OutAESKey = AESKey;
+
+	return true;
+}
+
+bool FIoStoreAnalyzer::FillPackageInfo(uint64 ContainerId, FStorePackageInfo& OutPackageInfo)
+{
+	FIoStoreTocResourceInfo* TocResource = TocResources.Find(ContainerId);
+	if (!TocResource)
+	{
+		return false;
+	}
+
+	OutPackageInfo.SerializeSize = 0;
+	OutPackageInfo.CompressionBlockSize = TocResource->Header.CompressionBlockSize;
+	OutPackageInfo.CompressionBlockCount = 0;
+
+	const int32 FirstBlockIndex = int32(OutPackageInfo.ChunkInfo.Offset / OutPackageInfo.CompressionBlockSize);
+	const int32 LastBlockIndex = int32((Align(OutPackageInfo.ChunkInfo.Offset + OutPackageInfo.ChunkInfo.Size, OutPackageInfo.CompressionBlockSize) - 1) / OutPackageInfo.CompressionBlockSize);
+	for (int32 BlockIndex = FirstBlockIndex; BlockIndex <= LastBlockIndex; ++BlockIndex)
+	{
+		if (!TocResource->CompressionBlocks.IsValidIndex(BlockIndex))
+		{
+			return false;
+		}
+
+		const FIoStoreTocCompressedBlockEntry& CompressionBlock = TocResource->CompressionBlocks[BlockIndex];
+		OutPackageInfo.SerializeSize += Align(CompressionBlock.GetCompressedSize(), FAES::AESBlockSize);
+
+		if (BlockIndex == FirstBlockIndex)
+		{
+			OutPackageInfo.CompressionMethod = TocResource->CompressionMethods[CompressionBlock.GetCompressionMethodIndex()];
+		}
+		
+		OutPackageInfo.CompressionBlockCount += 1;
+	}
+
+	int32* Index = TocResource->ChunkIdToIndex.Find(OutPackageInfo.ChunkId);
+	if (Index && TocResource->ChunkMetas.IsValidIndex(*Index))
+	{
+		OutPackageInfo.ChunkHash = TocResource->ChunkMetas[*Index].ChunkHash.ToString();
 	}
 
 	return true;
