@@ -7,6 +7,7 @@
 #include "Async/ParallelFor.h"
 #include "Containers/ArrayView.h"
 #include "HAL/CriticalSection.h"
+#include "HAL/FileManager.h"
 #include "HAL/PlatformFile.h"
 #include "Misc/Base64.h"
 #include "Misc/Compression.h"
@@ -16,6 +17,7 @@
 #include "Serialization/LargeMemoryReader.h"
 #include "Serialization/MemoryReader.h"
 #include "UObject/NameBatchSerialization.h"
+#include "UObject/ObjectVersion.h"
 
 #include "CommonDefines.h"
 
@@ -29,6 +31,7 @@ FIoStoreAnalyzer::FIoStoreAnalyzer()
 
 FIoStoreAnalyzer::~FIoStoreAnalyzer()
 {
+	StopExtract();
 	Reset();
 }
 
@@ -73,8 +76,9 @@ bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAE
 	{
 		FScopeLock Lock(&CriticalSection);
 
-		for (const FStorePackageInfo& Package : PackageInfos)
+		for (int32 i = 0; i < PackageInfos.Num(); ++i)
 		{
+			const FStorePackageInfo& Package = PackageInfos[i];
 			FPakEntry Entry;
 			Entry.Offset = Package.ChunkInfo.Offset;
 			Entry.UncompressedSize = Package.ChunkInfo.Size;
@@ -84,21 +88,14 @@ bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAE
 			HexToBytes(Package.ChunkHash, Entry.Hash);
 			Entry.SetEncrypted(StoreContainers[Package.ContainerIndex].bEncrypted);
 
-			FString Extension;
-			switch (Package.ChunkType)
-			{
-			case EIoChunkType::ExportBundleData: Extension = TEXT(".uexp"); break;
-			case EIoChunkType::BulkData: Extension = TEXT(".ubulk"); break;
-			case EIoChunkType::OptionalBulkData: Extension = TEXT(".uptnl"); break;
-			case EIoChunkType::MemoryMappedBulkData: Extension = TEXT(".umappedbulk"); break;
-			default: Extension = TEXT("");
-			}
-
-			FPakTreeEntryPtr ResultEntry = InsertFileToTree(Package.PackageName.ToString() + Extension, Entry);
+			const FString FullPath = Package.PackageName.ToString() + TEXT(".") + Package.Extension.ToString();
+			FPakTreeEntryPtr ResultEntry = InsertFileToTree(FullPath, Entry);
 			if (ResultEntry.IsValid())
 			{
 				ResultEntry->CompressionMethod = Package.CompressionMethod;
 			}
+
+			FileToPackageIndex.Add(FullPath, i);
 		}
 	}
 
@@ -118,12 +115,32 @@ bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAE
 
 void FIoStoreAnalyzer::ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles)
 {
+	StopExtract();
 
+	FPakAnalyzerDelegates::OnExtractStart.ExecuteIfBound();
+
+	TArray<int32> Packages;
+	for (FPakFileEntryPtr File : InFiles)
+	{
+		const int32* Index = FileToPackageIndex.Find(TEXT("/") / File->Path);
+		if (Index)
+		{
+			PendingExtracePackages.AddUnique(*Index);
+		}
+	}
+
+	if (PendingExtracePackages.Num() <= 0)
+	{
+		return;
+	}
+
+	ExtractOutputPath = InOutputPath;
+	ExtractThread.Add(Async(EAsyncExecution::Thread, [this]() { OnExtractFiles(); }));
 }
 
 void FIoStoreAnalyzer::CancelExtract()
 {
-
+	StopExtract();
 }
 
 void FIoStoreAnalyzer::SetExtractThreadCount(int32 InThreadCount)
@@ -153,6 +170,7 @@ void FIoStoreAnalyzer::Reset()
 
 	StoreContainers.Empty();
 	PackageInfos.Empty();
+	FileToPackageIndex.Empty();
 
 	DefaultAESKey = TEXT("");
 }
@@ -282,7 +300,7 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 		}
 
 		FContainerInfo Info;
-		Info.Reader = Reader;
+		Info.Reader = MoveTemp(Reader);
 		Info.Summary.PakFilePath = ContainerFilePath;
 
 		StoreContainers.Add(Info);
@@ -344,7 +362,7 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 	ParallelFor(PackageInfos.Num(), [this, &BulkPackageInfos, &Mutex](int32 Index)
 	{
 		FStorePackageInfo& PackageInfo = PackageInfos[Index];
-		TSharedPtr<FIoStoreReader> Reader = StoreContainers[PackageInfo.ContainerIndex].Reader;
+		TSharedPtr<FIoStoreReader>& Reader = StoreContainers[PackageInfo.ContainerIndex].Reader;
 		const uint64 ContainerId = StoreContainers[PackageInfo.ContainerIndex].Id.Value();
 
 		PackageInfo.ChunkId = CreateIoChunkId(PackageInfo.PackageId.Value(), 0, EIoChunkType::ExportBundleData);
@@ -379,6 +397,7 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 				TArrayView<const uint8>(NameMapHashesData, PackageSummary->NameMapHashesSize));
 		}
 
+		PackageInfo.Extension = TEXT("uexp");
 		PackageInfo.ChunkType = EIoChunkType::ExportBundleData;
 		PackageInfo.PackageName = FName::CreateFromDisplayId(PackageNameMap[PackageSummary->Name.GetIndex()], PackageSummary->Name.GetNumber());
 		TIoStatusOr<FIoStoreTocChunkInfo> ChunkInfo = Reader->GetChunkInfo(PackageInfo.ChunkId);
@@ -403,6 +422,14 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 				BulkPackageInfo.ContainerIndex = PackageInfo.ContainerIndex;
 				BulkPackageInfo.ChunkType = Type;
 				BulkPackageInfo.ChunkInfo = BulkChunkInfo.ValueOrDie();
+
+				switch (Type)
+				{
+				case EIoChunkType::BulkData: BulkPackageInfo.Extension = TEXT("ubulk"); break;
+				case EIoChunkType::OptionalBulkData: BulkPackageInfo.Extension = TEXT("uptnl"); break;
+				case EIoChunkType::MemoryMappedBulkData: BulkPackageInfo.Extension = TEXT("umappedbulk"); break;
+				default: BulkPackageInfo.Extension = TEXT("");
+				}
 
 				FillPackageInfo(ContainerId, BulkPackageInfo);
 
@@ -697,6 +724,115 @@ bool FIoStoreAnalyzer::FillPackageInfo(uint64 ContainerId, FStorePackageInfo& Ou
 	}
 
 	return true;
+}
+
+void FIoStoreAnalyzer::OnExtractFiles()
+{
+	TAtomic<int32> TotalErrorCount{ 0 };
+	TAtomic<int32> TotalCompleteCount{ 0 };
+	const int32 TotalTotalCount = PendingExtracePackages.Num();
+
+	ParallelFor(PendingExtracePackages.Num(), [this, TotalTotalCount, &TotalErrorCount, &TotalCompleteCount](int32 Index)
+	{
+		if (IsStopExtract)
+		{
+			return;
+		}
+
+		const int32 PackageIndex = PendingExtracePackages[Index];
+		if (!PackageInfos.IsValidIndex(PackageIndex))
+		{
+			TotalCompleteCount.IncrementExchange();
+			TotalErrorCount.IncrementExchange();
+			UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+			return;
+		}
+
+		const FStorePackageInfo& PackageInfo = PackageInfos[PackageIndex];
+		TSharedPtr<FIoStoreReader>& Reader = StoreContainers[PackageInfo.ContainerIndex].Reader;
+		if (!Reader.IsValid())
+		{
+			TotalCompleteCount.IncrementExchange();
+			TotalErrorCount.IncrementExchange();
+			UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+			return;
+		}
+
+		FIoReadOptions ReadOptions;
+		TIoStatusOr<FIoBuffer> IoBuffer = Reader->Read(PackageInfo.ChunkId, ReadOptions);
+		if (!IoBuffer.IsOk())
+		{
+			TotalCompleteCount.IncrementExchange();
+			TotalErrorCount.IncrementExchange();
+			UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+			return;
+		}
+
+		const FString OutputFilePath = ExtractOutputPath / PackageInfo.PackageName.ToString() + TEXT(".") + PackageInfo.Extension.ToString();
+		const FString BasePath = FPaths::GetPath(OutputFilePath);
+		if (!FPaths::DirectoryExists(BasePath))
+		{
+			IFileManager::Get().MakeDirectory(*BasePath, true);
+		}
+
+		IPlatformFile& PlatformFile = IPlatformFile::GetPlatformPhysical();
+		TUniquePtr<IFileHandle>	FileHandle(PlatformFile.OpenWrite(*OutputFilePath));
+		if (!FileHandle.IsValid())
+		{
+			TotalCompleteCount.IncrementExchange();
+			TotalErrorCount.IncrementExchange();
+			UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+			return;
+		}
+
+		if (PackageInfo.ChunkType == EIoChunkType::ExportBundleData)
+		{
+			const uint8* PackageSummaryData = IoBuffer.ValueOrDie().Data();
+			const FPackageSummary* PackageSummary = reinterpret_cast<const FPackageSummary*>(PackageSummaryData);
+
+			const uint8* Start = PackageSummaryData + PackageSummary->GraphDataOffset + PackageSummary->GraphDataSize;
+			const uint8* End = PackageSummaryData + IoBuffer.ValueOrDie().DataSize();
+
+			FileHandle->Write(Start, End - Start);
+
+			const uint32 PackageTag = PACKAGE_FILE_TAG;
+			FileHandle->Write((const uint8*)&PackageTag, 4);
+		}
+		else
+		{
+			FileHandle->Write(IoBuffer.ValueOrDie().Data(), IoBuffer.ValueOrDie().DataSize());
+		}
+
+		FileHandle->Flush();
+
+		TotalCompleteCount.IncrementExchange();
+
+		UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+	}, EParallelForFlags::Unbalanced);
+}
+
+void FIoStoreAnalyzer::StopExtract()
+{
+	IsStopExtract.AtomicSet(true);
+
+	for (auto& Thread : ExtractThread)
+	{
+		Thread.Wait();
+	}
+
+	ExtractThread.Empty();
+	IsStopExtract.AtomicSet(false);
+	PendingExtracePackages.Empty();
+}
+
+void FIoStoreAnalyzer::UpdateExtractProgress(int32 InTotal, int32 InComplete, int32 InError)
+{
+	FFunctionGraphTask::CreateAndDispatchWhenReady(
+		[InTotal, InComplete, InError]()
+		{
+			FPakAnalyzerDelegates::OnUpdateExtractProgress.ExecuteIfBound(InComplete, InError, InTotal);
+		},
+		TStatId(), nullptr, ENamedThreads::GameThread);
 }
 
 #endif // ENABLE_IO_STORE_ANALYZER

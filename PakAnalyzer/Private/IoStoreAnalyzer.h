@@ -8,6 +8,8 @@
 
 #if ENABLE_IO_STORE_ANALYZER
 
+#include "Async/Async.h"
+#include "HAL/ThreadSafeBool.h"
 #include "IO/IoDispatcher.h"
 #include "Misc/AES.h"
 #include "Misc/Guid.h"
@@ -38,45 +40,24 @@ protected:
 	bool InitializeReaders(const TArray<FString>& InPaks);
 	bool PreLoadIoStore(const FString& InTocPath, const FString& InCasPath, TMap<FGuid, FAES::FAESKey>& OutKeys);
 	bool TryDecryptIoStore(const FIoStoreTocResourceInfo& TocResource, const FIoOffsetAndLength& OffsetAndLength, const FIoStoreTocEntryMeta& Meta, const FString& InCasPath, const FString& InKey, FAES::FAESKey& OutAESKey);
-
-protected:
-	struct FContainerInfo
-	{
-		FIoContainerId Id;
-		FGuid EncryptionKeyGuid;
-		bool bCompressed;
-		bool bSigned;
-		bool bEncrypted;
-		bool bIndexed;
-
-		FPakFileSumary Summary;
-		TSharedPtr<FIoStoreReader> Reader;
-	};
-
-	struct FStorePackageInfo
-	{
-		FName PackageName;
-		FPackageId PackageId;
-		int32 ContainerIndex;
-		FIoChunkId ChunkId;
-		EIoChunkType ChunkType;
-		FIoStoreTocChunkInfo ChunkInfo;
-		uint32 SerializeSize = 0;
-		uint32 CompressionBlockSize = 0;
-		uint32 CompressionBlockCount = 0;
-		FName CompressionMethod;
-		FString ChunkHash;
-	};
-
 	bool FillPackageInfo(uint64 ContainerId, FStorePackageInfo& OutPackageInfo);
+	void OnExtractFiles();
+	void StopExtract();
+	void UpdateExtractProgress(int32 InTotal, int32 InComplete, int32 InError);
 
 protected:
 	TSharedPtr<FIoStoreReader> GlobalIoStoreReader;
 	TArray<FNameEntryId> GlobalNameMap;
 	TArray<FContainerInfo> StoreContainers;
 	TArray<FStorePackageInfo> PackageInfos;
+	TMap<FString, int32> FileToPackageIndex;
 
 	FString DefaultAESKey;
+
+	TArray<int32> PendingExtracePackages;
+	TArray<TFuture<void>> ExtractThread;
+	FThreadSafeBool IsStopExtract;
+	FString ExtractOutputPath;
 };
 
 #endif // ENABLE_IO_STORE_ANALYZER

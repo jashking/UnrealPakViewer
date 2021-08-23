@@ -9,6 +9,8 @@
 #include "IO/IoDispatcher.h"
 #include "Serialization/AsyncLoading2.h"
 
+#include "PakFileEntry.h"
+
 struct FIoStoreTocHeader
 {
 	static constexpr char TocMagicImg[] = "-==--==--==--==-";
@@ -191,6 +193,35 @@ struct FScriptObjectDesc
 	FName FullName;
 	FPackageObjectIndex GlobalImportIndex;
 	FPackageObjectIndex OuterIndex;
+};
+
+struct FContainerInfo
+{
+	FIoContainerId Id;
+	FGuid EncryptionKeyGuid;
+	bool bCompressed;
+	bool bSigned;
+	bool bEncrypted;
+	bool bIndexed;
+
+	FPakFileSumary Summary;
+	TSharedPtr<FIoStoreReader> Reader;
+};
+
+struct FStorePackageInfo
+{
+	FName PackageName;
+	FPackageId PackageId;
+	int32 ContainerIndex;
+	FIoChunkId ChunkId;
+	EIoChunkType ChunkType;
+	FIoStoreTocChunkInfo ChunkInfo;
+	uint32 SerializeSize = 0;
+	uint32 CompressionBlockSize = 0;
+	uint32 CompressionBlockCount = 0;
+	FName CompressionMethod;
+	FString ChunkHash;
+	FName Extension;
 };
 
 #endif // ENABLE_IO_STORE_ANALYZER

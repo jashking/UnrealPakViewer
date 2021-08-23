@@ -177,7 +177,7 @@ Cook 完成后都会在 *Saved/Cooked/[Platform]/[Project]/Metadata/DevelopmentA
 
 ## TODO ##
 
-* support utoc, ucas
+* restore uasset file from utoc
 * support multi pak/ucas open
 * commandline application
 * Pak compare visiualize
