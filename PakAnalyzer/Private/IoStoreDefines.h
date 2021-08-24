@@ -8,6 +8,9 @@
 
 #include "IO/IoDispatcher.h"
 #include "Serialization/AsyncLoading2.h"
+#if ENGINE_MAJOR_VERSION >= 5
+#include "Serialization/PackageStore.h"
+#endif // ENGINE_MAJOR_VERSION >= 5
 
 #include "PakFileEntry.h"
 

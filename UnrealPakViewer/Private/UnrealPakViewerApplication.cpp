@@ -6,6 +6,7 @@
 #include "HAL/PlatformProcess.h"
 #include "HAL/PlatformTime.h"
 #include "Interfaces/IPluginManager.h"
+#include "Launch/Resources/Version.h"
 #include "Modules/ModuleManager.h"
 #include "StandaloneRenderer.h"
 #include "Stats/Stats2.h"
@@ -74,8 +75,10 @@ void FUnrealPakViewerApplication::InitializeApplication()
 	// Crank up a normal Slate application using the platform's standalone renderer.
 	FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer());
 
+#if ENGINE_MAJOR_VERSION <= 4
 	// Menu anims aren't supported. See Runtime\Slate\Private\Framework\Application\MenuStack.cpp.
 	FSlateApplication::Get().EnableMenuAnimations(false);
+#endif
 
 	FSlateApplication::Get().AddWindow(SNew(SMainWindow));
 }

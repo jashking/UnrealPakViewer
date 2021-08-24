@@ -166,7 +166,11 @@ TSharedRef<SWidget> SMainWindow::MakeMainMenu()
 	TSharedRef<SWidget> MenuBarWidget = MenuBarBuilder.MakeWidget();
 
 	// Tell tab-manager about the multi-box for platforms with a global menu bar
+#if ENGINE_MAJOR_VERSION >= 5
+	TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox(), MenuBarWidget);
+#else
 	TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox());
+#endif
 
 	return MenuBarWidget;
 }

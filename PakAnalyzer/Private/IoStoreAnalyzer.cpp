@@ -19,6 +19,10 @@
 #include "UObject/NameBatchSerialization.h"
 #include "UObject/ObjectVersion.h"
 
+#if ENGINE_MAJOR_VERSION >= 5
+#include "Serialization/PackageStore.h"
+#endif // ENGINE_MAJOR_VERSION >= 5
+
 #include "CommonDefines.h"
 
 static TMap<FPackageObjectIndex, FScriptObjectDesc> ScriptObjectByGlobalIdMap;
@@ -177,8 +181,10 @@ void FIoStoreAnalyzer::Reset()
 
 TSharedPtr<FIoStoreReader> FIoStoreAnalyzer::CreateIoStoreReader(const FString& InPath)
 {
+#if ENGINE_MAJOR_VERSION <= 4
 	FIoStoreEnvironment IoEnvironment;
 	IoEnvironment.InitializeFileEnvironment(FPaths::SetExtension(InPath, TEXT("")));
+#endif
 
 	TMap<FGuid, FAES::FAESKey> DecryptionKeys;
 	if (!PreLoadIoStore(FPaths::SetExtension(InPath, TEXT("utoc")), FPaths::SetExtension(InPath, TEXT("ucas")), DecryptionKeys))
@@ -188,7 +194,11 @@ TSharedPtr<FIoStoreReader> FIoStoreAnalyzer::CreateIoStoreReader(const FString& 
 
 	TSharedPtr<FIoStoreReader> Reader = MakeShared<FIoStoreReader>();
 
+#if ENGINE_MAJOR_VERSION <= 4
 	FIoStatus Status = Reader->Initialize(IoEnvironment, DecryptionKeys);
+#else
+	FIoStatus Status = Reader->Initialize(*FPaths::SetExtension(InPath, TEXT("")), DecryptionKeys);
+#endif
 	if (Status.IsOk())
 	{
 		return Reader;

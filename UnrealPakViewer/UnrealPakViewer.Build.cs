@@ -1,7 +1,11 @@
 // Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
 
 using UnrealBuildTool;
+#if UE_5_0_OR_LATER
+using EpicGames.Core;
+#else
 using Tools.DotNETCommon;
+#endif
 
 using System.IO;
 
