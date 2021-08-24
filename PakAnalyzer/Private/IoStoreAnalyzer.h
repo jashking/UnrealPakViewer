@@ -40,10 +40,11 @@ protected:
 	bool InitializeReaders(const TArray<FString>& InPaks);
 	bool PreLoadIoStore(const FString& InTocPath, const FString& InCasPath, TMap<FGuid, FAES::FAESKey>& OutKeys);
 	bool TryDecryptIoStore(const FIoStoreTocResourceInfo& TocResource, const FIoOffsetAndLength& OffsetAndLength, const FIoStoreTocEntryMeta& Meta, const FString& InCasPath, const FString& InKey, FAES::FAESKey& OutAESKey);
-	bool FillPackageInfo(uint64 ContainerId, FStorePackageInfo& OutPackageInfo);
+	bool FillPackageInfo(const FIoStoreTocResourceInfo& TocResource, FStorePackageInfo& OutPackageInfo);
 	void OnExtractFiles();
 	void StopExtract();
 	void UpdateExtractProgress(int32 InTotal, int32 InComplete, int32 InError);
+	void ParseChunkInfo(const FIoChunkId& InChunkId, FPackageId& OutPackageId, EIoChunkType& OutChunkType);
 
 protected:
 	TSharedPtr<FIoStoreReader> GlobalIoStoreReader;

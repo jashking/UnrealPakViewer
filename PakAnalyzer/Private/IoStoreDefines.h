@@ -183,6 +183,7 @@ struct FIoStoreTocResourceInfo
 	FIoStoreTocHeader Header;
 	int64 TocFileSize = 0;
 
+	TArray<FIoChunkId> ChunkIds;
 	TMap<FIoChunkId, int32> ChunkIdToIndex;
 	TArray<FIoStoreTocCompressedBlockEntry> CompressionBlocks;
 	TArray<FIoStoreTocEntryMeta> ChunkMetas;
@@ -225,6 +226,16 @@ struct FStorePackageInfo
 	FName CompressionMethod;
 	FString ChunkHash;
 	FName Extension;
+
+	inline bool operator ==(const FStorePackageInfo& Rhs) const
+	{
+		return ChunkId == Rhs.ChunkId;
+	}
+
+	inline bool operator !=(const FStorePackageInfo& Rhs) const
+	{
+		return !(*this == Rhs);
+	}
 };
 
 #endif // ENABLE_IO_STORE_ANALYZER

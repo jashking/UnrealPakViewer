@@ -83,6 +83,11 @@ bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAE
 		for (int32 i = 0; i < PackageInfos.Num(); ++i)
 		{
 			const FStorePackageInfo& Package = PackageInfos[i];
+			if (!Package.PackageId.IsValid())
+			{
+				continue;
+			}
+
 			FPakEntry Entry;
 			Entry.Offset = Package.ChunkInfo.Offset;
 			Entry.UncompressedSize = Package.ChunkInfo.Size;
@@ -298,8 +303,16 @@ bool FIoStoreAnalyzer::InitializeGlobalReader(const FString& InPakPath)
 bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 {
 	static const EParallelForFlags ParallelForFlags = EParallelForFlags::Unbalanced /*| EParallelForFlags::ForceSingleThread*/;
-	FCriticalSection Mutex;
 
+	UE_LOG(LogPakAnalyzer, Display, TEXT("IoStore creating container readers..."));
+
+	struct FChunkInfo
+	{
+		FIoChunkId ChunkId;
+		int32 ReaderIndex;
+	};
+
+	TArray<FChunkInfo> AllChunkIds;
 	for (const FString& ContainerFilePath : InPaks)
 	{
 		TSharedPtr<FIoStoreReader> Reader = CreateIoStoreReader(ContainerFilePath);
@@ -312,144 +325,151 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 		FContainerInfo Info;
 		Info.Reader = MoveTemp(Reader);
 		Info.Summary.PakFilePath = ContainerFilePath;
+		Info.Id = Info.Reader->GetContainerId();
+		Info.EncryptionKeyGuid = Info.Reader->GetEncryptionKeyGuid();
+		Info.Summary.MountPoint = Info.Reader->GetDirectoryIndexReader().GetMountPoint();
+		EIoContainerFlags Flags = Info.Reader->GetContainerFlags();
+		Info.bCompressed = bool(Flags & EIoContainerFlags::Compressed);
+		Info.bEncrypted = bool(Flags & EIoContainerFlags::Encrypted);
+		Info.bSigned = bool(Flags & EIoContainerFlags::Signed);
+		Info.bIndexed = bool(Flags & EIoContainerFlags::Indexed);
+		Info.Summary.PakInfo.bEncryptedIndex = Info.bEncrypted;
+		Info.Summary.PakInfo.EncryptionKeyGuid = Info.EncryptionKeyGuid;
 
-		StoreContainers.Add(Info);
-	}
-
-	ParallelFor(StoreContainers.Num(), [this, &Mutex](int32 Index)
-	{
-		FContainerInfo& ContainerInfo = StoreContainers[Index];
-
-		ContainerInfo.Id = ContainerInfo.Reader->GetContainerId();
-		ContainerInfo.EncryptionKeyGuid = ContainerInfo.Reader->GetEncryptionKeyGuid();
-		ContainerInfo.Summary.MountPoint = ContainerInfo.Reader->GetDirectoryIndexReader().GetMountPoint();
-		EIoContainerFlags Flags = ContainerInfo.Reader->GetContainerFlags();
-		ContainerInfo.bCompressed = bool(Flags & EIoContainerFlags::Compressed);
-		ContainerInfo.bEncrypted = bool(Flags & EIoContainerFlags::Encrypted);
-		ContainerInfo.bSigned = bool(Flags & EIoContainerFlags::Signed);
-		ContainerInfo.bIndexed = bool(Flags & EIoContainerFlags::Indexed);
-		ContainerInfo.Summary.PakInfo.bEncryptedIndex = ContainerInfo.bEncrypted;
-		ContainerInfo.Summary.PakInfo.EncryptionKeyGuid = ContainerInfo.EncryptionKeyGuid;
-
-		FIoStoreTocResourceInfo* TocResource = TocResources.Find(ContainerInfo.Id.Value());
+		FIoStoreTocResourceInfo* TocResource = TocResources.Find(Info.Id.Value());
 		if (TocResource)
 		{
+			for (const FIoChunkId& ChunkId : TocResource->ChunkIds)
+			{
+				AllChunkIds.Add({ ChunkId, StoreContainers.Num()});
+			}
+
 			TArray<FString> CompressionMethods;
 			for (FName CompressionName : TocResource->CompressionMethods)
 			{
 				CompressionMethods.Add(CompressionName.ToString());
 			}
-			ContainerInfo.Summary.CompressionMethods = FString::Join(CompressionMethods, TEXT(", "));
+			Info.Summary.CompressionMethods = FString::Join(CompressionMethods, TEXT(", "));
 
-			const int64 CasFileSize = IPlatformFile::GetPlatformPhysical().FileSize(*ContainerInfo.Summary.PakFilePath);
-			ContainerInfo.Summary.PakFileSize = CasFileSize + TocResource->TocFileSize;
-			ContainerInfo.Summary.PakInfo.IndexOffset = CasFileSize;
+			const int64 CasFileSize = IPlatformFile::GetPlatformPhysical().FileSize(*Info.Summary.PakFilePath);
+			Info.Summary.PakFileSize = CasFileSize + TocResource->TocFileSize;
+			Info.Summary.PakInfo.IndexOffset = CasFileSize;
 		}
 
-		TIoStatusOr<FIoBuffer> IoBuffer = ContainerInfo.Reader->Read(CreateIoChunkId(ContainerInfo.Reader->GetContainerId().Value(), 0, EIoChunkType::ContainerHeader), FIoReadOptions());
-		if (IoBuffer.IsOk())
+		StoreContainers.Add(Info);
+	}
+
+	UE_LOG(LogPakAnalyzer, Display, TEXT("IoStore parsing packages..."));
+
+	PackageInfos.Empty(AllChunkIds.Num());
+	PackageInfos.AddZeroed(AllChunkIds.Num());
+	ParallelFor(AllChunkIds.Num(), [this, &AllChunkIds](int32 Index)
+	{
+		const FIoChunkId& ChunkId = AllChunkIds[Index].ChunkId;
+
+		FPackageId PackageId;
+		EIoChunkType ChunkType;
+		ParseChunkInfo(ChunkId, PackageId, ChunkType);
+
+		if (ChunkType == EIoChunkType::ExportBundleData || ChunkType == EIoChunkType::BulkData ||
+			ChunkType == EIoChunkType::OptionalBulkData || ChunkType == EIoChunkType::MemoryMappedBulkData)
 		{
-			FMemoryReaderView Ar(MakeArrayView(IoBuffer.ValueOrDie().Data(), IoBuffer.ValueOrDie().DataSize()));
-			FContainerHeader ContainerHeader;
-			Ar << ContainerHeader;
+			FStorePackageInfo& PackageInfo = PackageInfos[Index];
+			PackageInfo.PackageId = PackageId;
+			PackageInfo.ContainerIndex = AllChunkIds[Index].ReaderIndex;
+			PackageInfo.ChunkType = ChunkType;
+			PackageInfo.ChunkId = ChunkId;
 
-			TArrayView<FPackageStoreEntry> StoreEntries(reinterpret_cast<FPackageStoreEntry*>(ContainerHeader.StoreEntries.GetData()), ContainerHeader.PackageCount);
-
-			int32 PackageIndex = 0;
-			for (FPackageStoreEntry& ContainerEntry : StoreEntries)
+			switch (ChunkType)
 			{
-				FStorePackageInfo PackageInfo;
-				PackageInfo.PackageId = ContainerHeader.PackageIds[PackageIndex++];
-				PackageInfo.ContainerIndex = Index;
-
-				FScopeLock ScopeLock(&Mutex);
-				PackageInfos.Add(PackageInfo);
+			case EIoChunkType::ExportBundleData: PackageInfo.Extension = TEXT("uexp"); break;
+			case EIoChunkType::BulkData: PackageInfo.Extension = TEXT("ubulk"); break;
+			case EIoChunkType::OptionalBulkData: PackageInfo.Extension = TEXT("uptnl"); break;
+			case EIoChunkType::MemoryMappedBulkData: PackageInfo.Extension = TEXT("umappedbulk"); break;
+			default: PackageInfo.Extension = TEXT("");
 			}
 		}
 	}, ParallelForFlags);
 
-	TArray<FStorePackageInfo> BulkPackageInfos;
-	ParallelFor(PackageInfos.Num(), [this, &BulkPackageInfos, &Mutex](int32 Index)
+	UE_LOG(LogPakAnalyzer, Display, TEXT("IoStore loading package FNames..."));
+
+	ParallelFor(PackageInfos.Num(), [this](int32 Index)
 	{
 		FStorePackageInfo& PackageInfo = PackageInfos[Index];
-		TSharedPtr<FIoStoreReader>& Reader = StoreContainers[PackageInfo.ContainerIndex].Reader;
-		const uint64 ContainerId = StoreContainers[PackageInfo.ContainerIndex].Id.Value();
-
-		PackageInfo.ChunkId = CreateIoChunkId(PackageInfo.PackageId.Value(), 0, EIoChunkType::ExportBundleData);
-
-		FIoReadOptions ReadOptions;
-
-		TIoStatusOr<FIoBuffer> IoBuffer = Reader->Read(PackageInfo.ChunkId, ReadOptions);
-		if (!IoBuffer.IsOk())
+		if (!PackageInfo.PackageId.IsValid())
 		{
 			return;
 		}
 
-		const uint8* PackageSummaryData = IoBuffer.ValueOrDie().Data();
-		const FPackageSummary* PackageSummary = reinterpret_cast<const FPackageSummary*>(PackageSummaryData);
-		const uint64 PackageSummarySize = PackageSummary->GraphDataOffset + PackageSummary->GraphDataSize;
-		if (PackageSummarySize > IoBuffer.ValueOrDie().DataSize())
-		{
-			ReadOptions.SetRange(0, PackageSummarySize);
-			IoBuffer = Reader->Read(PackageInfo.ChunkId, ReadOptions);
-			PackageSummaryData = IoBuffer.ValueOrDie().Data();
-			PackageSummary = reinterpret_cast<const FPackageSummary*>(PackageSummaryData);
-		}
+		FContainerInfo& ContainerInfo = StoreContainers[PackageInfo.ContainerIndex];
+		TSharedPtr<FIoStoreReader>& Reader = ContainerInfo.Reader;
 
-		TArray<FNameEntryId> PackageNameMap;
-		if (PackageSummary->NameMapNamesSize)
-		{
-			const uint8* NameMapNamesData = PackageSummaryData + PackageSummary->NameMapNamesOffset;
-			const uint8* NameMapHashesData = PackageSummaryData + PackageSummary->NameMapHashesOffset;
-			LoadNameBatch(
-				PackageNameMap,
-				TArrayView<const uint8>(NameMapNamesData, PackageSummary->NameMapNamesSize),
-				TArrayView<const uint8>(NameMapHashesData, PackageSummary->NameMapHashesSize));
-		}
-
-		PackageInfo.Extension = TEXT("uexp");
-		PackageInfo.ChunkType = EIoChunkType::ExportBundleData;
-		PackageInfo.PackageName = FName::CreateFromDisplayId(PackageNameMap[PackageSummary->Name.GetIndex()], PackageSummary->Name.GetNumber());
 		TIoStatusOr<FIoStoreTocChunkInfo> ChunkInfo = Reader->GetChunkInfo(PackageInfo.ChunkId);
-		if (ChunkInfo.IsOk())
+		PackageInfo.ChunkInfo = ChunkInfo.ValueOrDie();
+
+		FIoStoreTocResourceInfo* TocResource = TocResources.Find(ContainerInfo.Id.Value());
+		if (TocResource)
 		{
-			PackageInfo.ChunkInfo = ChunkInfo.ValueOrDie();
-			FillPackageInfo(ContainerId, PackageInfo);
+			FillPackageInfo(*TocResource, PackageInfo);
 		}
 
-		// Bulk
-		TArray<EIoChunkType> BulkTypes = { EIoChunkType::BulkData, EIoChunkType::OptionalBulkData, EIoChunkType::MemoryMappedBulkData };
-		for (EIoChunkType Type : BulkTypes)
+		if (PackageInfo.ChunkType == EIoChunkType::ExportBundleData)
 		{
-			FIoChunkId BulkChunkId = CreateIoChunkId(PackageInfo.PackageId.Value(), 0, Type);
-			TIoStatusOr<FIoStoreTocChunkInfo> BulkChunkInfo = Reader->GetChunkInfo(BulkChunkId);
-			if (BulkChunkInfo.IsOk())
+			FIoReadOptions ReadOptions;
+			TIoStatusOr<FIoBuffer> IoBuffer = Reader->Read(PackageInfo.ChunkId, ReadOptions);
+
+			const uint8* PackageSummaryData = IoBuffer.ValueOrDie().Data();
+			const FPackageSummary* PackageSummary = reinterpret_cast<const FPackageSummary*>(PackageSummaryData);
+			const uint64 PackageSummarySize = PackageSummary->GraphDataOffset + PackageSummary->GraphDataSize;
+
+			TArray<FNameEntryId> PackageFNames;
+			if (PackageSummary->NameMapNamesSize)
 			{
-				FStorePackageInfo BulkPackageInfo;
-				BulkPackageInfo.ChunkId = BulkChunkId;
-				BulkPackageInfo.PackageId = PackageInfo.PackageId;
-				BulkPackageInfo.PackageName = PackageInfo.PackageName;
-				BulkPackageInfo.ContainerIndex = PackageInfo.ContainerIndex;
-				BulkPackageInfo.ChunkType = Type;
-				BulkPackageInfo.ChunkInfo = BulkChunkInfo.ValueOrDie();
+				const uint8* NameMapNamesData = PackageSummaryData + PackageSummary->NameMapNamesOffset;
+				const uint8* NameMapHashesData = PackageSummaryData + PackageSummary->NameMapHashesOffset;
+				LoadNameBatch(
+					PackageFNames,
+					TArrayView<const uint8>(NameMapNamesData, PackageSummary->NameMapNamesSize),
+					TArrayView<const uint8>(NameMapHashesData, PackageSummary->NameMapHashesSize));
+			}
 
-				switch (Type)
-				{
-				case EIoChunkType::BulkData: BulkPackageInfo.Extension = TEXT("ubulk"); break;
-				case EIoChunkType::OptionalBulkData: BulkPackageInfo.Extension = TEXT("uptnl"); break;
-				case EIoChunkType::MemoryMappedBulkData: BulkPackageInfo.Extension = TEXT("umappedbulk"); break;
-				default: BulkPackageInfo.Extension = TEXT("");
-				}
+			PackageInfo.PackageName = FName::CreateFromDisplayId(PackageFNames[PackageSummary->Name.GetIndex()], PackageSummary->Name.GetNumber());
+		}
+	}, ParallelForFlags);
 
-				FillPackageInfo(ContainerId, BulkPackageInfo);
+	UE_LOG(LogPakAnalyzer, Display, TEXT("IoStore assigning package name..."));
 
-				FScopeLock ScopeLock(&Mutex);
-				BulkPackageInfos.Add(BulkPackageInfo);
+	TMap<FPackageId, FName> PackageNameMap;
+	for (const FStorePackageInfo& PackageInfo : PackageInfos)
+	{
+		if (PackageInfo.PackageName != NAME_None)
+		{
+			PackageNameMap.Add(PackageInfo.PackageId, PackageInfo.PackageName);
+		}
+	}
+
+	ParallelFor(PackageInfos.Num(), [this, &PackageNameMap](int32 Index)
+	{
+		FStorePackageInfo& PackageInfo = PackageInfos[Index];
+		if (!PackageInfo.PackageId.IsValid())
+		{
+			return;
+		}
+
+		if (PackageInfo.PackageName == NAME_None)
+		{
+			if (FName* PackageName = PackageNameMap.Find(PackageInfo.PackageId))
+			{
+				PackageInfo.PackageName = *PackageName;
+			}
+			else
+			{
+				PackageInfo.PackageName = *FString::Printf(TEXT("%I64u"), PackageInfo.PackageId.Value());
 			}
 		}
 	}, ParallelForFlags);
 
-	PackageInfos += BulkPackageInfos;
+	UE_LOG(LogPakAnalyzer, Display, TEXT("IoStore creating container readers finish."));
 
 	return true;
 }
@@ -504,17 +524,16 @@ bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, const FString& I
 	TocResource.Header = Header;
 
 	// Chunk IDs
-	TArray<FIoChunkId> ChunkIdsArray;
 	const FIoChunkId* ChunkIds = reinterpret_cast<const FIoChunkId*>(TocBuffer.Get());
-	ChunkIdsArray = MakeArrayView<FIoChunkId const>(ChunkIds, Header.TocEntryCount);
-	if (ChunkIdsArray.Num() <= 0)
+	TocResource.ChunkIds = MakeArrayView<FIoChunkId const>(ChunkIds, Header.TocEntryCount);
+	if (TocResource.ChunkIds.Num() <= 0)
 	{
 		return false;
 	}
 
-	for (int32 ChunkIndex = 0; ChunkIndex < ChunkIdsArray.Num(); ++ChunkIndex)
+	for (int32 ChunkIndex = 0; ChunkIndex < TocResource.ChunkIds.Num(); ++ChunkIndex)
 	{
-		TocResource.ChunkIdToIndex.Add(ChunkIdsArray[ChunkIndex], ChunkIndex);
+		TocResource.ChunkIdToIndex.Add(TocResource.ChunkIds[ChunkIndex], ChunkIndex);
 	}
 
 	// Chunk offsets
@@ -695,42 +714,36 @@ bool FIoStoreAnalyzer::TryDecryptIoStore(const FIoStoreTocResourceInfo& TocResou
 	return true;
 }
 
-bool FIoStoreAnalyzer::FillPackageInfo(uint64 ContainerId, FStorePackageInfo& OutPackageInfo)
+bool FIoStoreAnalyzer::FillPackageInfo(const FIoStoreTocResourceInfo& TocResource, FStorePackageInfo& OutPackageInfo)
 {
-	FIoStoreTocResourceInfo* TocResource = TocResources.Find(ContainerId);
-	if (!TocResource)
-	{
-		return false;
-	}
-
 	OutPackageInfo.SerializeSize = 0;
-	OutPackageInfo.CompressionBlockSize = TocResource->Header.CompressionBlockSize;
+	OutPackageInfo.CompressionBlockSize = TocResource.Header.CompressionBlockSize;
 	OutPackageInfo.CompressionBlockCount = 0;
 
 	const int32 FirstBlockIndex = int32(OutPackageInfo.ChunkInfo.Offset / OutPackageInfo.CompressionBlockSize);
 	const int32 LastBlockIndex = int32((Align(OutPackageInfo.ChunkInfo.Offset + OutPackageInfo.ChunkInfo.Size, OutPackageInfo.CompressionBlockSize) - 1) / OutPackageInfo.CompressionBlockSize);
 	for (int32 BlockIndex = FirstBlockIndex; BlockIndex <= LastBlockIndex; ++BlockIndex)
 	{
-		if (!TocResource->CompressionBlocks.IsValidIndex(BlockIndex))
+		if (!TocResource.CompressionBlocks.IsValidIndex(BlockIndex))
 		{
 			return false;
 		}
 
-		const FIoStoreTocCompressedBlockEntry& CompressionBlock = TocResource->CompressionBlocks[BlockIndex];
+		const FIoStoreTocCompressedBlockEntry& CompressionBlock = TocResource.CompressionBlocks[BlockIndex];
 		OutPackageInfo.SerializeSize += Align(CompressionBlock.GetCompressedSize(), FAES::AESBlockSize);
 
 		if (BlockIndex == FirstBlockIndex)
 		{
-			OutPackageInfo.CompressionMethod = TocResource->CompressionMethods[CompressionBlock.GetCompressionMethodIndex()];
+			OutPackageInfo.CompressionMethod = TocResource.CompressionMethods[CompressionBlock.GetCompressionMethodIndex()];
 		}
 		
 		OutPackageInfo.CompressionBlockCount += 1;
 	}
 
-	int32* Index = TocResource->ChunkIdToIndex.Find(OutPackageInfo.ChunkId);
-	if (Index && TocResource->ChunkMetas.IsValidIndex(*Index))
+	const int32* Index = TocResource.ChunkIdToIndex.Find(OutPackageInfo.ChunkId);
+	if (Index && TocResource.ChunkMetas.IsValidIndex(*Index))
 	{
-		OutPackageInfo.ChunkHash = TocResource->ChunkMetas[*Index].ChunkHash.ToString();
+		OutPackageInfo.ChunkHash = TocResource.ChunkMetas[*Index].ChunkHash.ToString();
 	}
 
 	return true;
@@ -843,6 +856,14 @@ void FIoStoreAnalyzer::UpdateExtractProgress(int32 InTotal, int32 InComplete, in
 			FPakAnalyzerDelegates::OnUpdateExtractProgress.ExecuteIfBound(InComplete, InError, InTotal);
 		},
 		TStatId(), nullptr, ENamedThreads::GameThread);
+}
+
+void FIoStoreAnalyzer::ParseChunkInfo(const FIoChunkId& InChunkId, FPackageId& OutPackageId, EIoChunkType& OutChunkType)
+{
+	const uint8* Data = (const uint8*)(&InChunkId);
+
+	*(uint64*)(&OutPackageId) = *(uint64*)(&Data[0]);
+	OutChunkType = (EIoChunkType)(*(uint8*)(&Data[11]));
 }
 
 #endif // ENABLE_IO_STORE_ANALYZER
