@@ -45,6 +45,7 @@ protected:
 	void StopExtract();
 	void UpdateExtractProgress(int32 InTotal, int32 InComplete, int32 InError);
 	void ParseChunkInfo(const FIoChunkId& InChunkId, FPackageId& OutPackageId, EIoChunkType& OutChunkType);
+	FName FindObjectName(FPackageObjectIndex Index, const FStorePackageInfo* PackageInfo);
 
 protected:
 	TSharedPtr<FIoStoreReader> GlobalIoStoreReader;
@@ -59,6 +60,10 @@ protected:
 	TArray<TFuture<void>> ExtractThread;
 	FThreadSafeBool IsStopExtract;
 	FString ExtractOutputPath;
+
+	TMap<FPackageObjectIndex, FScriptObjectDesc> ScriptObjectByGlobalIdMap;
+	TMap<uint64, FIoStoreTocResourceInfo> TocResources;
+	TMap<FPackageObjectIndex, const FIoStoreExport*> ExportByGlobalIdMap;
 };
 
 #endif // ENABLE_IO_STORE_ANALYZER

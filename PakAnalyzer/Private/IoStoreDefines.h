@@ -199,6 +199,30 @@ struct FScriptObjectDesc
 	FPackageObjectIndex OuterIndex;
 };
 
+struct FPackageStoreExportEntry
+{
+	FPackageStoreExportEntry(const FPackageStoreEntry& InEntry)
+		: ExportBundlesSize(InEntry.ExportBundlesSize)
+		, ExportCount(InEntry.ExportCount)
+		, ExportBundleCount(InEntry.ExportBundleCount)
+		, LoadOrder(InEntry.LoadOrder)
+		, Pad(InEntry.Pad)
+	{
+		DependencyPackages.SetNum(InEntry.ImportedPackages.Num());
+		for (uint32 i = 0; i < InEntry.ImportedPackages.Num(); ++i)
+		{
+			DependencyPackages[i] = InEntry.ImportedPackages[i];
+		}
+	}
+
+	uint64 ExportBundlesSize = 0;
+	int32 ExportCount = 0;
+	int32 ExportBundleCount = 0;
+	uint32 LoadOrder = 0;
+	uint32 Pad = 0;
+	TArray<FPackageId> DependencyPackages;
+};
+
 struct FContainerInfo
 {
 	FIoContainerId Id;
@@ -210,6 +234,30 @@ struct FContainerInfo
 
 	FPakFileSumary Summary;
 	TSharedPtr<FIoStoreReader> Reader;
+
+	TMap<FPackageId, FPackageStoreExportEntry> StoreEntryMap;
+};
+
+struct FIoStoreExport
+{
+	FName Name;
+	FName FullName;
+	FPackageObjectIndex OuterIndex;
+	FPackageObjectIndex ClassIndex;
+	FPackageObjectIndex SuperIndex;
+	FPackageObjectIndex TemplateIndex;
+	FPackageObjectIndex GlobalImportIndex;
+	uint64 SerialOffset = 0;
+	uint64 SerialSize = 0;
+	EObjectFlags ObjectFlags = EObjectFlags::RF_NoFlags;
+	EExportFilterFlags FilterFlags = EExportFilterFlags::None;
+	struct FStorePackageInfo* Package = nullptr;
+};
+
+struct FIoStoreImport
+{
+	FName Name;
+	FPackageObjectIndex GlobalImportIndex;
 };
 
 struct FStorePackageInfo
@@ -220,12 +268,17 @@ struct FStorePackageInfo
 	FIoChunkId ChunkId;
 	EIoChunkType ChunkType;
 	FIoStoreTocChunkInfo ChunkInfo;
+	uint32 CookedHeaderSize = 0;
 	uint32 SerializeSize = 0;
 	uint32 CompressionBlockSize = 0;
 	uint32 CompressionBlockCount = 0;
 	FName CompressionMethod;
 	FString ChunkHash;
 	FName Extension;
+	TArray<FIoStoreImport> Imports;
+	TArray<FIoStoreExport> Exports;
+	FAssetSummaryPtr AssetSummary;
+	TArray<FPackageId> DependencyPackages;
 
 	inline bool operator ==(const FStorePackageInfo& Rhs) const
 	{
