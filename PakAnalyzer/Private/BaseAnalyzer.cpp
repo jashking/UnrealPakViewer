@@ -42,7 +42,7 @@ FString FBaseAnalyzer::GetLastLoadGuid() const
 
 bool FBaseAnalyzer::IsLoadDirty(const FString& InGuid) const
 {
-	return !InGuid.Equals(LoadGuid.ToString(), ESearchCase::IgnoreCase);
+	return !InGuid.Equals(LoadGuid.ToString(), ESearchCase::IgnoreCase) && LoadGuid.IsValid();
 }
 
 const FPakFileSumary& FBaseAnalyzer::GetPakFileSumary() const
