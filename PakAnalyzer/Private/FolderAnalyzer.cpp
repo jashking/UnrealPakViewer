@@ -62,7 +62,7 @@ bool FFolderAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAES
 	ShutdownAssetParseWorker();
 
 	// Make tree root
-	TreeRoot = MakeShared<FPakTreeEntry>(FPaths::GetCleanFilename(InPakPath), PakFileSumary.MountPoint, true);
+	TreeRoot = MakeShared<FPakTreeEntry>(*FPaths::GetCleanFilename(InPakPath), PakFileSumary.MountPoint, true);
 
 	TArray<FString> FoundFiles;
 	PlatformFile.FindFilesRecursively(FoundFiles, *InPakPath, TEXT(""));

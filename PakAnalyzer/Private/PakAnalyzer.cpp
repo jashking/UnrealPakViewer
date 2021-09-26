@@ -110,7 +110,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAESKey
 	ShutdownAssetParseWorker();
 
 	// Make tree root
-	TreeRoot = MakeShared<FPakTreeEntry>(FPaths::GetCleanFilename(InPakPath), PakFileSumary.MountPoint, true);
+	TreeRoot = MakeShared<FPakTreeEntry>(*FPaths::GetCleanFilename(InPakPath), PakFileSumary.MountPoint, true);
 
 	UE_LOG(LogPakAnalyzer, Log, TEXT("Load all file info from pak."));
 

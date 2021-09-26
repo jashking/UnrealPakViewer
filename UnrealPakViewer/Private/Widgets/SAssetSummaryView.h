@@ -61,7 +61,6 @@ protected:
 	TSharedRef<ITableRow> OnGenerateNameRow(FNamePtrType InName, const TSharedRef<class STableViewBase>& OwnerTable);
 	TSharedRef<ITableRow> OnGenerateImportObjectRow(FObjectImportPtrType InObject, const TSharedRef<class STableViewBase>& OwnerTable);
 	TSharedRef<ITableRow> OnGenerateExportObjectRow(FObjectExportPtrType InObject, const TSharedRef<class STableViewBase>& OwnerTable);
-	TSharedRef<ITableRow> OnGeneratePreloadDependencyRow(FPackageIndexPtrType InPackageIndex, const TSharedRef<class STableViewBase>& OwnerTable);
 	TSharedRef<ITableRow> OnGenerateDependsRow(FPackageInfoPtr InDepends, const TSharedRef<class STableViewBase>& OwnerTable);
 
 	void InsertColumn(TSharedPtr<SHeaderRow> InHeader, FName InId, const FString& InCloumnName = TEXT(""));

@@ -74,7 +74,7 @@ public:
 		}
 		else if (ColumnName == "FullPath")
 		{
-			return SNew(STextBlock).Text(FText::FromString(Object->ObjectPath)).ToolTipText(FText::FromString(Object->ObjectPath)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
+			return SNew(STextBlock).Text(FText::FromName(Object->ObjectPath)).ToolTipText(FText::FromName(Object->ObjectPath)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 		else
 		{
@@ -101,7 +101,7 @@ public:
 
 		for (FPackageInfoPtr Dependency : InObject->DependencyList)
 		{
-			Dependencies.Add(MakeShared<FString>(Dependency->ExtraInfo + TEXT(": ") + Dependency->PackageName));
+			Dependencies.Add(MakeShared<FName>(*FString::Printf(TEXT("%s: %s"), *Dependency->ExtraInfo.ToString(), *Dependency->PackageName.ToString())));
 		}
 
 		WeakObject = MoveTemp(InObject);
@@ -151,28 +151,28 @@ public:
 		}
 		else if (ColumnName == "ClassIndex")
 		{
-			RowContent = SNew(STextBlock).Text(FText::FromString(Object->ClassName)).ToolTipText(FText::FromString(Object->ClassName)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
+			RowContent = SNew(STextBlock).Text(FText::FromName(Object->ClassName)).ToolTipText(FText::FromName(Object->ClassName)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 		else if (ColumnName == "SuperIndex")
 		{
-			RowContent = SNew(STextBlock).Text(FText::FromString(Object->Super)).ToolTipText(FText::FromString(Object->Super)).Justification(ETextJustify::Right).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
+			RowContent = SNew(STextBlock).Text(FText::FromName(Object->Super)).ToolTipText(FText::FromName(Object->Super)).Justification(ETextJustify::Right).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 		else if (ColumnName == "TemplateIndex")
 		{
-			RowContent = SNew(STextBlock).Text(FText::FromString(Object->TemplateObject)).ToolTipText(FText::FromString(Object->TemplateObject)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
+			RowContent = SNew(STextBlock).Text(FText::FromName(Object->TemplateObject)).ToolTipText(FText::FromName(Object->TemplateObject)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 		else if (ColumnName == "FullPath")
 		{
-			RowContent = SNew(STextBlock).Text(FText::FromString(Object->ObjectPath)).ToolTipText(FText::FromString(Object->ObjectPath)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
+			RowContent = SNew(STextBlock).Text(FText::FromName(Object->ObjectPath)).ToolTipText(FText::FromName(Object->ObjectPath)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
 		}
 		else if (ColumnName == "Dependencies")
 		{
-			RowContent = SNew(SComboBox<TSharedPtr<FString>>)
+			RowContent = SNew(SComboBox<TSharedPtr<FName>>)
 				.ContentPadding(FMargin(6.0f, 2.0f))
 				.OptionsSource(&Dependencies)
-				.OnGenerateWidget_Lambda([](TSharedPtr<FString> Item)
+				.OnGenerateWidget_Lambda([](TSharedPtr<FName> Item)
 				{
-					return SNew(STextBlock).Text(FText::FromString(*Item)).ToolTipText(FText::FromString(*Item)).Margin(FMargin(2.f, 2.f, 2.f, 2.f));
+					return SNew(STextBlock).Text(FText::FromName(*Item)).ToolTipText(FText::FromName(*Item)).Margin(FMargin(2.f, 2.f, 2.f, 2.f));
 				})
 				.Content()
 				[
@@ -193,7 +193,7 @@ public:
 protected:
 	TWeakPtr<FObjectExportEx> WeakObject;
 
-	TArray<TSharedPtr<FString>> Dependencies;
+	TArray<TSharedPtr<FName>> Dependencies;
 };
 
 SAssetSummaryView::SAssetSummaryView()
@@ -492,50 +492,6 @@ void SAssetSummaryView::Construct(const FArguments& InArgs)
 			]
 		]
 
-		//+ SVerticalBox::Slot()
-		//.AutoHeight()
-		//.Padding(0.f, 2.f)
-		//[
-		//	SNew(SExpandableArea)
-		//	.InitiallyCollapsed(true)
-		//	.HeaderContent()
-		//	[
-		//		SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_PreloadDependency", "PreloadDependency:"))
-		//		.ValueContent()
-		//		[
-		//			SNew(SHorizontalBox)
-
-		//			+ SHorizontalBox::Slot()
-		//			.FillWidth(1.f)
-		//			[
-		//				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_Count", "Count:")).ValueText(this, &SAssetSummaryView::GetPreloadDependencyCount)
-		//			]
-
-		//			+ SHorizontalBox::Slot()
-		//			.FillWidth(1.f)
-		//			[
-		//				SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_Offset", "Offset:")).ValueText(this, &SAssetSummaryView::GetPreloadDependencyOffset)
-		//			]
-		//		]
-		//	]
-		//	.BodyContent()
-		//	[
-		//		SAssignNew(PreloadDependencyListView, SListView<FPackageIndexPtrType>)
-		//		.ItemHeight(25.f)
-		//		.SelectionMode(ESelectionMode::Multi)
-		//		.ListItemsSource(&PreloadDependency)
-		//		.OnGenerateRow(this, &SAssetSummaryView::OnGeneratePreloadDependencyRow)
-		//		.HeaderRow
-		//		(
-		//			SNew(SHeaderRow).Visibility(EVisibility::Visible)
-
-		//			+ SHeaderRow::Column(FName("DependencyPackage"))
-		//			.FillWidth(1.f)
-		//			.DefaultLabel(LOCTEXT("Tree_View_Summary_PackageIndex", "PackageIndex"))
-		//		)
-		//	]
-		//]
-
 		+ SVerticalBox::Slot()
 		.AutoHeight()
 		.Padding(0.f, 2.f)
@@ -649,19 +605,11 @@ TSharedRef<ITableRow> SAssetSummaryView::OnGenerateExportObjectRow(FObjectExport
 	return SNew(SExportObjectRow, InObject, OwnerTable);
 }
 
-TSharedRef<ITableRow> SAssetSummaryView::OnGeneratePreloadDependencyRow(FPackageIndexPtrType InPackageIndex, const TSharedRef<class STableViewBase>& OwnerTable)
-{
-	return SNew(STableRow<FNamePtrType>, OwnerTable).Padding(FMargin(0.f, 2.f))
-		[
-			SNew(STextBlock).Text(FText::AsNumber(InPackageIndex->ForDebugging()))
-		];
-}
-
 TSharedRef<ITableRow> SAssetSummaryView::OnGenerateDependsRow(FPackageInfoPtr InDepends, const TSharedRef<class STableViewBase>& OwnerTable)
 {
 	return SNew(STableRow<FPackageInfoPtr>, OwnerTable).Padding(FMargin(0.f, 2.f))
 		[
-			SNew(STextBlock).Text(FText::FromString(InDepends->PackageName)).ToolTipText(FText::FromString(InDepends->PackageName))
+			SNew(STextBlock).Text(FText::FromName(InDepends->PackageName)).ToolTipText(FText::FromName(InDepends->PackageName))
 		];
 }
 

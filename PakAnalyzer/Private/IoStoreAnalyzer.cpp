@@ -60,7 +60,7 @@ bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAE
 	DefaultAESKey = InAESKey;
 
 	// Make tree root
-	TreeRoot = MakeShared<FPakTreeEntry>(FPaths::GetCleanFilename(InPakPath), TEXT(""), true);
+	TreeRoot = MakeShared<FPakTreeEntry>(*FPaths::GetCleanFilename(InPakPath), TEXT(""), true);
 
 	if (!InitializeGlobalReader(InPakPath))
 	{
@@ -667,10 +667,10 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 			ObjectExport->bIsAsset = (Export.ObjectFlags & RF_Public) && !(Export.ObjectFlags & (RF_Transient | RF_ClassDefaultObject));
 			ObjectExport->bNotForClient = Export.FilterFlags == EExportFilterFlags::NotForClient;
 			ObjectExport->bNotForServer = Export.FilterFlags == EExportFilterFlags::NotForServer;
-			ObjectExport->ClassName = FindObjectName(Export.ClassIndex, &PackageInfo).ToString();
-			ObjectExport->Super = FindObjectName(Export.SuperIndex, &PackageInfo).ToString();
-			ObjectExport->TemplateObject = FindObjectName(Export.TemplateIndex, &PackageInfo).ToString();
-			ObjectExport->ObjectPath = Export.FullName.ToString();
+			ObjectExport->ClassName = FindObjectName(Export.ClassIndex, &PackageInfo);
+			ObjectExport->Super = FindObjectName(Export.SuperIndex, &PackageInfo);
+			ObjectExport->TemplateObject = FindObjectName(Export.TemplateIndex, &PackageInfo);
+			ObjectExport->ObjectPath = Export.FullName;
 			ObjectExport->DependencyList.SetNum(0);
 
 			PackageInfo.AssetSummary->ObjectExports[i] = ObjectExport;
@@ -683,8 +683,8 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 
 			FObjectImportPtrType ObjectImport = MakeShared<FObjectImportEx>();
 			ObjectImport->Index = i;
-			ObjectImport->ObjectPath = Import.Name.ToString();
-			ObjectImport->ObjectName = *FPaths::GetBaseFilename(ObjectImport->ObjectPath);
+			ObjectImport->ObjectPath = Import.Name;
+			ObjectImport->ObjectName = *FPaths::GetBaseFilename(ObjectImport->ObjectPath.ToString());
 
 			//if (!Import.GlobalImportIndex.IsNull())
 			//{
@@ -724,14 +724,14 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 			FPackageInfoPtr DependencyPackage = MakeShared<struct FPackageInfo>();
 			if (FName* PackageName = PackageNameMap.Find(PackageInfo.DependencyPackages[i]))
 			{
-				DependencyPackage->PackageName = PackageName->ToString();
+				DependencyPackage->PackageName = *PackageName;
 
 				FScopeLock ScopeLock(&Mutex);
-				DependsMap.Add(DependencyPackage->PackageName.ToLower(), PackageInfo.PackageName.ToString());
+				DependsMap.Add(DependencyPackage->PackageName.ToString().ToLower(), PackageInfo.PackageName.ToString());
 			}
 			else
 			{
-				DependencyPackage->PackageName = FString::Printf(TEXT("Missing package: 0x%X, may be in other ucas!"), PackageInfo.DependencyPackages[i].ValueForDebugging());
+				DependencyPackage->PackageName = *FString::Printf(TEXT("Missing package: 0x%X, may be in other ucas!"), PackageInfo.DependencyPackages[i].ValueForDebugging());
 			}
 
 			PackageInfo.AssetSummary->DependencyList[i] = DependencyPackage;
@@ -753,7 +753,7 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 		for (const FString& Asset : Assets)
 		{
 			FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
-			Depends->PackageName = Asset;
+			Depends->PackageName = *Asset;
 			PackageInfo.AssetSummary->DependentList.Add(Depends);
 		}
 	}, ParallelForFlags);

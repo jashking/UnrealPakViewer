@@ -43,8 +43,8 @@ protected:
 	void RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, const TMap<FName, bool>& InClassFilterMap, TArray<FPakFileEntryPtr>& OutFiles) const;
 	void RetriveUAssetFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileEntryPtr>& OutFiles) const;
 	void InsertClassInfo(FPakTreeEntryPtr InRoot, FName InClassName, int32 InFileCount, int64 InSize, int64 InCompressedSize);
-	FName GetAssetClass(const FString& InFilename, const FString& InPackagePath);
-	FString GetPackagePath(const FString& InFilePath);
+	FName GetAssetClass(const FString& InFilename, const FName InPackagePath);
+	FName GetPackagePath(const FString& InFilePath);
 
 protected:
 	FCriticalSection CriticalSection;

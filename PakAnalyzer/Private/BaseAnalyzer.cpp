@@ -331,7 +331,7 @@ void FBaseAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilte
 
 			if (bMatchClass && (InFilterText.IsEmpty() || /*Child->Filename.Contains(InFilterText) ||*/ Child->Path.Contains(InFilterText)))
 			{
-				FPakFileEntryPtr FileEntryPtr = MakeShared<FPakFileEntry>(Child->Filename.ToString(), Child->Path);
+				FPakFileEntryPtr FileEntryPtr = MakeShared<FPakFileEntry>(Child->Filename, Child->Path);
 				if (!Child->bIsDirectory)
 				{
 					FileEntryPtr->Class = Child->Class;
@@ -388,15 +388,15 @@ void FBaseAnalyzer::InsertClassInfo(FPakTreeEntryPtr InRoot, FName InClassName, 
 	ClassEntry->PercentOfParent = InRoot->CompressedSize > 0 ? (float)ClassEntry->CompressedSize / InRoot->CompressedSize : 0.f;
 }
 
-FName FBaseAnalyzer::GetAssetClass(const FString& InFilename, const FString& InPackagePath)
+FName FBaseAnalyzer::GetAssetClass(const FString& InFilename, FName InPackagePath)
 {
 	FName AssetClass = *FPaths::GetExtension(InFilename);
 	if (AssetRegistryState.IsValid())
 	{
 #if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
-		TArrayView<FAssetData const* const> AssetDataArray = AssetRegistryState->GetAssetsByPackageName(*InPackagePath);
+		TArrayView<FAssetData const* const> AssetDataArray = AssetRegistryState->GetAssetsByPackageName(InPackagePath);
 #else
-		const TArray<const FAssetData*>& AssetDataArray = AssetRegistryState->GetAssetsByPackageName(*InPackagePath);
+		const TArray<const FAssetData*>& AssetDataArray = AssetRegistryState->GetAssetsByPackageName(InPackagePath);
 #endif
 		if (AssetDataArray.Num() > 0)
 		{
@@ -407,7 +407,7 @@ FName FBaseAnalyzer::GetAssetClass(const FString& InFilename, const FString& InP
 	return AssetClass.IsNone() ? TEXT("Unknown") : AssetClass;
 }
 
-FString FBaseAnalyzer::GetPackagePath(const FString& InFilePath)
+FName FBaseAnalyzer::GetPackagePath(const FString& InFilePath)
 {
 	FString Left, Right;
 	if (InFilePath.Split(TEXT("/Content/"), &Left, &Right))
@@ -415,11 +415,11 @@ FString FBaseAnalyzer::GetPackagePath(const FString& InFilePath)
 		const FString Prefix = FPaths::GetPathLeaf(Left);
 		const bool bNotUseGamePrefix = Prefix == TEXT("Engine") || InFilePath.Contains(TEXT("Plugin"));
 
-		return FPaths::SetExtension(bNotUseGamePrefix ? TEXT("/") / Prefix / Right : TEXT("/Game") / Right, TEXT(""));
+		return *FPaths::SetExtension(bNotUseGamePrefix ? TEXT("/") / Prefix / Right : TEXT("/Game") / Right, TEXT(""));
 	}
 	else
 	{
-		return TEXT("/") / FPaths::SetExtension(InFilePath, TEXT(""));
+		return *FString(TEXT("/") / FPaths::SetExtension(InFilePath, TEXT("")));
 	}
 }
 
@@ -494,7 +494,7 @@ FPakTreeEntryPtr FBaseAnalyzer::InsertFileToTree(const FString& InFullPath, cons
 		{
 			const bool bLastItem = (i == PathItems.Num() - 1);
 
-			FPakTreeEntryPtr NewChild = MakeShared<FPakTreeEntry>(PathItems[i], CurrentPath, !bLastItem);
+			FPakTreeEntryPtr NewChild = MakeShared<FPakTreeEntry>(*PathItems[i], CurrentPath, !bLastItem);
 			if (bLastItem)
 			{
 				NewChild->PakEntry = InPakEntry;

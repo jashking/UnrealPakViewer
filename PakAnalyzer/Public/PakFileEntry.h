@@ -9,7 +9,6 @@ typedef TSharedPtr<struct FPakClassEntry> FPakClassEntryPtr;
 typedef TSharedPtr<FName> FNamePtrType;
 typedef TSharedPtr<struct FObjectExportEx> FObjectExportPtrType;
 typedef TSharedPtr<struct FObjectImportEx> FObjectImportPtrType;
-typedef TSharedPtr<class FPackageIndex> FPackageIndexPtrType;
 typedef TSharedPtr<struct FAssetSummary> FAssetSummaryPtr;
 typedef TSharedPtr<struct FPakFileEntry> FPakFileEntryPtr;
 typedef TSharedPtr<struct FPakTreeEntry> FPakTreeEntryPtr;
@@ -36,26 +35,35 @@ struct FPakClassEntry
 	float PercentOfParent;
 };
 
-struct FObjectExportEx : public FObjectExport
+struct FObjectExportEx
 {
+	FName ObjectName;
+	uint64 SerialSize = 0;
+	uint64 SerialOffset = 0;
+	bool bIsAsset = false;
+	bool bNotForClient = false;
+	bool bNotForServer = false;
 	int32 Index = 0;
-	FString ObjectPath;
-	FString ClassName;
-	FString TemplateObject;
-	FString Super;
+	FName ObjectPath;
+	FName ClassName;
+	FName TemplateObject;
+	FName Super;
 	TArray<FPackageInfoPtr> DependencyList;
 };
 
-struct FObjectImportEx : public FObjectImport
+struct FObjectImportEx
 {
 	int32 Index = 0;
-	FString ObjectPath;
+	FName ClassPackage;
+	FName ClassName;
+	FName ObjectName;
+	FName ObjectPath;
 };
 
 struct FPackageInfo
 {
-	FString PackageName;
-	FString ExtraInfo;
+	FName PackageName;
+	FName ExtraInfo;
 };
 
 struct FAssetSummary
@@ -64,15 +72,14 @@ struct FAssetSummary
 	TArray<FNamePtrType> Names;
 	TArray<FObjectExportPtrType> ObjectExports;
 	TArray<FObjectImportPtrType> ObjectImports;
-	TArray<FPackageIndexPtrType> PreloadDependency;
 	TArray<FPackageInfoPtr> DependencyList; // this asset depends on
 	TArray<FPackageInfoPtr> DependentList; // assets depends on this
 };
 
 struct FPakFileEntry : TSharedFromThis<FPakFileEntry>
 {
-	FPakFileEntry(const FString& InFilename, const FString& InPath)
-		: Filename(*InFilename)
+	FPakFileEntry(FName InFilename, const FString& InPath)
+		: Filename(InFilename)
 		, Path(InPath)
 	{
 
@@ -83,7 +90,7 @@ struct FPakFileEntry : TSharedFromThis<FPakFileEntry>
 	FString Path;
 	FName CompressionMethod;
 	FName Class;
-	FString PackagePath;
+	FName PackagePath;
 	FAssetSummaryPtr AssetSummary;
 };
 
@@ -99,7 +106,7 @@ struct FPakTreeEntry : public FPakFileEntry
 	TMap<FName, TSharedPtr<FPakTreeEntry>> ChildrenMap;
 	TMap<FName, FPakClassEntryPtr> FileClassMap;
 
-	FPakTreeEntry(const FString& InFilename, const FString& InPath, bool bInIsDirectory)
+	FPakTreeEntry(FName InFilename, const FString& InPath, bool bInIsDirectory)
 		: FPakFileEntry(InFilename, InPath)
 		, FileCount(0)
 		, Size(0)

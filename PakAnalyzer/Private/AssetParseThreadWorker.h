@@ -27,8 +27,8 @@ public:
 	FOnReadAssetContent OnReadAssetContent;
 
 protected:
-	bool ParseObjectName(FAssetSummaryPtr InSummary, FPackageIndex Index, FString& OutObjectName);
-	bool ParseObjectPath(FAssetSummaryPtr InSummary, FPackageIndex Index, FString& OutFullPath);
+	bool ParseObjectName(const TArray<FObjectImport>& Imports, const TArray<FObjectExport>& Exports, FPackageIndex Index, FName& OutObjectName);
+	bool ParseObjectPath(FAssetSummaryPtr InSummary, FPackageIndex Index, FName& OutFullPath);
 
 protected:
 	class FRunnableThread* Thread;
