@@ -707,7 +707,7 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 			PackageInfo.AssetSummary->ObjectExports[i] = ObjectExport;
 
 			FName ObjectClass = *FPaths::GetBaseFilename(ObjectExport->ClassName.ToString());
-			FName ObjectName = *FPaths::GetBaseFilename(ObjectExport->ObjectPath.ToString());
+			FName ObjectName = *FPaths::GetBaseFilename(ObjectExport->ObjectName.ToString());
 			if (ObjectName == MainObjectName)
 			{
 				MainObjectClassName = ObjectClass;

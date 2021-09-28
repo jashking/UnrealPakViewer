@@ -266,7 +266,7 @@ uint32 FAssetParseThreadWorker::Run()
 				ParseObjectName(Imports, Exports, Export.TemplateIndex, ExportEx->TemplateObject);
 				ParseObjectName(Imports, Exports, Export.SuperIndex, ExportEx->Super);
 
-				FName ObjectName = *FPaths::GetBaseFilename(ExportEx->ObjectPath.ToString());
+				FName ObjectName = *FPaths::GetBaseFilename(ExportEx->ObjectName.ToString());
 				if (ObjectName == MainObjectName)
 				{
 					MainObjectClassName = ExportEx->ClassName;
