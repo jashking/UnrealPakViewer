@@ -2,7 +2,8 @@
 
 可视化查看 Pak 文件内容，支持以下特性
 
-* 支持树形视图和列表视图查看 Pak 中的文件
+* 支持树形视图和列表视图查看 pak/ucas 中的文件
+* 支持同时打开多个 pak/ucas 文件
 * 列表视图中支持搜索，过滤，排序
 * 支持查看 UAsset 文件的具体内容组成信息
 * 以百分比显示各个文件夹，文件，文件类型的大小占比
@@ -177,8 +178,6 @@ Cook 完成后都会在 *Saved/Cooked/[Platform]/[Project]/Metadata/DevelopmentA
 
 ## TODO ##
 
-* restore uasset file from utoc
-* support multi pak/ucas open
 * commandline application
 * Pak compare visiualize
 * resource preview
