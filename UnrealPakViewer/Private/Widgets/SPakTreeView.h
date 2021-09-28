@@ -33,7 +33,7 @@ public:
 	 */
 	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
-	FORCEINLINE void SetDelayHighlightItem(const FString& InPath) { DelayHighlightItem = InPath; }
+	FORCEINLINE void SetDelayHighlightItem(const FString& InPath, int32 PakIndex) { DelayHighlightItem = InPath; DelayHighlightItemPakIndex = PakIndex; }
 
 protected:
 	////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,7 +46,7 @@ protected:
 	/** Called by STreeView when selection has changed. */
 	void OnSelectionChanged(FPakTreeEntryPtr SelectedItem, ESelectInfo::Type SelectInfo);
 
-	void ExpandTreeItem(const FString& InPath);
+	void ExpandTreeItem(const FString& InPath, int32 PakIndex);
 
 	// Detail View
 	FORCEINLINE FText GetSelectionName() const;
@@ -64,6 +64,8 @@ protected:
 	FORCEINLINE FText GetCompressionMethod() const;
 	FORCEINLINE FText GetSelectionSHA1() const;
 	FORCEINLINE FText GetSelectionIsEncrypted() const;
+	FORCEINLINE FText GetSelectionOwnerPakName() const;
+	FORCEINLINE FText GetSelectionOwnerPakPath() const;
 	FORCEINLINE FText GetSelectionFileCount() const;
 	FORCEINLINE const FSlateBrush* GetFolderImage(FPakTreeEntryPtr InTreeNode) const;
 	FORCEINLINE FText GetSelectionClass() const;
@@ -100,11 +102,13 @@ protected:
 	TSharedPtr<SKeyValueRow> SHA1Row;
 	TSharedPtr<SKeyValueRow> IsEncryptedRow;
 	TSharedPtr<SKeyValueRow> FileCountRow;
+	TSharedPtr<SKeyValueRow> OwnerPakRow;
 	TSharedPtr<class SPakClassView> ClassView;
 	TSharedPtr<SKeyValueRow> ClassRow;
 	TSharedPtr<class SAssetSummaryView> AssetSummaryView;
 
 	FString DelayHighlightItem;
+	int32 DelayHighlightItemPakIndex = -1;
 
 	bool bIsDirty = false;
 };

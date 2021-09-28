@@ -13,7 +13,8 @@ public:
 	}
 
 	SLATE_EVENT(FOnConfirm, OnConfirm)
-
+	SLATE_ATTRIBUTE(FString, PakPath)
+	SLATE_ATTRIBUTE(FGuid, PakGuid)
 	SLATE_END_ARGS()
 
 	SKeyInputWindow();
@@ -27,6 +28,8 @@ protected:
 
 protected:
 	FOnConfirm OnConfirm;
+	TAttribute<FString> PakPath;
+	TAttribute<FGuid> PakGuid;
 
 	TSharedPtr<class SEditableTextBox> EncryptionKeyBox;
 };

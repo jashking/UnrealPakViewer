@@ -41,12 +41,12 @@ FPakAnalyzer::~FPakAnalyzer()
 	Reset();
 }
 
-bool FPakAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAESKey)
+FPakTreeEntryPtr FPakAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InDefaultAESKey/* = TEXT("")*/)
 {
 	if (InPakPath.IsEmpty())
 	{
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Pak path is empty!"));
-		return false;
+		return nullptr;
 	}
 
 	UE_LOG(LogPakAnalyzer, Log, TEXT("Start load pak file: %s."), *InPakPath);
@@ -56,16 +56,14 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAESKey
 	{
 		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Load pak file failed! Pak file not exists! Path: %s."), *InPakPath));
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Pak file not exists! Path: %s."), *InPakPath);
-		return false;
+		return nullptr;
 	}
 
-	Reset();
-
-	DefaultAESKey = InAESKey;
-	if (!PreLoadPak(InPakPath))
+	FString DecryptAESKey;
+	if (!PreLoadPak(InPakPath, InDefaultAESKey, DecryptAESKey))
 	{
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Pre load pak file failed! Path: %s."), *InPakPath);
-		return false;
+		return nullptr;
 	}
 
 #if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
@@ -80,7 +78,7 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAESKey
 		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Load pak file failed! Create PakFile failed! Path: %s."), *InPakPath));
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Create PakFile failed! Path: %s."), *InPakPath);
 
-		return false;
+		return nullptr;
 	}
 
 	if (!PakFilePtr->IsValid())
@@ -88,29 +86,33 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAESKey
 		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Load pak file failed! Unable to open pak file! Path: %s."), *InPakPath));
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Unable to open pak file! Path: %s."), *InPakPath);
 
-		return false;
+		return nullptr;
 	}
 
-	// Generate unique id
-	LoadGuid = FGuid::NewGuid();
-
 	// Save pak sumary
-	PakFileSumary.MountPoint = PakFilePtr->GetMountPoint();
-	PakFileSumary.PakInfo = PakFilePtr->GetInfo();
-	PakFileSumary.PakFilePath = InPakPath;
-	PakFileSumary.PakFileSize = PakFilePtr->TotalSize();
+	FPakFileSumaryPtr Summary = MakeShared<FPakFileSumary>();
+	PakFileSummaries.Add(Summary);
+	const int32 SummaryIndex = PakFileSummaries.Num() - 1;
+
+	Summary->MountPoint = PakFilePtr->GetMountPoint();
+	Summary->PakInfo = PakFilePtr->GetInfo();
+	Summary->PakFilePath = InPakPath;
+	Summary->PakFileSize = PakFilePtr->TotalSize();
+	Summary->DecryptAESKeyStr = DecryptAESKey;
+	if (!FBase64::Decode(*DecryptAESKey, DecryptAESKey.Len(), Summary->DecryptAESKey.Key))
+	{
+		Summary->DecryptAESKey.Reset();
+	}
 
 	TArray<FString> Methods;
-	for (const FName& Name : PakFileSumary.PakInfo.CompressionMethods)
+	for (const FName& Name : Summary->PakInfo.CompressionMethods)
 	{
 		Methods.Add(Name.ToString());
 	}
-	PakFileSumary.CompressionMethods = FString::Join(Methods, TEXT(", "));
-
-	ShutdownAssetParseWorker();
+	Summary->CompressionMethods = FString::Join(Methods, TEXT(", "));
 
 	// Make tree root
-	TreeRoot = MakeShared<FPakTreeEntry>(*FPaths::GetCleanFilename(InPakPath), PakFileSumary.MountPoint, true);
+	FPakTreeEntryPtr PakTreeRoot = MakeShared<FPakTreeEntry>(*FPaths::GetCleanFilename(InPakPath), Summary->MountPoint, true);
 
 	UE_LOG(LogPakAnalyzer, Log, TEXT("Load all file info from pak."));
 
@@ -151,22 +153,74 @@ bool FPakAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAESKey
 			PakFilePtr->ReadHashFromPayload(PakEntry, PakEntry.Hash);
 #endif
 
-			Child = InsertFileToTree(Record.Filename, PakEntry);
+			FString FullFilePath = Summary->MountPoint / Record.Filename;
+			FullFilePath.ReplaceInline(TEXT("../"), TEXT(""));
+			FullFilePath.ReplaceInline(TEXT("..\\"), TEXT(""));
+
+			Child = InsertFileToTree(PakTreeRoot, *Summary, FullFilePath, PakEntry);
+			Child->OwnerPakIndex = SummaryIndex;
 			if (Child.IsValid() && Child->Filename.ToString().EndsWith(TEXT("AssetRegistry.bin")))
 			{
-				LoadAssetRegistryFromPak(PakFilePtr, Child);
+				LoadAssetRegistryFromPak(PakFilePtr, Child, Summary->DecryptAESKey);
 			}
 		}
 	}
 
-	RefreshTreeNode(TreeRoot);
-	RefreshTreeNodeSizePercent(TreeRoot);
-	RefreshClassMap(TreeRoot);
-	ParseAssetFile(TreeRoot);
+	RefreshTreeNode(PakTreeRoot);
+	RefreshTreeNodeSizePercent(PakTreeRoot, PakTreeRoot);
 
-	bHasPakLoaded = true;
+	Summary->FileCount = PakTreeRoot->FileCount;
 
 	UE_LOG(LogPakAnalyzer, Log, TEXT("Finish load pak file: %s."), *InPakPath);
+
+	return PakTreeRoot;
+}
+
+bool FPakAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys)
+{
+	TArray<FString> PakFiles;
+	TArray<FString> UsedDefaultAESKeys;
+	IPlatformFile& PlatformFile = IPlatformFile::GetPlatformPhysical();
+	
+	for (int32 i = 0; i < InPakPaths.Num(); ++i)
+	{
+		const FString& PakPath = InPakPaths[i];
+		if (PlatformFile.FileExists(*PakPath) && PakPath.EndsWith(".pak"))
+		{
+			PakFiles.Add(PakPath);
+			UsedDefaultAESKeys.Add(InDefaultAESKeys.IsValidIndex(i) ? InDefaultAESKeys[i] : TEXT(""));
+		}
+	}
+
+	if (PakFiles.Num() <= 0)
+	{
+		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(TEXT("Load pak file failed! Pak files not exists!"));
+		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Pak files not exists!"));
+		return false;
+	}
+
+	Reset();
+	DefaultAESKeys = UsedDefaultAESKeys;
+
+	for (int32 i = 0; i < PakFiles.Num(); ++i)
+	{
+		FPakTreeEntryPtr PakTreeRoot = LoadPakFile(PakFiles[i], DefaultAESKeys.IsValidIndex(i) ? DefaultAESKeys[i] : TEXT(""));
+		if (PakTreeRoot.IsValid())
+		{
+			PakTreeRoots.Add(PakTreeRoot);
+		}
+	}
+
+	for (const FPakTreeEntryPtr& PakTreeRoot : PakTreeRoots)
+	{
+		RefreshClassMap(PakTreeRoot, PakTreeRoot);
+	}
+
+	ParseAssetFile();
+
+	// Generate unique id
+	LoadGuid = FGuid::NewGuid();
+	bHasPakLoaded = true;
 
 	return true;
 }
@@ -214,10 +268,17 @@ void FPakAnalyzer::ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntr
 
 	ResetProgress();
 
+	TArray<FPakFileSumary> Summaries;
+	Summaries.AddDefaulted(PakFileSummaries.Num());
+	for (int32 i = 0; i < PakFileSummaries.Num(); ++i)
+	{
+		Summaries[i] = *PakFileSummaries[i];
+	}
+
 	for (int32 i = 0; i < WorkerCount; ++i)
 	{
 		ExtractWorkers[i]->InitTaskFiles(TaskFiles[i]);
-		ExtractWorkers[i]->StartExtract(PakFileSumary.PakFilePath, PakFileSumary.PakInfo.Version, CachedAESKey, InOutputPath);
+		ExtractWorkers[i]->StartExtract(Summaries, InOutputPath);
 	}
 }
 
@@ -240,12 +301,13 @@ void FPakAnalyzer::SetExtractThreadCount(int32 InThreadCount)
 
 void FPakAnalyzer::Reset()
 {
-	FBaseAnalyzer::Reset();
+	ShutdownAssetParseWorker();
+	DefaultAESKeys.Empty();
 
-	DefaultAESKey = TEXT("");
+	FBaseAnalyzer::Reset();
 }
 
-bool FPakAnalyzer::LoadAssetRegistryFromPak(FPakFile* InPakFile, FPakFileEntryPtr InPakFileEntry)
+bool FPakAnalyzer::LoadAssetRegistryFromPak(FPakFile* InPakFile, FPakFileEntryPtr InPakFileEntry, const FAES::FAESKey& DecryptAESKey)
 {
 	if (!InPakFile || !InPakFile->IsValid() || !InPakFileEntry.IsValid())
 	{
@@ -269,14 +331,14 @@ bool FPakAnalyzer::LoadAssetRegistryFromPak(FPakFile* InPakFile, FPakFileEntryPt
 
 	if (EntryInfo.CompressionMethodIndex == 0)
 	{
-		if (!FExtractThreadWorker::BufferedCopyFile(ContentWriter, *InPakFile->GetSharedReader(nullptr), EntryInfo, Buffer, BufferSize, CachedAESKey))
+		if (!FExtractThreadWorker::BufferedCopyFile(ContentWriter, *InPakFile->GetSharedReader(nullptr), EntryInfo, Buffer, BufferSize, DecryptAESKey))
 		{
 			bReadResult = false;
 		}
 	}
 	else
 	{
-		if (!FExtractThreadWorker::UncompressCopyFile(ContentWriter, *InPakFile->GetSharedReader(nullptr), EntryInfo, PersistantCompressionBuffer, CompressionBufferSize, CachedAESKey, InPakFileEntry->CompressionMethod, bHasRelativeCompressedChunkOffsets))
+		if (!FExtractThreadWorker::UncompressCopyFile(ContentWriter, *InPakFile->GetSharedReader(nullptr), EntryInfo, PersistantCompressionBuffer, CompressionBufferSize, DecryptAESKey, InPakFileEntry->CompressionMethod, bHasRelativeCompressedChunkOffsets))
 		{
 			bReadResult = false;
 		}
@@ -293,13 +355,13 @@ bool FPakAnalyzer::LoadAssetRegistryFromPak(FPakFile* InPakFile, FPakFileEntryPt
 	const bool bLoadResult = LoadAssetRegistry(ContentReader);
 	if (bLoadResult)
 	{
-		PakFileSumary.AssetRegistryPath = InPakFileEntry->Path;
+		AssetRegistryPath = InPakFileEntry->Path;
 	}
 
 	return bLoadResult;
 }
 
-bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
+bool FPakAnalyzer::PreLoadPak(const FString& InPakPath, const FString& InDefaultAESKey, FString& OutDecryptKey)
 {
 	UE_LOG(LogPakAnalyzer, Log, TEXT("Pre load pak file: %s and check file hash."), *InPakPath);
 
@@ -349,7 +411,8 @@ bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
 
 	if (Info.EncryptionKeyGuid.IsValid() || Info.bEncryptedIndex)
 	{
-		bShouldLoad = DefaultAESKey.IsEmpty() ? false : TryDecryptPak(Reader, Info, DefaultAESKey, false);
+		OutDecryptKey = InDefaultAESKey;
+		bShouldLoad = InDefaultAESKey.IsEmpty() ? false : TryDecryptPak(Reader, Info, InDefaultAESKey, false);
 
 		if (!bShouldLoad)
 		{
@@ -358,9 +421,9 @@ bool FPakAnalyzer::PreLoadPak(const FString& InPakPath)
 				bool bCancel = true;
 				do
 				{
-					const FString KeyString = FPakAnalyzerDelegates::OnGetAESKey.Execute(bCancel);
+					OutDecryptKey = FPakAnalyzerDelegates::OnGetAESKey.Execute(InPakPath, Info.EncryptionKeyGuid, bCancel);
 
-					bShouldLoad = !bCancel ? TryDecryptPak(Reader, Info, KeyString, true) : false;
+					bShouldLoad = !bCancel ? TryDecryptPak(Reader, Info, OutDecryptKey, true) : false;
 				} while (!bShouldLoad && !bCancel);
 			}
 			else
@@ -443,8 +506,6 @@ bool FPakAnalyzer::TryDecryptPak(FArchive* InReader, const FPakInfo& InPakInfo, 
 		}
 		else
 		{
-			CachedAESKey = AESKey;
-
 			UE_LOG(LogPakAnalyzer, Log, TEXT("Use AES encryption key base64[%s]."), *KeyString);
 			FCoreDelegates::GetPakEncryptionKeyDelegate().BindLambda(
 				[AESKey](uint8 OutKey[32])
@@ -492,14 +553,28 @@ void FPakAnalyzer::ShutdownAllExtractWorker()
 	}
 }
 
-void FPakAnalyzer::ParseAssetFile(FPakTreeEntryPtr InRoot)
+void FPakAnalyzer::ParseAssetFile()
 {
 	if (AssetParseWorker.IsValid())
 	{
 		TArray<FPakFileEntryPtr> UAssetFiles;
-		RetriveUAssetFiles(InRoot, UAssetFiles);
 
-		AssetParseWorker->StartParse(UAssetFiles, PakFileSumary.PakFilePath, PakFileSumary.PakInfo.Version, CachedAESKey);
+		for (const FPakTreeEntryPtr& PakTreeRoot : PakTreeRoots)
+		{
+			RetriveUAssetFiles(PakTreeRoot, UAssetFiles);
+		}
+
+		if (UAssetFiles.Num() > 0)
+		{
+			TArray<FPakFileSumary> Summaries;
+			Summaries.AddDefaulted(PakFileSummaries.Num());
+			for (int32 i = 0; i < PakFileSummaries.Num(); ++i)
+			{
+				Summaries[i] = *PakFileSummaries[i];
+			}
+
+			AssetParseWorker->StartParse(UAssetFiles, Summaries);
+		}
 	}
 }
 

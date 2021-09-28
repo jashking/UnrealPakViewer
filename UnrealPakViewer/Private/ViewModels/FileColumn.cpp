@@ -11,3 +11,6 @@ const FName FFileColumn::CompressionBlockSizeColumnName(TEXT("CompressionBlockSi
 const FName FFileColumn::CompressionMethodColumnName(TEXT("CompressionMethod"));
 const FName FFileColumn::SHA1ColumnName(TEXT("SHA1"));
 const FName FFileColumn::IsEncryptedColumnName(TEXT("IsEncrypted"));
+const FName FFileColumn::OwnerPakColumnName(TEXT("OwnerPak"));
+const FName FFileColumn::DependencyCountColumnName(TEXT("DependencyCount"));
+const FName FFileColumn::DependentCountColumnName(TEXT("DependentCount"));

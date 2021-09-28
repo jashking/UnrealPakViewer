@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "IPlatformFilePak.h"
+#include "Misc/AES.h"
 #include "UObject/ObjectResource.h"
 #include "UObject/PackageFileSummary.h"
 
@@ -13,6 +14,7 @@ typedef TSharedPtr<struct FAssetSummary> FAssetSummaryPtr;
 typedef TSharedPtr<struct FPakFileEntry> FPakFileEntryPtr;
 typedef TSharedPtr<struct FPakTreeEntry> FPakTreeEntryPtr;
 typedef TSharedPtr<struct FPackageInfo> FPackageInfoPtr;
+typedef TSharedPtr<struct FPakFileSumary> FPakFileSumaryPtr;
 
 struct FPakClassEntry
 {
@@ -92,6 +94,7 @@ struct FPakFileEntry : TSharedFromThis<FPakFileEntry>
 	FName Class;
 	FName PackagePath;
 	FAssetSummaryPtr AssetSummary;
+	int16 OwnerPakIndex = 0;
 };
 
 struct FPakTreeEntry : public FPakFileEntry
@@ -124,7 +127,9 @@ struct FPakFileSumary
 	FPakInfo PakInfo;
 	FString MountPoint;
 	FString PakFilePath;
-	int64 PakFileSize;
+	int64 PakFileSize = 0;
 	FString CompressionMethods;
-	FString AssetRegistryPath;
+	FString DecryptAESKeyStr;
+	FAES::FAESKey DecryptAESKey;
+	int32 FileCount = 0;
 };

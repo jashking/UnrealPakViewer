@@ -25,7 +25,7 @@ public:
 	}
 
 	void DoWork();
-	void SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid, const TMap<FName, bool>& InClassFilterMap);
+	void SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid, const TMap<FName, bool>& InClassFilterMap, const TMap<int32, bool>& InIndexFilterMap);
 	FOnSortAndFilterFinished& GetOnSortAndFilterFinishedDelegate() { return OnWorkFinished; }
 
 	FORCEINLINE TStatId GetStatId() const
@@ -50,4 +50,5 @@ protected:
 	TArray<FPakFileEntryPtr> Result;
 
 	TMap<FName, bool> ClassFilterMap;
+	TMap<int32, bool> IndexFilterMap;
 };

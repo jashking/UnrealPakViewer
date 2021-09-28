@@ -23,7 +23,7 @@ public:
 
 	void Shutdown();
 	void EnsureCompletion();
-	void StartExtract(const FString& InPakFile, int32 InPakVersion, const FAES::FAESKey& InKey, const FString& InOutputPath);
+	void StartExtract(const TArray<FPakFileSumary>& InSummaries, const FString& InOutputPath);
 	void InitTaskFiles(TArray<FPakFileEntry>& InFiles);
 
 	FOnUpdateExtractProgress& GetOnUpdateExtractProgressDelegate();
@@ -37,10 +37,7 @@ protected:
 	FThreadSafeCounter StopTaskCounter;
 
 	TArray<FPakFileEntry> Files;
-
-	FString PakFilePath;
-	int32 PakVersion;
-	FAES::FAESKey AESKey;
+	TArray<FPakFileSumary> Summaries;
 	FString OutputPath;
 
 	FOnUpdateExtractProgress OnUpdateExtractProgress;

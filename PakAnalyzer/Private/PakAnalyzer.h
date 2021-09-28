@@ -21,23 +21,24 @@ public:
 	FPakAnalyzer();
 	virtual ~FPakAnalyzer();
 
-	virtual bool LoadPakFile(const FString& InPakPath, const FString& InAESKey = TEXT("")) override;
+	virtual bool LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys) override;
 	virtual void ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles) override;
 	virtual void CancelExtract() override;
 	virtual void SetExtractThreadCount(int32 InThreadCount) override;
 	virtual void Reset() override;
 
 protected:
-	bool LoadAssetRegistryFromPak(FPakFile* InPakFile, FPakFileEntryPtr InPakFileEntry);
+	FPakTreeEntryPtr LoadPakFile(const FString& InPakPath, const FString& InDefaultAESKey = TEXT(""));
+	bool LoadAssetRegistryFromPak(FPakFile* InPakFile, FPakFileEntryPtr InPakFileEntry, const FAES::FAESKey& DecryptAESKey);
 
-	bool PreLoadPak(const FString& InPakPath);
+	bool PreLoadPak(const FString& InPakPath, const FString& InDefaultAESKey, FString& OutDecryptKey);
 	bool ValidateEncryptionKey(TArray<uint8>& IndexData, const FSHAHash& InExpectedHash, const FAES::FAESKey& InAESKey);
 	bool TryDecryptPak(FArchive* InReader, const FPakInfo& InPakInfo, const FString& InKey, bool bShowWarning);
 
 	void InitializeExtractWorker();
 	void ShutdownAllExtractWorker();
 
-	void ParseAssetFile(FPakTreeEntryPtr InRoot);
+	void ParseAssetFile();
 	void InitializeAssetParseWorker();
 	void ShutdownAssetParseWorker();
 
@@ -58,7 +59,7 @@ protected:
 	TArray<TSharedPtr<class FExtractThreadWorker>> ExtractWorkers;
 	TMap<FGuid, FExtractProgress> ExtractWorkerProgresses;
 
-	FString DefaultAESKey;
+	TArray<FString> DefaultAESKeys;
 
 	TSharedPtr<class FAssetParseThreadWorker> AssetParseWorker;
 };

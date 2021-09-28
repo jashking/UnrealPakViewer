@@ -2,6 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "Widgets/SCompoundWidget.h"
+#include "Widgets/Views/SListView.h"
+
+#include "PakFileEntry.h"
 
 /** Implements the Pak Info window. */
 class SPakSummaryView : public SCompoundWidget
@@ -19,23 +22,17 @@ public:
 	/** Constructs this widget. */
 	void Construct(const FArguments& InArgs);
 
+	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
+
 protected:
-	FORCEINLINE FText GetPakPath() const;
-	FORCEINLINE FText GetPakMountPoint() const;
-	FORCEINLINE FText GetPakVersion() const;
-	FORCEINLINE FText GetPakFileSize() const;
-	FORCEINLINE FText GetPakFileSizeToolTip() const;
-	FORCEINLINE FText GetPakFileCount() const;
-	FORCEINLINE FText GetPakHeaderSize() const;
-	FORCEINLINE FText GetPakHeaderSizeToolTip() const;
-	FORCEINLINE FText GetPakIndexSize() const;
-	FORCEINLINE FText GetPakIndexSizeToolTip() const;
-	FORCEINLINE FText GetPakFileIndexHash() const;
-	FORCEINLINE FText GetPakFileIndexIsEncrypted() const;
-	FORCEINLINE FText GetPakFileContentSize() const;
-	FORCEINLINE FText GetPakFileContentSizeToolTip() const;
-	FORCEINLINE FText GetPakFileEncryptionMethods() const;
 	FORCEINLINE FText GetAssetRegistryPath() const;
 
 	FReply OnLoadAssetRegistry();
+
+	TSharedRef<ITableRow> OnGenerateSummaryRow(FPakFileSumaryPtr InSummary, const TSharedRef<class STableViewBase>& OwnerTable);
+
+protected:
+	TSharedPtr<SListView<FPakFileSumaryPtr>> SummaryListView;
+	TArray<FPakFileSumaryPtr> Summaries;
+	FString LastLoadGuid;
 };

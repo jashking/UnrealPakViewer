@@ -30,9 +30,9 @@ protected:
 	void OnLoadPakFile();
 	void OnLoadFolder();
 	void OnLoadPakFailed(const FString& InReason);
-	FString OnGetAESKey(bool& bCancel);
-	void OnSwitchToTreeView(const FString& InPath);
-	void OnSwitchToFileView(const FString& InPath);
+	FString OnGetAESKey(const FString& InPakPath, const FGuid& PakGuid, bool& bCancel);
+	void OnSwitchToTreeView(const FString& InPath, int32 PakIndex);
+	void OnSwitchToFileView(const FString& InPath, int32 PakIndex);
 	void OnExtractStart();
 	void OnLoadRecentFile(int32 InIndex);
 	bool OnLoadRecentFileCanExecute(int32 InIndex) const;
@@ -60,7 +60,7 @@ protected:
 	 */
 	virtual FReply OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent& DragDropEvent)  override;
 
-	void LoadPakFile(const FString& PakFilePath);
+	void LoadPakFile(const TArray<FString>& PakFilePaths);
 	void RemoveRecentFile(const FString& InFullPath);
 	void SaveConfig();
 	void LoadConfig();

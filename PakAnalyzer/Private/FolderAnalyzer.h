@@ -21,7 +21,7 @@ public:
 	FFolderAnalyzer();
 	virtual ~FFolderAnalyzer();
 
-	virtual bool LoadPakFile(const FString& InPakPath, const FString& InAESKey = TEXT("")) override;
+	virtual bool LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys) override;
 	virtual void ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles) override;
 	virtual void CancelExtract() override;
 	virtual void SetExtractThreadCount(int32 InThreadCount) override;

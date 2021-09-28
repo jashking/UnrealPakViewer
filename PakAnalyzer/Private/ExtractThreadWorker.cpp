@@ -12,7 +12,6 @@
 
 FExtractThreadWorker::FExtractThreadWorker()
 	: Thread(nullptr)
-	, PakVersion(FPakInfo::PakFile_Version_Latest)
 {
 	Guid = FGuid::NewGuid();
 }
@@ -29,18 +28,17 @@ bool FExtractThreadWorker::Init()
 
 uint32 FExtractThreadWorker::Run()
 {
-	FArchive* ReaderArchive = IFileManager::Get().CreateFileReader(*PakFilePath);
-
 	const int64 BufferSize = 8 * 1024 * 1024; // 8MB buffer for extracting
 	void* Buffer = FMemory::Malloc(BufferSize);
 	uint8* PersistantCompressionBuffer = NULL;
 	int64 CompressionBufferSize = 0;
 
-	const bool bHasRelativeCompressedChunkOffsets = PakVersion >= FPakInfo::PakFile_Version_RelativeChunkOffsets;
-
 	int32 CompleteCount = 0;
 	int32 ErrorCount = 0;
 	const int32 TotalCount = Files.Num();
+
+	FArchive* ReaderArchive = nullptr;
+	int32 LastReaderIndex = -1;
 
 	for (const FPakFileEntry& File : Files)
 	{
@@ -49,66 +47,99 @@ uint32 FExtractThreadWorker::Run()
 			break;
 		}
 
-		ReaderArchive->Seek(File.PakEntry.Offset);
-
-		FPakEntry EntryInfo;
-		EntryInfo.Serialize(*ReaderArchive, PakVersion);
-		if (File.PakEntry == EntryInfo)
+		if (!Summaries.IsValidIndex(File.OwnerPakIndex))
 		{
-			const FString OutputFilePath = OutputPath / File.Path;
-			const FString BasePath = FPaths::GetPath(OutputFilePath);
-			if (!FPaths::DirectoryExists(BasePath))
+			continue;
+		}
+
+		const FPakFileSumary& Summary = Summaries[File.OwnerPakIndex];
+
+		if (!ReaderArchive || File.OwnerPakIndex != LastReaderIndex)
+		{
+			if (ReaderArchive)
 			{
-				IFileManager::Get().MakeDirectory(*BasePath, true);
+				ReaderArchive->Close();
+				delete ReaderArchive;
+				ReaderArchive = nullptr;
 			}
 
-			TUniquePtr<FArchive> FileHandle(IFileManager::Get().CreateFileWriter(*OutputFilePath));
-			if (FileHandle)
+			ReaderArchive = IFileManager::Get().CreateFileReader(*Summary.PakFilePath);
+			LastReaderIndex = File.OwnerPakIndex;
+		}
+
+		if (!ReaderArchive)
+		{
+			++ErrorCount;
+		}
+		else
+		{
+			const bool bHasRelativeCompressedChunkOffsets = Summary.PakInfo.Version >= FPakInfo::PakFile_Version_RelativeChunkOffsets;
+
+			ReaderArchive->Seek(File.PakEntry.Offset);
+
+			FPakEntry EntryInfo;
+			EntryInfo.Serialize(*ReaderArchive, Summary.PakInfo.Version);
+			if (File.PakEntry == EntryInfo)
 			{
-				if (EntryInfo.CompressionMethodIndex == 0)
+				const FString OutputFilePath = OutputPath / File.Path;
+				const FString BasePath = FPaths::GetPath(OutputFilePath);
+				if (!FPaths::DirectoryExists(BasePath))
 				{
-					if (!BufferedCopyFile(*FileHandle, *ReaderArchive, File.PakEntry, Buffer, BufferSize, AESKey))
+					IFileManager::Get().MakeDirectory(*BasePath, true);
+				}
+
+				TUniquePtr<FArchive> FileHandle(IFileManager::Get().CreateFileWriter(*OutputFilePath));
+				if (FileHandle)
+				{
+					if (EntryInfo.CompressionMethodIndex == 0)
 					{
-						// Add to failed list
-						++ErrorCount;
-						UE_LOG(LogPakAnalyzer, Error, TEXT("Extract none-compressed file failed! File: %s"), *File.Path);
+						if (!BufferedCopyFile(*FileHandle, *ReaderArchive, File.PakEntry, Buffer, BufferSize, Summary.DecryptAESKey))
+						{
+							// Add to failed list
+							++ErrorCount;
+							UE_LOG(LogPakAnalyzer, Error, TEXT("Extract none-compressed file failed! File: %s"), *File.Path);
+						}
+					}
+					else
+					{
+						if (!UncompressCopyFile(*FileHandle, *ReaderArchive, File.PakEntry, PersistantCompressionBuffer, CompressionBufferSize, Summary.DecryptAESKey, File.CompressionMethod, bHasRelativeCompressedChunkOffsets))
+						{
+							// Add to failed list
+							++ErrorCount;
+							UE_LOG(LogPakAnalyzer, Error, TEXT("Extract compressed file failed! File: %s"), *File.Path);
+						}
 					}
 				}
 				else
 				{
-					if (!UncompressCopyFile(*FileHandle, *ReaderArchive, File.PakEntry, PersistantCompressionBuffer, CompressionBufferSize, AESKey, File.CompressionMethod, bHasRelativeCompressedChunkOffsets))
-					{
-						// Add to failed list
-						++ErrorCount;
-						UE_LOG(LogPakAnalyzer, Error, TEXT("Extract compressed file failed! File: %s"), *File.Path);
-					}
+					// open to write failed
+					++ErrorCount;
+					UE_LOG(LogPakAnalyzer, Error, TEXT("Open local file to write failed! File: %s"), *OutputFilePath);
 				}
 			}
 			else
 			{
-				// open to write failed
+				// mismatch
 				++ErrorCount;
-				UE_LOG(LogPakAnalyzer, Error, TEXT("Open local file to write failed! File: %s"), *OutputFilePath);
+				UE_LOG(LogPakAnalyzer, Error, TEXT("Extract file failed! PakEntry mismatch! File: %s"), *File.Path);
 			}
-		}
-		else
-		{
-			// mismatch
-			++ErrorCount;
-			UE_LOG(LogPakAnalyzer, Error, TEXT("Extract file failed! PakEntry mismatch! File: %s"), *File.Path);
 		}
 
 		++CompleteCount;
 
 		OnUpdateExtractProgress.ExecuteIfBound(Guid, CompleteCount, ErrorCount, TotalCount);
-		//FPlatformProcess::SleepNoStats(0);
 	}
 
 	FMemory::Free(Buffer);
 	FMemory::Free(PersistantCompressionBuffer);
 
-	ReaderArchive->Close();
-	delete ReaderArchive;
+	if (ReaderArchive)
+	{
+		ReaderArchive->Close();
+		delete ReaderArchive;
+		ReaderArchive = nullptr;
+	}
+	
 
 	if (CompleteCount == TotalCount)
 	{
@@ -156,16 +187,14 @@ void FExtractThreadWorker::EnsureCompletion()
 	}
 }
 
-void FExtractThreadWorker::StartExtract(const FString& InPakFile, int32 InPakVersion, const FAES::FAESKey& InKey, const FString& InOutputPath)
+void FExtractThreadWorker::StartExtract(const TArray<FPakFileSumary>& InSummaries, const FString& InOutputPath)
 {
 	Shutdown();
 
-	UE_LOG(LogPakAnalyzer, Log, TEXT("Start extract worker: %s, output: %s, file count: %d, pak version: %d."), *Guid.ToString(), *InOutputPath, Files.Num(), InPakVersion);
+	UE_LOG(LogPakAnalyzer, Log, TEXT("Start extract worker: %s, output: %s, file count: %d."), *Guid.ToString(), *InOutputPath, Files.Num());
 
-	PakFilePath = InPakFile;
+	Summaries = InSummaries;
 	OutputPath = InOutputPath;
-	PakVersion = InPakVersion;
-	AESKey = InKey;
 
 	Thread = FRunnableThread::Create(this, TEXT("ExtractThreadWorker"), 0, EThreadPriority::TPri_Highest);
 }

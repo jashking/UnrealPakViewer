@@ -8,6 +8,7 @@
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFile.h"
 #include "HAL/PlatformMisc.h"
+#include "HAL/UnrealMemory.h"
 #include "Json.h"
 #include "Launch/Resources/Version.h"
 #include "Misc/Base64.h"
@@ -31,8 +32,9 @@ FFolderAnalyzer::~FFolderAnalyzer()
 	Reset();
 }
 
-bool FFolderAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAESKey)
+bool FFolderAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys)
 {
+	const FString InPakPath = InPakPaths.Num() > 0 ? InPakPaths[0] : TEXT("");
 	if (InPakPath.IsEmpty())
 	{
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Open folder failed! Folder path is empty!"));
@@ -54,15 +56,18 @@ bool FFolderAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAES
 	// Generate unique id
 	LoadGuid = FGuid::NewGuid();
 
+	FPakFileSumaryPtr Summary = MakeShared<FPakFileSumary>();
+	PakFileSummaries.Add(Summary);
+
 	// Save pak sumary
-	PakFileSumary.MountPoint = InPakPath;
-	//PakFileSumary.PakInfo = PakFilePtr->GetInfo();
-	PakFileSumary.PakFilePath = InPakPath;
+	Summary->MountPoint = InPakPath;
+	FMemory::Memset(&Summary->PakInfo, 0, sizeof(Summary->PakInfo));
+	Summary->PakFilePath = InPakPath;
 
 	ShutdownAssetParseWorker();
 
 	// Make tree root
-	TreeRoot = MakeShared<FPakTreeEntry>(*FPaths::GetCleanFilename(InPakPath), PakFileSumary.MountPoint, true);
+	FPakTreeEntryPtr TreeRoot = MakeShared<FPakTreeEntry>(*FPaths::GetCleanFilename(InPakPath), Summary->MountPoint, true);
 
 	TArray<FString> FoundFiles;
 	PlatformFile.FindFilesRecursively(FoundFiles, *InPakPath, TEXT(""));
@@ -80,25 +85,28 @@ bool FFolderAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAES
 		FString RelativeFilename = File;
 		RelativeFilename.RemoveFromStart(InPakPath);
 
-		InsertFileToTree(RelativeFilename, Entry);
+		InsertFileToTree(TreeRoot, *Summary, RelativeFilename, Entry);
 
 		if (File.Contains(TEXT("DevelopmentAssetRegistry.bin")))
 		{
-			PakFileSumary.AssetRegistryPath = File;
+			AssetRegistryPath = File;
 		}
 	}
 
-	PakFileSumary.PakFileSize = TotalSize;
+	Summary->PakFileSize = TotalSize;
+	Summary->FileCount = TreeRoot->FileCount;
 
 	RefreshTreeNode(TreeRoot);
-	RefreshTreeNodeSizePercent(TreeRoot);
+	RefreshTreeNodeSizePercent(TreeRoot, TreeRoot);
 	ParseAssetFile(TreeRoot);
+
+	PakTreeRoots.Add(TreeRoot);
 
 	bHasPakLoaded = true;
 
-	if (!PakFileSumary.AssetRegistryPath.IsEmpty())
+	if (!AssetRegistryPath.IsEmpty())
 	{
-		LoadAssetRegistry(PakFileSumary.AssetRegistryPath);
+		LoadAssetRegistry(AssetRegistryPath);
 	}
 
 	UE_LOG(LogPakAnalyzer, Log, TEXT("Finish load pak file: %s."), *InPakPath);
@@ -125,7 +133,8 @@ void FFolderAnalyzer::ParseAssetFile(FPakTreeEntryPtr InRoot)
 		TArray<FPakFileEntryPtr> UAssetFiles;
 		RetriveUAssetFiles(InRoot, UAssetFiles);
 
-		AssetParseWorker->StartParse(UAssetFiles, PakFileSumary.PakFilePath, PakFileSumary.PakInfo.Version, CachedAESKey);
+		TArray<FPakFileSumary> Summaries = { *PakFileSummaries[0] };
+		AssetParseWorker->StartParse(UAssetFiles, Summaries);
 	}
 }
 
@@ -158,6 +167,6 @@ void FFolderAnalyzer::OnReadAssetContent(FPakFileEntryPtr InFile, bool& bOutSucc
 		return;
 	}
 
-	const FString FilePath = PakFileSumary.MountPoint / InFile->Path;
+	const FString FilePath = PakFileSummaries[0]->MountPoint / InFile->Path;
 	bOutSuccess = FFileHelper::LoadFileToArray(OutContent, *FilePath);
 }

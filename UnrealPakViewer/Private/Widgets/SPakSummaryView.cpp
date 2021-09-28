@@ -4,14 +4,109 @@
 #include "EditorStyle.h"
 #include "Framework/Application/SlateApplication.h"
 #include "IPlatformFilePak.h"
+#include "Misc/Paths.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Layout/SExpandableArea.h"
+#include "Widgets/Views/STableRow.h"
 
 #include "PakAnalyzerModule.h"
 #include "SKeyValueRow.h"
 #include "ViewModels/WidgetDelegates.h"
 
 #define LOCTEXT_NAMESPACE "SPakSummaryView"
+
+class SSummaryRow : public SMultiColumnTableRow<FPakFileSumaryPtr>
+{
+	SLATE_BEGIN_ARGS(SSummaryRow) {}
+	SLATE_END_ARGS()
+
+public:
+	void Construct(const FArguments& InArgs, FPakFileSumaryPtr InSummary, const TSharedRef<STableViewBase>& InOwnerTableView)
+	{
+		if (!InSummary.IsValid())
+		{
+			return;
+		}
+
+		WeakSummary = MoveTemp(InSummary);
+
+		SMultiColumnTableRow<FPakFileSumaryPtr>::Construct(FSuperRowType::FArguments().Padding(FMargin(0.f, 2.f)), InOwnerTableView);
+	}
+
+	virtual TSharedRef<SWidget> GenerateWidgetForColumn(const FName& ColumnName) override
+	{
+		static const float LeftMargin = 4.f;
+
+		FPakFileSumaryPtr Summary = WeakSummary.Pin();
+		if (!Summary.IsValid())
+		{
+			return SNew(STextBlock).Text(LOCTEXT("NullColumn", "Null")).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
+		}
+
+		TSharedRef<SWidget> RowContent = SNullWidget::NullWidget;
+
+		if (ColumnName == "Name")
+		{
+			RowContent = SNew(STextBlock).Text(FText::FromString(FPaths::GetCleanFilename(Summary->PakFilePath))).ToolTipText(FText::FromString(Summary->PakFilePath));
+		}
+		else if (ColumnName == "MountPoint")
+		{
+			RowContent = SNew(STextBlock).Text(FText::FromString(Summary->MountPoint)).ToolTipText(FText::FromString(Summary->MountPoint)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
+		}
+		else if (ColumnName == "Version")
+		{
+			RowContent = SNew(STextBlock).Text(FText::AsNumber(Summary->PakInfo.Version)).Justification(ETextJustify::Center);
+		}
+		else if (ColumnName == "FileCount")
+		{
+			RowContent = SNew(STextBlock).Text(FText::AsNumber(Summary->FileCount)).Justification(ETextJustify::Center);
+		}
+		else if (ColumnName == "PakSize")
+		{
+			RowContent = SNew(STextBlock).Text(FText::AsMemory(Summary->PakFileSize, EMemoryUnitStandard::IEC)).ToolTipText(FText::AsNumber(Summary->PakFileSize)).Justification(ETextJustify::Center);
+		}
+		else if (ColumnName == "ContentSize")
+		{
+			RowContent = SNew(STextBlock).Text(FText::AsMemory(Summary->PakInfo.IndexOffset, EMemoryUnitStandard::IEC)).ToolTipText(FText::AsNumber(Summary->PakInfo.IndexOffset)).Justification(ETextJustify::Center);
+		}
+		else if (ColumnName == "HeaderSize")
+		{
+			RowContent = SNew(STextBlock).Text(FText::AsMemory(Summary->PakFileSize - Summary->PakInfo.IndexOffset - Summary->PakInfo.IndexSize, EMemoryUnitStandard::IEC)).ToolTipText(FText::AsNumber(Summary->PakFileSize - Summary->PakInfo.IndexOffset - Summary->PakInfo.IndexSize)).Justification(ETextJustify::Center);
+		}
+		else if (ColumnName == "IndexSize")
+		{
+			RowContent = SNew(STextBlock).Text(FText::AsMemory(Summary->PakInfo.IndexSize, EMemoryUnitStandard::IEC)).ToolTipText(FText::AsNumber(Summary->PakInfo.IndexSize)).Justification(ETextJustify::Center);
+		}
+		else if (ColumnName == "IndexHash")
+		{
+			RowContent = SNew(STextBlock).Text(FText::FromString(LexToString(Summary->PakInfo.IndexHash)));
+		}
+		else if (ColumnName == "IndexEncrypted")
+		{
+			RowContent = SNew(STextBlock).Text(FText::FromString(Summary->PakInfo.bEncryptedIndex ? TEXT("True") : TEXT("False"))).Justification(ETextJustify::Center);
+		}
+		else if (ColumnName == "CompressionMethods")
+		{
+			RowContent = SNew(STextBlock).Text(FText::FromString(Summary->CompressionMethods)).ToolTipText(FText::FromString(Summary->CompressionMethods));
+		}
+		else if (ColumnName == "DecryptAES")
+		{
+			RowContent = SNew(STextBlock).Text(FText::FromString(Summary->DecryptAESKeyStr)).ToolTipText(FText::FromString(Summary->DecryptAESKeyStr)).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
+		}
+		else
+		{
+			RowContent = SNew(STextBlock).Text(LOCTEXT("UnknownColumn", "Unknown Column")).Margin(FMargin(LeftMargin, 0.f, 0.f, 0.f));
+		}
+
+		return SNew(SBox).VAlign(VAlign_Center)
+			[
+				RowContent
+			];
+	}
+
+protected:
+	TWeakPtr<FPakFileSumary> WeakSummary;
+};
 
 SPakSummaryView::SPakSummaryView()
 {
@@ -37,97 +132,63 @@ void SPakSummaryView::Construct(const FArguments& InArgs)
 			.AreaTitle(LOCTEXT("PakSumary", "Pak Summary"))
 			.BodyContent()
 			[
-				SNew(SHorizontalBox)
+				SAssignNew(SummaryListView, SListView<FPakFileSumaryPtr>)
+				.ItemHeight(25.f)
+				.SelectionMode(ESelectionMode::Single)
+				.ListItemsSource(&Summaries)
+				.OnGenerateRow(this, &SPakSummaryView::OnGenerateSummaryRow)
+				.HeaderRow
+				(
+					SNew(SHeaderRow).Visibility(EVisibility::Visible)
 
-				+ SHorizontalBox::Slot()
-				.FillWidth(1.f)
-				.Padding(2.0f)
-				[
-					SNew(SVerticalBox)
+					+ SHeaderRow::Column(FName("Name"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Package_Summary_Name", "Name"))
 
-					+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(0.f, 2.f)
-					[
-						SNew(SKeyValueRow).KeyStretchCoefficient(0.2f).KeyText(LOCTEXT("Detail_View_Pak_Path", "Pak Path:")).ValueText(this, &SPakSummaryView::GetPakPath)
-					]
+					+ SHeaderRow::Column(FName("MountPoint"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Package_Summary_MountPoint", "Mount Point"))
 
-					+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(0.f, 2.f)
-					[
-						SNew(SKeyValueRow).KeyStretchCoefficient(0.2f).KeyText(LOCTEXT("Detail_View_Pak_MountPoint", "Mount Point:")).ValueText(this, &SPakSummaryView::GetPakMountPoint)
-					]
+					+ SHeaderRow::Column(FName("Version"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Package_Summary_Version", "Version"))
 
-					+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(0.f, 2.f)
-					[
-						SNew(SKeyValueRow).KeyStretchCoefficient(0.2f).KeyText(LOCTEXT("Detail_View_Pak_Version", "Pak Version:")).ValueText(this, &SPakSummaryView::GetPakVersion)
-					]
+					+ SHeaderRow::Column(FName("FileCount"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Package_Summary_FileCount", "File Count"))
 
-					+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(0.f, 2.f)
-					[
-						SNew(SKeyValueRow).KeyStretchCoefficient(0.2f).KeyText(LOCTEXT("Detail_View_Pak_FileSize", "Pak File Size:")).ValueText(this, &SPakSummaryView::GetPakFileSize).ValueToolTipText(this, &SPakSummaryView::GetPakFileSizeToolTip)
-					]
+					+ SHeaderRow::Column(FName("PakSize"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Package_Summary_PakSize", "Pak Size"))
 
-					+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(0.f, 2.f)
-					[
-						SNew(SKeyValueRow).KeyStretchCoefficient(0.2f).KeyText(LOCTEXT("Detail_View_Pak_FileCount", "Pak File Count:")).ValueText(this, &SPakSummaryView::GetPakFileCount)
-					]
+					+ SHeaderRow::Column(FName("ContentSize"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Package_Summary_ContentSize", "Content Size"))
 
-					+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(0.f, 2.f)
-					[
-						SNew(SKeyValueRow).KeyStretchCoefficient(0.2f).KeyText(LOCTEXT("Detail_View_Pak_HeaderSize", "Pak Header Size:")).ValueText(this, &SPakSummaryView::GetPakHeaderSize).ValueToolTipText(this, &SPakSummaryView::GetPakHeaderSizeToolTip)
-					]
+					+ SHeaderRow::Column(FName("HeaderSize"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Package_Summary_HeaderSize", "Header Size"))
 
-					+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(0.f, 2.f)
-					[
-						SNew(SKeyValueRow).KeyStretchCoefficient(0.2f).KeyText(LOCTEXT("Detail_View_Pak_IndexSize", "Pak Index Size:")).ValueText(this, &SPakSummaryView::GetPakIndexSize).ValueToolTipText(this, &SPakSummaryView::GetPakIndexSizeToolTip)
-					]
+					+ SHeaderRow::Column(FName("IndexSize"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Package_Summary_IndexSize", "Index Size"))
 
-					+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(0.f, 2.f)
-					[
-						SNew(SKeyValueRow).KeyStretchCoefficient(0.2f).KeyText(LOCTEXT("Detail_View_Pak_IndexHash", "Pak Index Hash:")).ValueText(this, &SPakSummaryView::GetPakFileIndexHash)
-					]
+					+ SHeaderRow::Column(FName("IndexHash"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Package_Summary_IndexHash", "Index Hash"))
 
-					+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(0.f, 2.f)
-					[
-						SNew(SKeyValueRow).KeyStretchCoefficient(0.2f).KeyText(LOCTEXT("Detail_View_Pak_IndexEncrypted", "Pak Index Is Encrypted:")).ValueText(this, &SPakSummaryView::GetPakFileIndexIsEncrypted)
-					]
+					+ SHeaderRow::Column(FName("IndexEncrypted"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Package_Summary_IndexEncrypted", "Index Encrypted"))
 
-					+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(0.f, 2.f)
-					[
-						SNew(SKeyValueRow).KeyStretchCoefficient(0.2f).KeyText(LOCTEXT("Detail_View_Pak_FileContentSize", "Pak File Content Size:")).ValueText(this, &SPakSummaryView::GetPakFileContentSize).ValueToolTipText(this, &SPakSummaryView::GetPakFileContentSizeToolTip)
-					]
+					+ SHeaderRow::Column(FName("CompressionMethods"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Package_Summary_CompressionMethods", "Compression Methods"))
 
-					+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(0.f, 2.f)
-					[
-						SNew(SKeyValueRow).KeyStretchCoefficient(0.2f).KeyText(LOCTEXT("Detail_View_Pak_CompressionMethods", "Pak Compression Methods:")).ValueText(this, &SPakSummaryView::GetPakFileEncryptionMethods)
-					]
-				]
-
-				//+ SHorizontalBox::Slot()
-				//.FillWidth(1.f)
-				//.Padding(2.0f)
-				//[
-				//]
+					+ SHeaderRow::Column(FName("DecryptAES"))
+					.FillWidth(1.f)
+					.DefaultLabel(LOCTEXT("Package_Summary_DecryptAES", "Decrypt AES"))
+				)
 			]
 		]
 
@@ -153,128 +214,37 @@ void SPakSummaryView::Construct(const FArguments& InArgs)
 			]
 		]
 	];
+
+	LastLoadGuid = LexToString(FGuid());
 }
 
-FORCEINLINE FText SPakSummaryView::GetPakPath() const
+void SPakSummaryView::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 {
 	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	if (PakAnalyzer)
+	{
+		const bool bLoadDirty = PakAnalyzer->IsLoadDirty(LastLoadGuid);
 
-	return PakAnalyzer && PakAnalyzer->HasPakLoaded() ? FText::FromString(PakAnalyzer->GetPakFileSumary().PakFilePath) : FText();
-}
+		if (bLoadDirty)
+		{
+			LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
+			Summaries = PakAnalyzer->GetPakFileSumary();
 
-FORCEINLINE FText SPakSummaryView::GetPakMountPoint() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+			if (SummaryListView.IsValid())
+			{
+				SummaryListView->RebuildList();
+			}
+		}
+	}
 
-	return PakAnalyzer && PakAnalyzer->HasPakLoaded() ? FText::FromString(PakAnalyzer->GetPakFileSumary().MountPoint) : FText();
-}
-
-FORCEINLINE FText SPakSummaryView::GetPakVersion() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer ? &PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
-
-	return PakInfo && PakAnalyzer->HasPakLoaded() ? FText::AsNumber(PakInfo->Version) : FText();
-}
-
-FORCEINLINE FText SPakSummaryView::GetPakFileSize() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-
-	return PakAnalyzer && PakAnalyzer->HasPakLoaded() ? FText::AsMemory(PakAnalyzer->GetPakFileSumary().PakFileSize, EMemoryUnitStandard::IEC) : FText();
-}
-
-FORCEINLINE FText SPakSummaryView::GetPakFileSizeToolTip() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-
-	return PakAnalyzer && PakAnalyzer->HasPakLoaded() ? FText::AsNumber(PakAnalyzer->GetPakFileSumary().PakFileSize) : FText();
-}
-
-FORCEINLINE FText SPakSummaryView::GetPakFileCount() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-
-	return PakAnalyzer && PakAnalyzer->HasPakLoaded() ? FText::AsNumber(PakAnalyzer->GetFileCount()) : FText();
-}
-
-FORCEINLINE FText SPakSummaryView::GetPakHeaderSize() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer ? &PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
-
-	return PakInfo && PakAnalyzer->HasPakLoaded() ? FText::AsMemory(PakAnalyzer->GetPakFileSumary().PakFileSize - PakInfo->IndexOffset - PakInfo->IndexSize, EMemoryUnitStandard::IEC) : FText();
-}
-
-FORCEINLINE FText SPakSummaryView::GetPakHeaderSizeToolTip() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer ? &PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
-
-	return PakInfo && PakAnalyzer->HasPakLoaded() ? FText::AsNumber(PakAnalyzer->GetPakFileSumary().PakFileSize - PakInfo->IndexOffset - PakInfo->IndexSize) : FText();
-
-}
-
-FORCEINLINE FText SPakSummaryView::GetPakIndexSize() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer ? &PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
-
-	return PakInfo && PakAnalyzer->HasPakLoaded() ? FText::AsMemory(PakInfo->IndexSize, EMemoryUnitStandard::IEC) : FText();
-}
-
-FORCEINLINE FText SPakSummaryView::GetPakIndexSizeToolTip() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer ? &PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
-
-	return PakInfo && PakAnalyzer->HasPakLoaded() ? FText::AsNumber(PakInfo->IndexSize) : FText();
-}
-
-FORCEINLINE FText SPakSummaryView::GetPakFileIndexHash() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer ? &PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
-	
-	return PakInfo && PakAnalyzer->HasPakLoaded() ? FText::FromString(LexToString(PakInfo->IndexHash)) : FText();
-}
-
-FORCEINLINE FText SPakSummaryView::GetPakFileIndexIsEncrypted() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer ? &PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
-
-	return PakInfo && PakAnalyzer->HasPakLoaded() ? FText::FromString(PakInfo->bEncryptedIndex ? TEXT("True") : TEXT("False")) : FText();
-}
-
-FORCEINLINE FText SPakSummaryView::GetPakFileContentSize() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer ? &PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
-
-	return PakInfo && PakAnalyzer->HasPakLoaded() ? FText::AsMemory(PakInfo->IndexOffset, EMemoryUnitStandard::IEC) : FText();
-}
-
-FORCEINLINE FText SPakSummaryView::GetPakFileContentSizeToolTip() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	const FPakInfo* PakInfo = PakAnalyzer ? &PakAnalyzer->GetPakFileSumary().PakInfo : nullptr;
-
-	return PakInfo && PakAnalyzer->HasPakLoaded() ? FText::AsNumber(PakInfo->IndexOffset) : FText();
-}
-
-FORCEINLINE FText SPakSummaryView::GetPakFileEncryptionMethods() const
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-
-	return PakAnalyzer && PakAnalyzer->HasPakLoaded() ? FText::FromString(PakAnalyzer->GetPakFileSumary().CompressionMethods) : FText();
+	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 }
 
 FORCEINLINE FText SPakSummaryView::GetAssetRegistryPath() const
 {
 	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 
-	return PakAnalyzer && PakAnalyzer->HasPakLoaded() ? FText::FromString(PakAnalyzer->GetPakFileSumary().AssetRegistryPath) : FText();
+	return PakAnalyzer ? FText::FromString(PakAnalyzer->GetAssetRegistryPath()) : FText();
 }
 
 FReply SPakSummaryView::OnLoadAssetRegistry()
@@ -313,6 +283,11 @@ FReply SPakSummaryView::OnLoadAssetRegistry()
 		}
 	}
 	return FReply::Handled();
+}
+
+TSharedRef<ITableRow> SPakSummaryView::OnGenerateSummaryRow(FPakFileSumaryPtr InSummary, const TSharedRef<class STableViewBase>& OwnerTable)
+{
+	return SNew(SSummaryRow, InSummary, OwnerTable);
 }
 
 #undef LOCTEXT_NAMESPACE

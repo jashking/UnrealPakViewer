@@ -73,7 +73,6 @@ FString FindFullPath(const TArray<T>& InMaps, int32 Index, const FString& InPath
 
 FAssetParseThreadWorker::FAssetParseThreadWorker()
 	: Thread(nullptr)
-	, PakVersion(FPakInfo::PakFile_Version_Latest)
 {
 }
 
@@ -106,6 +105,15 @@ uint32 FAssetParseThreadWorker::Run()
 		bool SerializeSuccess = false;
 
 		FPakFileEntryPtr File = Files[InIndex];
+		if (!Summaries.IsValidIndex(File->OwnerPakIndex))
+		{
+			return;
+		}
+
+		const FPakFileSumary& Summary = Summaries[File->OwnerPakIndex];
+		const FString PakFilePath = Summary.PakFilePath;
+		const int32 PakVersion = Summary.PakInfo.Version;
+		const FAES::FAESKey AESKey = Summary.DecryptAESKey;
 
 		if (OnReadAssetContent.IsBound())
 		{
@@ -408,16 +416,14 @@ void FAssetParseThreadWorker::EnsureCompletion()
 	}
 }
 
-void FAssetParseThreadWorker::StartParse(TArray<FPakFileEntryPtr>& InFiles, const FString& InPakFile, int32 InPakVersion, const FAES::FAESKey& InKey)
+void FAssetParseThreadWorker::StartParse(TArray<FPakFileEntryPtr>& InFiles, TArray<FPakFileSumary>& InSummaries)
 {
 	Shutdown();
 
-	UE_LOG(LogPakAnalyzer, Log, TEXT("Start asset parse worker, file count: %d, pak version: %d."), InFiles.Num(), InPakVersion);
+	UE_LOG(LogPakAnalyzer, Log, TEXT("Start asset parse worker, file count: %d."), InFiles.Num());
 
 	Files = MoveTemp(InFiles);
-	PakFilePath = InPakFile;
-	PakVersion = InPakVersion;
-	AESKey = InKey;
+	Summaries = MoveTemp(InSummaries);
 
 	Thread = FRunnableThread::Create(this, TEXT("AssetParseThreadWorker"), 0, EThreadPriority::TPri_Highest);
 }

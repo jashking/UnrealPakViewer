@@ -30,14 +30,17 @@ public:
 	static const FName CompressionMethodColumnName;
 	static const FName SHA1ColumnName;
 	static const FName IsEncryptedColumnName;
+	static const FName OwnerPakColumnName;
+	static const FName DependencyCountColumnName;
+	static const FName DependentCountColumnName;
 
 	FFileColumn() = delete;
-	FFileColumn(int32 InIndex, const FName InId, const FText& InTitleName, const FText& InDescription, float InInitialWidth, const EFileColumnFlags& InFlags, FFileCompareFunc InAscendingCompareDelegate = nullptr, FFileCompareFunc InDescendingCompareDelegate = nullptr)
+	FFileColumn(int32 InIndex, const FName InId, const FText& InTitleName, const FText& InDescription, float InFillWidth, const EFileColumnFlags& InFlags, FFileCompareFunc InAscendingCompareDelegate = nullptr, FFileCompareFunc InDescendingCompareDelegate = nullptr)
 		: Index(InIndex)
 		, Id(InId)
 		, TitleName(InTitleName)
 		, Description(InDescription)
-		, InitialWidth(InInitialWidth)
+		, FillWidth(InFillWidth)
 		, Flags(InFlags)
 		, AscendingCompareDelegate(InAscendingCompareDelegate)
 		, DescendingCompareDelegate(InDescendingCompareDelegate)
@@ -56,7 +59,7 @@ public:
 	void ToggleVisibility() { bIsVisible = !bIsVisible; }
 	void SetVisibilityFlag(bool bOnOff) { bIsVisible = bOnOff; }
 
-	float GetInitialWidth() const { return InitialWidth; }
+	float GetFillWidth() const { return FillWidth; }
 
 	/** Whether this column should be initially visible. */
 	bool ShouldBeVisible() const { return EnumHasAnyFlags(Flags, EFileColumnFlags::ShouldBeVisible); }
@@ -81,7 +84,7 @@ protected:
 	FName Id;
 	FText TitleName;
 	FText Description;
-	float InitialWidth;
+	float FillWidth;
 	EFileColumnFlags Flags;
 	FFileCompareFunc AscendingCompareDelegate;
 	FFileCompareFunc DescendingCompareDelegate;

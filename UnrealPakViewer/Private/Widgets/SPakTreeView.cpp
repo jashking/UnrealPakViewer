@@ -43,7 +43,7 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 		.Padding(2.0f)
 		[
 			SAssignNew(TreeView, STreeView<FPakTreeEntryPtr>)
-			.SelectionMode(ESelectionMode::Single)
+			.SelectionMode(ESelectionMode::Multi)
 			.ItemHeight(12.0f)
 			.TreeItemsSource(&TreeNodes)
 			.OnGetChildren(this, &SPakTreeView::OnGetTreeNodeChildren)
@@ -166,6 +166,13 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 				.AutoHeight()
 				.Padding(0.f, 2.f)
 				[
+					SAssignNew(OwnerPakRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_OwnerPak", "OwnerPak:")).ValueText(this, &SPakTreeView::GetSelectionOwnerPakName).ValueToolTipText(this, &SPakTreeView::GetSelectionOwnerPakPath)
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 2.f)
+				[
 					SAssignNew(FileCountRow, SKeyValueRow).KeyText(LOCTEXT("Tree_View_Selection_FileCount", "File Count:")).ValueText(this, &SPakTreeView::GetSelectionFileCount)
 				]
 
@@ -199,7 +206,7 @@ void SPakTreeView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 		LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
 
 		TreeNodes.Empty();
-		TreeNodes.Add(PakAnalyzer->GetPakTreeRootNode());
+		TreeNodes = PakAnalyzer->GetPakTreeRootNode();
 
 		if (TreeView.IsValid())
 		{
@@ -209,8 +216,9 @@ void SPakTreeView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 
 	if (!DelayHighlightItem.IsEmpty())
 	{
-		ExpandTreeItem(DelayHighlightItem);
+		ExpandTreeItem(DelayHighlightItem, DelayHighlightItemPakIndex);
 		DelayHighlightItem = TEXT("");
+		DelayHighlightItemPakIndex = -1;
 	}
 
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
@@ -305,6 +313,7 @@ void SPakTreeView::OnSelectionChanged(FPakTreeEntryPtr SelectedItem, ESelectInfo
 	CompressionMethodRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 	SHA1Row->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 	IsEncryptedRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
+	OwnerPakRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 	ClassRow->SetVisibility(bIsSelectionFile ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
 
 	FileCountRow->SetVisibility(bIsSelectionDirectory ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed);
@@ -322,14 +331,14 @@ void SPakTreeView::OnSelectionChanged(FPakTreeEntryPtr SelectedItem, ESelectInfo
 	}
 }
 
-void SPakTreeView::ExpandTreeItem(const FString& InPath)
+void SPakTreeView::ExpandTreeItem(const FString& InPath, int32 PakIndex)
 {
 	static const TCHAR* Delims[2] = { TEXT("\\"), TEXT("/") };
 
 	TArray<FString> PathItems;
 	InPath.ParseIntoArray(PathItems, Delims, 2);
 
-	if (PathItems.Num() <= 0 || TreeNodes.Num() <= 0)
+	if (PathItems.Num() <= 0 || TreeNodes.Num() <= 0 || !TreeNodes.IsValidIndex(PakIndex))
 	{
 		return;
 	}
@@ -337,7 +346,7 @@ void SPakTreeView::ExpandTreeItem(const FString& InPath)
 	TreeView->ClearExpandedItems();
 	TreeView->ClearSelection();
 
-	FPakTreeEntryPtr Parent = TreeNodes[0];
+	FPakTreeEntryPtr Parent = TreeNodes[PakIndex];
 	for (int32 i = 0; i < PathItems.Num(); ++i)
 	{
 		FPakTreeEntryPtr* Child = Parent->ChildrenMap.Find(*PathItems[i]);
@@ -441,6 +450,34 @@ FORCEINLINE FText SPakTreeView::GetSelectionIsEncrypted() const
 {
 	const FPakEntry* PakEntry = CurrentSelectedItem.IsValid() ? &CurrentSelectedItem->PakEntry : nullptr;
 	return PakEntry ? FText::FromString(PakEntry->IsEncrypted() ? TEXT("True") : TEXT("False")) : FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionOwnerPakName() const
+{
+	if (CurrentSelectedItem.IsValid())
+	{
+		const TArray<FPakFileSumaryPtr>& Summaries = IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary();
+		if (Summaries.IsValidIndex(CurrentSelectedItem->OwnerPakIndex))
+		{
+			return FText::FromString(FPaths::GetCleanFilename(Summaries[CurrentSelectedItem->OwnerPakIndex]->PakFilePath));
+		}
+	}
+
+	return FText();
+}
+
+FORCEINLINE FText SPakTreeView::GetSelectionOwnerPakPath() const
+{
+	if (CurrentSelectedItem.IsValid())
+	{
+		const TArray<FPakFileSumaryPtr>& Summaries = IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary();
+		if (Summaries.IsValidIndex(CurrentSelectedItem->OwnerPakIndex))
+		{
+			return FText::FromString(Summaries[CurrentSelectedItem->OwnerPakIndex]->PakFilePath);
+		}
+	}
+
+	return FText();
 }
 
 FORCEINLINE FText SPakTreeView::GetSelectionFileCount() const
@@ -560,10 +597,8 @@ void SPakTreeView::OnExtractExecute()
 	{
 		RetriveFiles(PakTreeEntry, TargetFiles);
 	}
-
-	//const FString PakFileName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
 	
-	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExtractFiles(OutputPath/* / PakFileName*/, TargetFiles);
+	IPakAnalyzerModule::Get().GetPakAnalyzer()->ExtractFiles(OutputPath, TargetFiles);
 }
 
 void SPakTreeView::OnJumpToFileViewExecute()
@@ -571,7 +606,7 @@ void SPakTreeView::OnJumpToFileViewExecute()
 	TArray<FPakTreeEntryPtr> SelectedItems = TreeView->GetSelectedItems();
 	if (SelectedItems.Num() > 0 && SelectedItems[0].IsValid())
 	{
-		FWidgetDelegates::GetOnSwitchToFileViewDelegate().Broadcast(SelectedItems[0]->Path);
+		FWidgetDelegates::GetOnSwitchToFileViewDelegate().Broadcast(SelectedItems[0]->Path, SelectedItems[0]->OwnerPakIndex);
 	}
 }
 
@@ -588,13 +623,12 @@ bool SPakTreeView::HasFileSelection() const
 	TArray<FPakTreeEntryPtr> SelectedItems;
 	TreeView->GetSelectedItems(SelectedItems);
 
-	return SelectedItems.Num() > 0 && !SelectedItems[0]->bIsDirectory;
+	return SelectedItems.Num() > 0 && !SelectedItems[SelectedItems.Num() - 1]->bIsDirectory;
 }
 
 void SPakTreeView::OnExportToJson()
 {
 	bool bOpened = false;
-	const FString PakName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
 	TArray<FString> OutFileNames;
 
 	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
@@ -606,7 +640,7 @@ void SPakTreeView::OnExportToJson()
 			FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr),
 			LOCTEXT("OpenExportDialogTitleText", "Select output json file path...").ToString(),
 			TEXT(""),
-			FString::Printf(TEXT("%s.json"), *PakName),
+			TEXT(""),
 			TEXT("Json Files (*.json)|*.json|All Files (*.*)|*.*"),
 			EFileDialogFlags::None,
 			OutFileNames);
@@ -632,7 +666,6 @@ void SPakTreeView::OnExportToJson()
 void SPakTreeView::OnExportToCsv()
 {
 	bool bOpened = false;
-	const FString PakName = FPaths::GetBaseFilename(IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary().PakFilePath);
 	TArray<FString> OutFileNames;
 
 	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
@@ -644,7 +677,7 @@ void SPakTreeView::OnExportToCsv()
 			FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr),
 			LOCTEXT("OpenExportDialogTitleText", "Select output csv file path...").ToString(),
 			TEXT(""),
-			FString::Printf(TEXT("%s.csv"), *PakName),
+			TEXT(""),
 			TEXT("Json Files (*.csv)|*.csv|All Files (*.*)|*.*"),
 			EFileDialogFlags::None,
 			OutFileNames);

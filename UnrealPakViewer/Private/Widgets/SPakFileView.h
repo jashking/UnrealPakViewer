@@ -37,7 +37,7 @@ public:
 
 	FText GetSearchText() const;
 
-	FORCEINLINE void SetDelayHighlightItem(const FString& InPath) { DelayHighlightItem = InPath; }
+	FORCEINLINE void SetDelayHighlightItem(const FString& InPath, int32 PakIndex) { DelayHighlightItem = InPath, DelayHighlightItemPakIndex = PakIndex; }
 
 protected:
 	bool SearchBoxIsEnabled() const;
@@ -55,12 +55,19 @@ protected:
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// File List View - Class Filter
 	TSharedRef<SWidget> OnBuildClassFilterMenu();
+	TSharedRef<SWidget> OnBuildPakFilterMenu();
 
 	void OnShowAllClassesExecute();
 	bool IsShowAllClassesChecked() const;
 	void OnToggleClassesExecute(FName InClassName);
 	bool IsClassesFilterChecked(FName InClassName) const;
 	void FillClassesFilter();
+
+	void OnShowAllPaksExecute();
+	bool IsShowAllPaksChecked() const;
+	void OnTogglePakExecute(int32 InPakIndex);
+	bool IsPakFilterChecked(int32 InPakIndex) const;
+	void FillPaksFilter();
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	// File List View - Columns
@@ -105,7 +112,7 @@ protected:
 	void OnExportToCsv();
 	void OnExtract();
 
-	void ScrollToItem(const FString& InPath);
+	void ScrollToItem(const FString& InPath, int32 PakIndex);
 
 	void OnLoadAssetReigstryFinished();
 
@@ -113,9 +120,6 @@ protected:
 	bool GetSelectedItems(TArray<FPakFileEntryPtr>& OutSelectedItems) const;
 
 protected:
-	/** External scrollbar used to synchronize file view position. */
-	TSharedPtr<class SScrollBar> ExternalScrollbar;
-
 	/** The search box widget used to filter items displayed in the file view. */
 	TSharedPtr<class SSearchBox> SearchBox;
 
@@ -144,8 +148,16 @@ protected:
 	FString LastLoadGuid;
 
 	FString DelayHighlightItem;
+	int32 DelayHighlightItemPakIndex = -1;
 
 	TMap<FName, bool> ClassFilterMap;
 
 	FPakFileEntryPtr FilesSummary;
+
+	struct FPakFilterInfo
+	{
+		bool bShow;
+		FName PakName;
+	};
+	TArray<FPakFilterInfo> PakFilterMap;
 };

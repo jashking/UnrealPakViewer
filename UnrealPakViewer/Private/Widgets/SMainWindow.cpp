@@ -300,14 +300,14 @@ void SMainWindow::OnLoadPakFile()
 #else
 			LOCTEXT("LoadPak_FileFilter", "Pak files (*.pak)|*.pak|All files (*.*)|*.*").ToString(),
 #endif
-			EFileDialogFlags::None,
+			EFileDialogFlags::Multiple,
 			OutFiles
 		);
 	}
 
 	if (bOpened && OutFiles.Num() > 0)
 	{
-		LoadPakFile(OutFiles[0]);
+		LoadPakFile(OutFiles);
 	}
 }
 
@@ -332,7 +332,8 @@ void SMainWindow::OnLoadFolder()
 
 	if (bOpened)
 	{
-		LoadPakFile(OutFolder);
+		TArray<FString> Folders = { OutFolder };
+		LoadPakFile(Folders);
 	}
 }
 
@@ -341,13 +342,15 @@ void SMainWindow::OnLoadPakFailed(const FString& InReason)
 	FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(InReason));
 }
 
-FString SMainWindow::OnGetAESKey(bool& bCancel)
+FString SMainWindow::OnGetAESKey(const FString& InPakPath, const FGuid& PakGuid, bool& bCancel)
 {
 	FString EncryptionKey = TEXT("");
 	bCancel = true;
 
 	TSharedPtr<SKeyInputWindow> KeyInputWindow =
 		SNew(SKeyInputWindow)
+		.PakPath(InPakPath)
+		.PakGuid(PakGuid)
 		.OnConfirm_Lambda([&EncryptionKey, &bCancel](const FString& InEncryptionKey) { EncryptionKey = InEncryptionKey; bCancel = false; });
 
 	FSlateApplication::Get().AddModalWindow(KeyInputWindow.ToSharedRef(), SharedThis(this), false);
@@ -355,7 +358,7 @@ FString SMainWindow::OnGetAESKey(bool& bCancel)
 	return EncryptionKey;
 }
 
-void SMainWindow::OnSwitchToTreeView(const FString& InPath)
+void SMainWindow::OnSwitchToTreeView(const FString& InPath, int32 PakIndex)
 {
 #if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 	TSharedPtr<SDockTab> TreeViewTab = TabManager->TryInvokeTab(TreeViewTabId);
@@ -365,11 +368,11 @@ void SMainWindow::OnSwitchToTreeView(const FString& InPath)
 	if (TreeViewTab.IsValid())
 	{
 		TSharedRef<SPakTreeView> TreeView = StaticCastSharedRef<SPakTreeView>(TreeViewTab->GetContent());
-		TreeView->SetDelayHighlightItem(InPath);
+		TreeView->SetDelayHighlightItem(InPath, PakIndex);
 	}
 }
 
-void SMainWindow::OnSwitchToFileView(const FString& InPath)
+void SMainWindow::OnSwitchToFileView(const FString& InPath, int32 PakIndex)
 {
 #if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 	TSharedPtr<SDockTab> FileViewTab = TabManager->TryInvokeTab(FileViewTabId);
@@ -379,7 +382,7 @@ void SMainWindow::OnSwitchToFileView(const FString& InPath)
 	if (FileViewTab.IsValid())
 	{
 		TSharedRef<SPakFileView> FileView = StaticCastSharedRef<SPakFileView>(FileViewTab->GetContent());
-		FileView->SetDelayHighlightItem(InPath);
+		FileView->SetDelayHighlightItem(InPath, PakIndex);
 	}
 }
 
@@ -399,7 +402,8 @@ void SMainWindow::OnLoadRecentFile(int32 InIndex)
 {
 	if (RecentFiles.IsValidIndex(InIndex))
 	{
-		LoadPakFile(RecentFiles[InIndex]);
+		TArray<FString> PakFiles = { RecentFiles[InIndex] };
+		LoadPakFile(PakFiles);
 	}
 }
 
@@ -439,18 +443,25 @@ FReply SMainWindow::OnDrop(const FGeometry& MyGeometry, const FDragDropEvent& Dr
 		{
 			// For now, only allow a single file.
 			const TArray<FString>& Files = DragDropOp->GetFiles();
-			if (Files.Num() == 1)
+
+			TArray<FString> PakFiles;
+			for (const FString File : Files)
 			{
-				const FString DraggedFileExtension = FPaths::GetExtension(Files[0], true).ToLower();
+				const FString DraggedFileExtension = FPaths::GetExtension(File, true).ToLower();
 #if ENABLE_IO_STORE_ANALYZER
 				if (DraggedFileExtension == TEXT(".pak") || DraggedFileExtension == TEXT(".ucas"))
 #else
 				if (DraggedFileExtension == TEXT(".pak"))
 #endif
 				{
-					LoadPakFile(Files[0]);
-					return FReply::Handled();
+					PakFiles.Add(File);
 				}
+			}
+
+			if (PakFiles.Num() > 0)
+			{
+				LoadPakFile(PakFiles);
+				return FReply::Handled();
 			}
 		}
 	}
@@ -466,9 +477,9 @@ FReply SMainWindow::OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent
 		if (DragDropOp->HasFiles())
 		{
 			const TArray<FString>& Files = DragDropOp->GetFiles();
-			if (Files.Num() == 1)
+			for (const FString File : Files)
 			{
-				const FString DraggedFileExtension = FPaths::GetExtension(Files[0], true).ToLower();
+				const FString DraggedFileExtension = FPaths::GetExtension(File, true).ToLower();
 #if ENABLE_IO_STORE_ANALYZER
 				if (DraggedFileExtension == TEXT(".pak") || DraggedFileExtension == TEXT(".ucas"))
 #else
@@ -478,39 +489,59 @@ FReply SMainWindow::OnDragOver(const FGeometry& MyGeometry, const FDragDropEvent
 					return FReply::Handled();
 				}
 			}
+
+			return FReply::Unhandled();
 		}
 	}
 
 	return SCompoundWidget::OnDragOver(MyGeometry, DragDropEvent);
 }
 
-void SMainWindow::LoadPakFile(const FString& PakFilePath)
+void SMainWindow::LoadPakFile(const TArray<FString>& PakFilePaths)
 {
-	static const int32 MAX_RECENT_FILE_COUNT = 10;
+	static const int32 MAX_RECENT_FILE_COUNT = 30;
 
-	const FString FullPath = FPaths::ConvertRelativePathToFull(PakFilePath);
+	TArray<FString> PakFiles;
+	TArray<FString> CachedAESKeys;
+	for (const FString& PakFilePath : PakFilePaths)
+	{
+		const FString FullPath = FPaths::ConvertRelativePathToFull(PakFilePath);
+		PakFiles.Add(FullPath);
+		CachedAESKeys.Add(FindExistingAESKey(FullPath));
+	}
 
-	IPakAnalyzerModule::Get().InitializeAnalyzerBackend(FullPath);
+	if (PakFiles.Num() <= 0)
+	{
+		return;
+	}
 
-	const FString ExistingAESKey = FindExistingAESKey(FullPath);
+	IPakAnalyzerModule::Get().InitializeAnalyzerBackend(PakFiles[0]);
 
-	const bool bLoadResult = IPakAnalyzerModule::Get().GetPakAnalyzer()->LoadPakFile(FullPath, ExistingAESKey);
+	const bool bLoadResult = IPakAnalyzerModule::Get().GetPakAnalyzer()->LoadPakFiles(PakFiles, CachedAESKeys);
 	if (bLoadResult)
 	{
-		RemoveRecentFile(FullPath);
-		const FString DescriptionAES = IPakAnalyzerModule::Get().GetPakAnalyzer()->GetDecriptionAESKey();
-		if (!DescriptionAES.IsEmpty())
+		const TArray<FPakFileSumaryPtr>& Summaries = IPakAnalyzerModule::Get().GetPakAnalyzer()->GetPakFileSumary();
+		for (const FPakFileSumaryPtr& Summary : Summaries)
 		{
-			AESKeyCaches.Add(FullPath, DescriptionAES);
-		}
+			if (!Summary.IsValid())
+			{
+				continue;
+			}
 
-		RecentFiles.Insert(FullPath, 0);
-		if (RecentFiles.Num() > MAX_RECENT_FILE_COUNT)
-		{
-			RecentFiles.SetNum(MAX_RECENT_FILE_COUNT); // keep max 5 recent files
+			RemoveRecentFile(Summary->PakFilePath);
+			if (!Summary->DecryptAESKeyStr.IsEmpty())
+			{
+				AESKeyCaches.Add(Summary->PakFilePath, Summary->DecryptAESKeyStr);
+			}
+
+			RecentFiles.Insert(Summary->PakFilePath, 0);
+			if (RecentFiles.Num() > MAX_RECENT_FILE_COUNT)
+			{
+				RecentFiles.SetNum(MAX_RECENT_FILE_COUNT);
+			}
+
+			SaveConfig();
 		}
-	
-		SaveConfig();
 	}
 }
 

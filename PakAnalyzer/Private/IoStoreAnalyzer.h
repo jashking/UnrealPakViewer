@@ -26,19 +26,18 @@ public:
 	FIoStoreAnalyzer();
 	virtual ~FIoStoreAnalyzer();
 
-	virtual bool LoadPakFile(const FString& InPakPath, const FString& InAESKey = TEXT("")) override;
+	virtual bool LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys) override;
 	virtual void ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles) override;
 	virtual void CancelExtract() override;
 	virtual void SetExtractThreadCount(int32 InThreadCount) override;
-	virtual const FPakFileSumary& GetPakFileSumary() const override;
 
 protected:
 	virtual void Reset() override;
-	TSharedPtr<FIoStoreReader> CreateIoStoreReader(const FString& InPath);
+	TSharedPtr<FIoStoreReader> CreateIoStoreReader(const FString& InPath, const FString& InDefaultAESKey, FString& OutDecryptKey);
 
 	bool InitializeGlobalReader(const FString& InPakPath);
-	bool InitializeReaders(const TArray<FString>& InPaks);
-	bool PreLoadIoStore(const FString& InTocPath, const FString& InCasPath, TMap<FGuid, FAES::FAESKey>& OutKeys);
+	bool InitializeReaders(const TArray<FString>& InPaks, const TArray<FString>& InDefaultAESKeys);
+	bool PreLoadIoStore(const FString& InTocPath, const FString& InCasPath, const FString& InDefaultAESKey, TMap<FGuid, FAES::FAESKey>& OutKeys, FString& OutDecryptKey);
 	bool TryDecryptIoStore(const FIoStoreTocResourceInfo& TocResource, const FIoOffsetAndLength& OffsetAndLength, const FIoStoreTocEntryMeta& Meta, const FString& InCasPath, const FString& InKey, FAES::FAESKey& OutAESKey);
 	bool FillPackageInfo(const FIoStoreTocResourceInfo& TocResource, FStorePackageInfo& OutPackageInfo);
 	void OnExtractFiles();
@@ -54,7 +53,7 @@ protected:
 	TArray<FStorePackageInfo> PackageInfos;
 	TMap<FString, int32> FileToPackageIndex;
 
-	FString DefaultAESKey;
+	TArray<FString> DefaultAESKeys;
 
 	TArray<int32> PendingExtracePackages;
 	TArray<TFuture<void>> ExtractThread;

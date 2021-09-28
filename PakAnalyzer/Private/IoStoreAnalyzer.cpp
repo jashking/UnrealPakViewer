@@ -37,42 +37,58 @@ FIoStoreAnalyzer::~FIoStoreAnalyzer()
 	Reset();
 }
 
-bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAESKey)
+bool FIoStoreAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys)
 {
-	if (InPakPath.IsEmpty())
-	{
-		UE_LOG(LogPakAnalyzer, Error, TEXT("Load iostore file failed! Path is empty!"));
-		return false;
-	}
-
-	UE_LOG(LogPakAnalyzer, Log, TEXT("Start load iostore file: %s."), *InPakPath);
-
+	TArray<FString> UcasFiles;
+	TArray<FString> UsedDefaultAESKeys;
 	IPlatformFile& PlatformFile = IPlatformFile::GetPlatformPhysical();
-	if (!PlatformFile.FileExists(*InPakPath))
+	for (int32 i = 0; i < InPakPaths.Num(); ++i)
 	{
-		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Load iostore file failed! File not exists! Path: %s."), *InPakPath));
-		UE_LOG(LogPakAnalyzer, Error, TEXT("Load iostore file failed! File not exists! Path: %s."), *InPakPath);
+		const FString& PakPath = InPakPaths[i];
+		if (PlatformFile.FileExists(*PakPath) && PakPath.EndsWith(".ucas"))
+		{
+			UcasFiles.Add(PakPath);
+			UsedDefaultAESKeys.Add(InDefaultAESKeys.IsValidIndex(i) ? InDefaultAESKeys[i] : TEXT(""));
+		}
+	}
+
+	if (UcasFiles.Num() <= 0)
+	{
+		UE_LOG(LogPakAnalyzer, Error, TEXT("Load iostore file failed! No ucas files!"));
 		return false;
 	}
+
+	UE_LOG(LogPakAnalyzer, Log, TEXT("Start load iostore file count: %d."), UcasFiles.Num());
 
 	Reset();
+	DefaultAESKeys = UsedDefaultAESKeys;
 
-	DefaultAESKey = InAESKey;
-
-	// Make tree root
-	TreeRoot = MakeShared<FPakTreeEntry>(*FPaths::GetCleanFilename(InPakPath), TEXT(""), true);
-
-	if (!InitializeGlobalReader(InPakPath))
+	if (!InitializeGlobalReader(UcasFiles[0]))
 	{
 		UE_LOG(LogPakAnalyzer, Warning, TEXT("Load iostore global container failed!"));
 	}
 
-	TArray<FString> IoStorePaks = { InPakPath };
-	if (!InitializeReaders(IoStorePaks))
+	if (!InitializeReaders(UcasFiles, DefaultAESKeys))
 	{
-		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Read iostore file failed! Path: %s."), *InPakPath));
-		UE_LOG(LogPakAnalyzer, Error, TEXT("Read iostore file failed! Path: %s."), *InPakPath);
+		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Read iostore files failed!")));
+		UE_LOG(LogPakAnalyzer, Error, TEXT("Read iostore files failed!"));
 		return false;
+	}
+
+	if (StoreContainers.Num() <= 0)
+	{
+		UE_LOG(LogPakAnalyzer, Error, TEXT("Read iostore files failed! Create containers failed!"));
+		return false;
+	}
+
+	// Make tree roots
+	PakTreeRoots.AddZeroed(StoreContainers.Num());
+	PakFileSummaries.AddZeroed(StoreContainers.Num());
+	for (int32 i = 0; i < StoreContainers.Num(); ++i)
+	{
+		PakTreeRoots[i] = MakeShared<FPakTreeEntry>(*FPaths::GetCleanFilename(StoreContainers[i].Summary.PakFilePath), StoreContainers[i].Summary.MountPoint, true);
+		PakFileSummaries[i] = MakeShared<FPakFileSumary>();
+		*PakFileSummaries[i] = StoreContainers[i].Summary;
 	}
 
 	{
@@ -96,15 +112,18 @@ bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAE
 			Entry.SetEncrypted(StoreContainers[Package.ContainerIndex].bEncrypted);
 
 			const FString FullPath = Package.PackageName.ToString() + TEXT(".") + Package.Extension.ToString();
-			FPakTreeEntryPtr ResultEntry = InsertFileToTree(FullPath, Entry);
+			FPakTreeEntryPtr ResultEntry = InsertFileToTree(PakTreeRoots[Package.ContainerIndex], StoreContainers[Package.ContainerIndex].Summary, FullPath, Entry);
 			if (ResultEntry.IsValid())
 			{
+				ResultEntry->OwnerPakIndex = Package.ContainerIndex;
 				ResultEntry->CompressionMethod = Package.CompressionMethod;
 
 				if (Package.AssetSummary.IsValid())
 				{
 					ResultEntry->AssetSummary = Package.AssetSummary;
 				}
+
+				PakFileSummaries[Package.ContainerIndex]->FileCount += 1;
 			}
 
 			FileToPackageIndex.Add(FullPath, i);
@@ -114,13 +133,16 @@ bool FIoStoreAnalyzer::LoadPakFile(const FString& InPakPath, const FString& InAE
 	// Generate unique id
 	LoadGuid = FGuid::NewGuid();
 
-	RefreshTreeNode(TreeRoot);
-	RefreshTreeNodeSizePercent(TreeRoot);
-	RefreshClassMap(TreeRoot);
+	for (const FPakTreeEntryPtr TreeRoot : PakTreeRoots)
+	{
+		RefreshTreeNode(TreeRoot);
+		RefreshTreeNodeSizePercent(TreeRoot, TreeRoot);
+		RefreshClassMap(TreeRoot, TreeRoot);
+	}
 
 	bHasPakLoaded = true;
 
-	UE_LOG(LogPakAnalyzer, Log, TEXT("Finish load iostore file: %s."), *InPakPath);
+	UE_LOG(LogPakAnalyzer, Log, TEXT("Finish load iostore file count: %d."), UcasFiles.Num());
 
 	return true;
 }
@@ -160,11 +182,6 @@ void FIoStoreAnalyzer::SetExtractThreadCount(int32 InThreadCount)
 
 }
 
-const FPakFileSumary& FIoStoreAnalyzer::GetPakFileSumary() const
-{
-	return StoreContainers.Num() > 0 ? StoreContainers[0].Summary : PakFileSumary;
-}
-
 void FIoStoreAnalyzer::Reset()
 {
 	FBaseAnalyzer::Reset();
@@ -185,10 +202,10 @@ void FIoStoreAnalyzer::Reset()
 	PackageInfos.Empty();
 	FileToPackageIndex.Empty();
 
-	DefaultAESKey = TEXT("");
+	DefaultAESKeys.Empty();
 }
 
-TSharedPtr<FIoStoreReader> FIoStoreAnalyzer::CreateIoStoreReader(const FString& InPath)
+TSharedPtr<FIoStoreReader> FIoStoreAnalyzer::CreateIoStoreReader(const FString& InPath, const FString& InDefaultAESKey, FString& OutDecryptKey)
 {
 #if ENGINE_MAJOR_VERSION <= 4
 	FIoStoreEnvironment IoEnvironment;
@@ -196,7 +213,7 @@ TSharedPtr<FIoStoreReader> FIoStoreAnalyzer::CreateIoStoreReader(const FString& 
 #endif
 
 	TMap<FGuid, FAES::FAESKey> DecryptionKeys;
-	if (!PreLoadIoStore(FPaths::SetExtension(InPath, TEXT("utoc")), FPaths::SetExtension(InPath, TEXT("ucas")), DecryptionKeys))
+	if (!PreLoadIoStore(FPaths::SetExtension(InPath, TEXT("utoc")), FPaths::SetExtension(InPath, TEXT("ucas")), InDefaultAESKey, DecryptionKeys, OutDecryptKey))
 	{
 		return nullptr;
 	}
@@ -221,8 +238,9 @@ TSharedPtr<FIoStoreReader> FIoStoreAnalyzer::CreateIoStoreReader(const FString& 
 
 bool FIoStoreAnalyzer::InitializeGlobalReader(const FString& InPakPath)
 {
+	FString DecryptKey;
 	const FString GlobalContainerPath = FPaths::GetPath(InPakPath) / TEXT("global");
-	GlobalIoStoreReader = CreateIoStoreReader(GlobalContainerPath);
+	GlobalIoStoreReader = CreateIoStoreReader(GlobalContainerPath, TEXT(""), DecryptKey);
 	if (!GlobalIoStoreReader.IsValid())
 	{
 		UE_LOG(LogPakAnalyzer, Error, TEXT("IoStore failed load global container: %s!"), *GlobalContainerPath);
@@ -304,7 +322,7 @@ bool FIoStoreAnalyzer::InitializeGlobalReader(const FString& InPakPath)
 	return true;
 }
 
-bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
+bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TArray<FString>& InDefaultAESKeys)
 {
 	static const EParallelForFlags ParallelForFlags = EParallelForFlags::Unbalanced /*| EParallelForFlags::ForceSingleThread*/;
 
@@ -317,9 +335,13 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 	};
 
 	TArray<FChunkInfo> AllChunkIds;
-	for (const FString& ContainerFilePath : InPaks)
+	for (int32 PakIndex = 0; PakIndex < InPaks.Num(); ++PakIndex)
 	{
-		TSharedPtr<FIoStoreReader> Reader = CreateIoStoreReader(ContainerFilePath);
+		const FString& ContainerFilePath = InPaks[PakIndex];
+		const FString& DefaultAESKey = InDefaultAESKeys.IsValidIndex(PakIndex) ? InDefaultAESKeys[PakIndex] : TEXT("");
+		FString DecryptKey;
+
+		TSharedPtr<FIoStoreReader> Reader = CreateIoStoreReader(ContainerFilePath, DefaultAESKey, DecryptKey);
 		if (!Reader.IsValid())
 		{
 			UE_LOG(LogPakAnalyzer, Warning, TEXT("Failed to read container '%s'"), *ContainerFilePath);
@@ -339,6 +361,11 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 		Info.bIndexed = bool(Flags & EIoContainerFlags::Indexed);
 		Info.Summary.PakInfo.bEncryptedIndex = Info.bEncrypted;
 		Info.Summary.PakInfo.EncryptionKeyGuid = Info.EncryptionKeyGuid;
+		Info.Summary.DecryptAESKeyStr = DecryptKey;
+		if (!FBase64::Decode(*DecryptKey, DecryptKey.Len(), Info.Summary.DecryptAESKey.Key))
+		{
+			Info.Summary.DecryptAESKey.Reset();
+		}
 
 		FIoStoreTocResourceInfo* TocResource = TocResources.Find(Info.Id.Value());
 		if (TocResource)
@@ -763,7 +790,7 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks)
 	return true;
 }
 
-bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, const FString& InCasPath, TMap<FGuid, FAES::FAESKey>& OutKeys)
+bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, const FString& InCasPath, const FString& InDefaultAESKey, TMap<FGuid, FAES::FAESKey>& OutKeys, FString& OutDecryptKey)
 {
 	IPlatformFile& PlatformFile = IPlatformFile::GetPlatformPhysical();
 
@@ -869,9 +896,10 @@ bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, const FString& I
 	bool bShouldLoad = true;
 	if (Header.EncryptionKeyGuid.IsValid() || EnumHasAnyFlags(Header.ContainerFlags, EIoContainerFlags::Encrypted))
 	{
+		OutDecryptKey = InDefaultAESKey;
 		FAES::FAESKey AESKey;
 
-		bShouldLoad = DefaultAESKey.IsEmpty() ? false : TryDecryptIoStore(TocResource, ChunkOffsetLengthsArray[0], TocResource.ChunkMetas[0], InCasPath, DefaultAESKey, AESKey);
+		bShouldLoad = InDefaultAESKey.IsEmpty() ? false : TryDecryptIoStore(TocResource, ChunkOffsetLengthsArray[0], TocResource.ChunkMetas[0], InCasPath, InDefaultAESKey, AESKey);
 
 		if (!bShouldLoad)
 		{
@@ -880,9 +908,9 @@ bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, const FString& I
 				bool bCancel = true;
 				do
 				{
-					const FString KeyString = FPakAnalyzerDelegates::OnGetAESKey.Execute(bCancel);
+					OutDecryptKey = FPakAnalyzerDelegates::OnGetAESKey.Execute(InCasPath, Header.EncryptionKeyGuid, bCancel);
 
-					bShouldLoad = !bCancel ? TryDecryptIoStore(TocResource, ChunkOffsetLengthsArray[0], TocResource.ChunkMetas[0], InCasPath, KeyString, AESKey) : false;
+					bShouldLoad = !bCancel ? TryDecryptIoStore(TocResource, ChunkOffsetLengthsArray[0], TocResource.ChunkMetas[0], InCasPath, OutDecryptKey, AESKey) : false;
 				} while (!bShouldLoad && !bCancel);
 			}
 			else
@@ -899,7 +927,6 @@ bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, const FString& I
 		}
 
 		OutKeys.Add(Header.EncryptionKeyGuid, AESKey);
-		CachedAESKey = AESKey;
 	}
 
 	TocResources.Add(Header.ContainerId.Value(), TocResource);

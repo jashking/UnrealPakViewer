@@ -22,7 +22,7 @@ public:
 
 	void Shutdown();
 	void EnsureCompletion();
-	void StartParse(TArray<FPakFileEntryPtr>& InFiles, const FString& InPakFile, int32 InPakVersion, const FAES::FAESKey& InKey);
+	void StartParse(TArray<FPakFileEntryPtr>& InFiles, TArray<FPakFileSumary>& InSummaries);
 
 	FOnReadAssetContent OnReadAssetContent;
 
@@ -35,8 +35,5 @@ protected:
 	FThreadSafeCounter StopTaskCounter;
 
 	TArray<FPakFileEntryPtr> Files;
-
-	FString PakFilePath;
-	int32 PakVersion;
-	FAES::FAESKey AESKey;
+	TArray<FPakFileSumary> Summaries;
 };

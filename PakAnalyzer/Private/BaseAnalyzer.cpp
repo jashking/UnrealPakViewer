@@ -20,19 +20,19 @@ FBaseAnalyzer::~FBaseAnalyzer()
 
 }
 
-void FBaseAnalyzer::GetFiles(const FString& InFilterText, const TMap<FName, bool>& InClassFilterMap, TArray<FPakFileEntryPtr>& OutFiles) const
+bool FBaseAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys)
+{
+	return false;
+}
+
+void FBaseAnalyzer::GetFiles(const FString& InFilterText, const TMap<FName, bool>& InClassFilterMap, const TMap<int32, bool>& InPakIndexFilter, TArray<FPakFileEntryPtr>& OutFiles) const
 {
 	FScopeLock Lock(const_cast<FCriticalSection*>(&CriticalSection));
 
-	if (TreeRoot.IsValid())
+	for (FPakTreeEntryPtr PakTreeRoot : PakTreeRoots)
 	{
-		RetriveFiles(TreeRoot, InFilterText, InClassFilterMap, OutFiles);
+		RetriveFiles(PakTreeRoot, InFilterText, InClassFilterMap, InPakIndexFilter, OutFiles);
 	}
-}
-
-int32 FBaseAnalyzer::GetFileCount() const
-{
-	return TreeRoot.IsValid() ? TreeRoot->FileCount : 0;
 }
 
 FString FBaseAnalyzer::GetLastLoadGuid() const
@@ -45,14 +45,14 @@ bool FBaseAnalyzer::IsLoadDirty(const FString& InGuid) const
 	return !InGuid.Equals(LoadGuid.ToString(), ESearchCase::IgnoreCase) && LoadGuid.IsValid();
 }
 
-const FPakFileSumary& FBaseAnalyzer::GetPakFileSumary() const
+const TArray<FPakFileSumaryPtr>& FBaseAnalyzer::GetPakFileSumary() const
 {
-	return PakFileSumary;
+	return PakFileSummaries;
 }
 
-FPakTreeEntryPtr FBaseAnalyzer::GetPakTreeRootNode() const
+const TArray<FPakTreeEntryPtr>& FBaseAnalyzer::GetPakTreeRootNode() const
 {
-	return TreeRoot;
+	return PakTreeRoots;
 }
 
 bool FBaseAnalyzer::HasPakLoaded() const
@@ -78,9 +78,13 @@ bool FBaseAnalyzer::LoadAssetRegistry(const FString& InRegristryPath)
 		return false;
 	}
 
-	PakFileSumary.AssetRegistryPath = FPaths::ConvertRelativePathToFull(InRegristryPath);
+	AssetRegistryPath = FPaths::ConvertRelativePathToFull(InRegristryPath);
 
-	RefreshClassMap(TreeRoot);
+	for (FPakTreeEntryPtr TreeRoot : PakTreeRoots)
+	{
+		RefreshClassMap(TreeRoot, TreeRoot);
+	}
+	
 	return true;
 }
 
@@ -105,18 +109,7 @@ bool FBaseAnalyzer::ExportToJson(const FString& InOutputPath, const TArray<FPakF
 	UE_LOG(LogPakAnalyzer, Log, TEXT("Export to json: %s."), *InOutputPath);
 
 	TSharedRef<FJsonObject> RootObject = MakeShareable(new FJsonObject);
-	RootObject->SetStringField(TEXT("Name"), FPaths::GetCleanFilename(PakFileSumary.PakFilePath));
-	RootObject->SetStringField(TEXT("Path"), PakFileSumary.PakFilePath);
-	RootObject->SetNumberField(TEXT("Pak File Size"), PakFileSumary.PakFileSize);
-	RootObject->SetNumberField(TEXT("File Count"), TreeRoot->FileCount);
-	RootObject->SetNumberField(TEXT("Total Size"), TreeRoot->Size);
-	RootObject->SetNumberField(TEXT("Total Compressed Size"), TreeRoot->CompressedSize);
-	RootObject->SetStringField(TEXT("MountPoint"), PakFileSumary.MountPoint);
-	//RootObject->SetNumberField(TEXT("IndexSize"), PakFileSumary.PakInfo.IndexSize);
-	//RootObject->SetNumberField(TEXT("IndexOffset"), PakFileSumary.PakInfo.IndexOffset);
-	//RootObject->SetNumberField(TEXT("IndexEncrypted"), PakFileSumary.PakInfo.bEncryptedIndex);
-	//RootObject->SetNumberField(TEXT("HeaderSize"), PakFileSumary.PakFileSize - PakFileSumary.PakInfo.IndexSize - PakFileSumary.PakInfo.IndexOffset);
-	RootObject->SetNumberField(TEXT("PakVersion"), PakFileSumary.PakInfo.Version);
+	RootObject->SetNumberField(TEXT("Exported File Count"), InFiles.Num());
 
 	TArray<TSharedPtr<FJsonValue>> FileObjects;
 
@@ -141,6 +134,9 @@ bool FBaseAnalyzer::ExportToJson(const FString& InOutputPath, const TArray<FPakF
 		FileObject->SetStringField(TEXT("SHA1"), BytesToHex(PakEntry.Hash, sizeof(PakEntry.Hash)));
 		FileObject->SetStringField(TEXT("IsEncrypted"), PakEntry.IsEncrypted() ? TEXT("True") : TEXT("False"));
 		FileObject->SetStringField(TEXT("Class"), It->Class.ToString());
+		FileObject->SetNumberField(TEXT("Dependency Count"), It->AssetSummary.IsValid() ? It->AssetSummary->DependencyList.Num() : 0);
+		FileObject->SetNumberField(TEXT("Dependent Count"), It->AssetSummary.IsValid() ? It->AssetSummary->DependentList.Num() : 0);
+		FileObject->SetStringField(TEXT("OwnerPak"), PakFileSummaries.IsValidIndex(It->OwnerPakIndex) ? FPaths::GetCleanFilename(PakFileSummaries[It->OwnerPakIndex]->PakFilePath) : TEXT(""));
 
 		FileObjects.Add(MakeShareable(new FJsonValueObject(FileObject)));
 
@@ -160,7 +156,6 @@ bool FBaseAnalyzer::ExportToJson(const FString& InOutputPath, const TArray<FPakF
 		}
 	}
 
-	RootObject->SetNumberField(TEXT("Exported File Count"), InFiles.Num());
 	RootObject->SetNumberField(TEXT("Exported Total Size"), TotalSize);
 	RootObject->SetNumberField(TEXT("Exported Total Compressed Size"), TotalCompressedSize);
 
@@ -209,14 +204,14 @@ bool FBaseAnalyzer::ExportToCsv(const FString& InOutputPath, const TArray<FPakFi
 
 	TArray<FString> Lines;
 	Lines.Empty(InFiles.Num() + 2);
-	Lines.Add(TEXT("Id, Name, Path, Offset, Class, Size, Compressed Size, Compressed Block Count, Compressed Block Size, SHA1, IsEncrypted"));
+	Lines.Add(TEXT("Id, Name, Path, Offset, Class, Size, Compressed Size, Compressed Block Count, Compressed Block Size, SHA1, IsEncrypted, Dependency Count, Dependent Count, OwnerPak"));
 
 	int32 Index = 1;
 	for (const FPakFileEntryPtr It : InFiles)
 	{
 		const FPakEntry& PakEntry = It->PakEntry;
 
-		Lines.Add(FString::Printf(TEXT("%d, %s, %s, %lld, %s, %lld, %lld, %d, %d, %s, %s"),
+		Lines.Add(FString::Printf(TEXT("%d, %s, %s, %lld, %s, %lld, %lld, %d, %d, %s, %s, %d, %d, %s"),
 			Index,
 			*It->Filename.ToString(),
 			*It->Path,
@@ -227,7 +222,11 @@ bool FBaseAnalyzer::ExportToCsv(const FString& InOutputPath, const TArray<FPakFi
 			PakEntry.CompressionBlocks.Num(),
 			PakEntry.CompressionBlockSize,
 			*BytesToHex(PakEntry.Hash, sizeof(PakEntry.Hash)),
-			PakEntry.IsEncrypted() ? TEXT("True") : TEXT("False")));
+			PakEntry.IsEncrypted() ? TEXT("True") : TEXT("False"),
+			It->AssetSummary.IsValid() ? It->AssetSummary->DependencyList.Num() : 0,
+			It->AssetSummary.IsValid() ? It->AssetSummary->DependentList.Num() : 0,
+			PakFileSummaries.IsValidIndex(It->OwnerPakIndex) ? *FPaths::GetCleanFilename(PakFileSummaries[It->OwnerPakIndex]->PakFilePath) : TEXT(""))
+			);
 		++Index;
 	}
 
@@ -238,12 +237,12 @@ bool FBaseAnalyzer::ExportToCsv(const FString& InOutputPath, const TArray<FPakFi
 	return bExportResult;
 }
 
-FString FBaseAnalyzer::GetDecriptionAESKey() const
+FString FBaseAnalyzer::GetAssetRegistryPath() const
 {
-	return CachedAESKey.IsValid() ? FBase64::Encode(CachedAESKey.Key, FAES::FAESKey::KeySize) : TEXT("");
+	return AssetRegistryPath;
 }
 
-void FBaseAnalyzer::RefreshClassMap(FPakTreeEntryPtr InRoot)
+void FBaseAnalyzer::RefreshClassMap(FPakTreeEntryPtr InTreeRoot, FPakTreeEntryPtr InRoot)
 {
 	InRoot->FileClassMap.Empty();
 
@@ -253,16 +252,16 @@ void FBaseAnalyzer::RefreshClassMap(FPakTreeEntryPtr InRoot)
 
 		if (Child->bIsDirectory)
 		{
-			RefreshClassMap(Child);
+			RefreshClassMap(InTreeRoot, Child);
 			for (auto& ClassPair : Child->FileClassMap)
 			{
-				InsertClassInfo(InRoot, ClassPair.Key, ClassPair.Value->FileCount, ClassPair.Value->Size, ClassPair.Value->CompressedSize);
+				InsertClassInfo(InTreeRoot, InRoot, ClassPair.Key, ClassPair.Value->FileCount, ClassPair.Value->Size, ClassPair.Value->CompressedSize);
 			}
 		}
 		else
 		{
 			Child->Class = GetAssetClass(Child->Path, Child->PackagePath);
-			InsertClassInfo(InRoot, Child->Class, 1, Child->Size, Child->CompressedSize);
+			InsertClassInfo(InTreeRoot, InRoot, Child->Class, 1, Child->Size, Child->CompressedSize);
 
 		}
 	}
@@ -300,47 +299,40 @@ void FBaseAnalyzer::RefreshTreeNode(FPakTreeEntryPtr InRoot)
 		});
 }
 
-void FBaseAnalyzer::RefreshTreeNodeSizePercent(FPakTreeEntryPtr InRoot)
+void FBaseAnalyzer::RefreshTreeNodeSizePercent(FPakTreeEntryPtr InTreeRoot, FPakTreeEntryPtr InRoot)
 {
 	for (auto& Pair : InRoot->ChildrenMap)
 	{
 		FPakTreeEntryPtr Child = Pair.Value;
-		Child->CompressedSizePercentOfTotal = TreeRoot->CompressedSize > 0 ? (float)Child->CompressedSize / TreeRoot->CompressedSize : 0.f;
+		Child->CompressedSizePercentOfTotal = InTreeRoot->CompressedSize > 0 ? (float)Child->CompressedSize / InTreeRoot->CompressedSize : 0.f;
 		Child->CompressedSizePercentOfParent = InRoot->CompressedSize > 0 ? (float)Child->CompressedSize / InRoot->CompressedSize : 0.f;
 
 		if (Child->bIsDirectory)
 		{
-			RefreshTreeNodeSizePercent(Child);
+			RefreshTreeNodeSizePercent(InTreeRoot, Child);
 		}
 	}
 }
 
-void FBaseAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, const TMap<FName, bool>& InClassFilterMap, TArray<FPakFileEntryPtr>& OutFiles) const
+void FBaseAnalyzer::RetriveFiles(FPakTreeEntryPtr InRoot, const FString& InFilterText, const TMap<FName, bool>& InClassFilterMap, const TMap<int32, bool>& InPakIndexFilter, TArray<FPakFileEntryPtr>& OutFiles) const
 {
 	for (auto& Pair : InRoot->ChildrenMap)
 	{
 		FPakTreeEntryPtr Child = Pair.Value;
 		if (Child->bIsDirectory)
 		{
-			RetriveFiles(Child, InFilterText, InClassFilterMap, OutFiles);
+			RetriveFiles(Child, InFilterText, InClassFilterMap, InPakIndexFilter, OutFiles);
 		}
 		else
 		{
 			const bool* bShow = InClassFilterMap.Find(Child->Class);
+			const bool* bShowIndex = InPakIndexFilter.Find(Child->OwnerPakIndex);
 			const bool bMatchClass = (InClassFilterMap.Num() <= 0 || (bShow && *bShow));
+			const bool bMatchIndex = (InPakIndexFilter.Num() <= 0) || (bShowIndex && *bShowIndex);
 
-			if (bMatchClass && (InFilterText.IsEmpty() || /*Child->Filename.Contains(InFilterText) ||*/ Child->Path.Contains(InFilterText)))
+			if (bMatchClass && bMatchIndex && (InFilterText.IsEmpty() || /*Child->Filename.Contains(InFilterText) ||*/ Child->Path.Contains(InFilterText)))
 			{
-				FPakFileEntryPtr FileEntryPtr = MakeShared<FPakFileEntry>(Child->Filename, Child->Path);
-				if (!Child->bIsDirectory)
-				{
-					FileEntryPtr->Class = Child->Class;
-					FileEntryPtr->PakEntry = Child->PakEntry;
-					FileEntryPtr->CompressionMethod = Child->CompressionMethod;
-					FileEntryPtr->PackagePath = Child->PackagePath;
-				}
-
-				OutFiles.Add(FileEntryPtr);
+				OutFiles.Add(Child);
 			}
 		}
 	}
@@ -365,7 +357,7 @@ void FBaseAnalyzer::RetriveUAssetFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileE
 	}
 }
 
-void FBaseAnalyzer::InsertClassInfo(FPakTreeEntryPtr InRoot, FName InClassName, int32 InFileCount, int64 InSize, int64 InCompressedSize)
+void FBaseAnalyzer::InsertClassInfo(FPakTreeEntryPtr InTreeRoot, FPakTreeEntryPtr InRoot, FName InClassName, int32 InFileCount, int64 InSize, int64 InCompressedSize)
 {
 	FPakClassEntryPtr* ClassEntryPtr = InRoot->FileClassMap.Find(InClassName);
 	FPakClassEntryPtr ClassEntry = nullptr;
@@ -384,7 +376,7 @@ void FBaseAnalyzer::InsertClassInfo(FPakTreeEntryPtr InRoot, FName InClassName, 
 		ClassEntry->CompressedSize += InCompressedSize;
 	}
 
-	ClassEntry->PercentOfTotal = TreeRoot->CompressedSize > 0 ? (float)ClassEntry->CompressedSize / TreeRoot->CompressedSize : 0.f;
+	ClassEntry->PercentOfTotal = InTreeRoot->CompressedSize > 0 ? (float)ClassEntry->CompressedSize / InTreeRoot->CompressedSize : 0.f;
 	ClassEntry->PercentOfParent = InRoot->CompressedSize > 0 ? (float)ClassEntry->CompressedSize / InRoot->CompressedSize : 0.f;
 }
 
@@ -427,25 +419,32 @@ void FBaseAnalyzer::Reset()
 {
 	LoadGuid.Invalidate();
 
-	PakFileSumary.MountPoint = TEXT("");
-	PakFileSumary.PakInfo = FPakInfo();
-	PakFileSumary.PakFilePath = TEXT("");
-	PakFileSumary.PakFileSize = 0;
-	PakFileSumary.CompressionMethods = TEXT("");
-	PakFileSumary.AssetRegistryPath = TEXT("");
+	for (FPakFileSumaryPtr Summary : PakFileSummaries)
+	{
+		Summary.Reset();
+	}
 
-	TreeRoot.Reset();
+	for (FPakTreeEntryPtr Root : PakTreeRoots)
+	{
+		Root.Reset();
+	}
+
+	PakFileSummaries.Empty();
+	PakTreeRoots.Empty();
+
 	AssetRegistryState.Reset();
 
 	bHasPakLoaded = false;
+
+	AssetRegistryPath = TEXT("");
 }
 
-FString FBaseAnalyzer::ResolveCompressionMethod(const FPakEntry* InPakEntry) const
+FString FBaseAnalyzer::ResolveCompressionMethod(const FPakFileSumary& Summary, const FPakEntry* InPakEntry) const
 {
 #if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 22
-	if (InPakEntry->CompressionMethodIndex >= 0 && InPakEntry->CompressionMethodIndex < (uint32)PakFileSumary.PakInfo.CompressionMethods.Num())
+	if (InPakEntry->CompressionMethodIndex >= 0 && InPakEntry->CompressionMethodIndex < (uint32)Summary.PakInfo.CompressionMethods.Num())
 	{
-		return PakFileSumary.PakInfo.CompressionMethods[InPakEntry->CompressionMethodIndex].ToString();
+		return Summary.PakInfo.CompressionMethods[InPakEntry->CompressionMethodIndex].ToString();
 	}
 	else
 	{
@@ -465,7 +464,7 @@ FString FBaseAnalyzer::ResolveCompressionMethod(const FPakEntry* InPakEntry) con
 #endif
 }
 
-FPakTreeEntryPtr FBaseAnalyzer::InsertFileToTree(const FString& InFullPath, const FPakEntry& InPakEntry)
+FPakTreeEntryPtr FBaseAnalyzer::InsertFileToTree(FPakTreeEntryPtr InRoot, const FPakFileSumary& Summary, const FString& InFullPath, const FPakEntry& InPakEntry)
 {
 	static const TCHAR* Delims[2] = { TEXT("\\"), TEXT("/") };
 
@@ -478,7 +477,7 @@ FPakTreeEntryPtr FBaseAnalyzer::InsertFileToTree(const FString& InFullPath, cons
 	}
 
 	FString CurrentPath;
-	FPakTreeEntryPtr Parent = TreeRoot;
+	FPakTreeEntryPtr Parent = InRoot;
 
 	for (int32 i = 0; i < PathItems.Num(); ++i)
 	{
@@ -498,8 +497,8 @@ FPakTreeEntryPtr FBaseAnalyzer::InsertFileToTree(const FString& InFullPath, cons
 			if (bLastItem)
 			{
 				NewChild->PakEntry = InPakEntry;
-				NewChild->CompressionMethod = *ResolveCompressionMethod(&InPakEntry);
-				NewChild->PackagePath = GetPackagePath(PakFileSumary.MountPoint / CurrentPath);
+				NewChild->CompressionMethod = *ResolveCompressionMethod(Summary, &InPakEntry);
+				NewChild->PackagePath = GetPackagePath(CurrentPath);
 			}
 
 			Parent->ChildrenMap.Add(*PathItems[i], NewChild);
