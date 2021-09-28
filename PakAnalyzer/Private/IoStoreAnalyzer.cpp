@@ -124,6 +124,10 @@ bool FIoStoreAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TAr
 			}
 
 			FileToPackageIndex.Add(FullPath, i);
+			if (!Package.DefaultClassName.IsNone())
+			{
+				DefaultClassMap.Add(Package.PackageName, Package.DefaultClassName);
+			}
 		}
 	}
 
@@ -676,6 +680,12 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 			return;
 		}
 
+		FName MainObjectName = *FPaths::GetBaseFilename(PackageInfo.PackageName.ToString());
+		FName MainClassObjectName = *FString::Printf(TEXT("%s_C"), *MainObjectName.ToString());
+		FName MainObjectClassName = NAME_None;
+		FName MainClassObjectClassName = NAME_None;
+		FName AssetClass = NAME_None;
+
 		for (int32 i = 0; i < PackageInfo.Exports.Num(); ++i)
 		{
 			FIoStoreExport& Export = PackageInfo.Exports[i];
@@ -695,6 +705,39 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 			ObjectExport->DependencyList.SetNum(0);
 
 			PackageInfo.AssetSummary->ObjectExports[i] = ObjectExport;
+
+			FName ObjectClass = *FPaths::GetBaseFilename(ObjectExport->ClassName.ToString());
+			FName ObjectName = *FPaths::GetBaseFilename(ObjectExport->ObjectPath.ToString());
+			if (ObjectName == MainObjectName)
+			{
+				MainObjectClassName = ObjectClass;
+			}
+			else if (ObjectName == MainClassObjectName)
+			{
+				MainClassObjectClassName = ObjectClass;
+			}
+
+			if (ObjectExport->bIsAsset)
+			{
+				AssetClass = ObjectClass;
+			}
+		}
+
+		if (MainObjectClassName == NAME_None && MainClassObjectClassName == NAME_None)
+		{
+			if (PackageInfo.AssetSummary->ObjectExports.Num() == 1)
+			{
+				MainObjectClassName = *FPaths::GetBaseFilename(PackageInfo.AssetSummary->ObjectExports[0]->ClassName.ToString());
+			}
+			else if (!AssetClass.IsNone())
+			{
+				MainObjectClassName = AssetClass;
+			}
+		}
+
+		if (MainObjectClassName != NAME_None || MainClassObjectClassName != NAME_None)
+		{
+			PackageInfo.DefaultClassName = MainObjectClassName != NAME_None ? MainObjectClassName : MainClassObjectClassName;
 		}
 
 		for (int32 i = 0; i < PackageInfo.Imports.Num(); ++i)

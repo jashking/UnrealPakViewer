@@ -253,6 +253,7 @@ uint32 FAssetParseThreadWorker::Run()
 			FName MainClassObjectName = *FString::Printf(TEXT("%s_C"), *MainObjectName.ToString());
 			FName MainObjectClassName = NAME_None;
 			FName MainClassObjectClassName = NAME_None;
+			FName AssetClass = NAME_None;
 
 			// Parse Export Object Path
 			for (int32 i = 0; i < File->AssetSummary->ObjectExports.Num(); ++i)
@@ -274,11 +275,23 @@ uint32 FAssetParseThreadWorker::Run()
 				{
 					MainClassObjectClassName = ExportEx->ClassName;
 				}
+
+				if (ExportEx->bIsAsset)
+				{
+					AssetClass = ExportEx->ClassName;
+				}
 			}
-			
-			if (MainObjectClassName == NAME_None && MainClassObjectClassName == NAME_None && File->AssetSummary->ObjectExports.Num() == 1)
+
+			if (MainObjectClassName == NAME_None && MainClassObjectClassName == NAME_None)
 			{
-				MainObjectClassName = File->AssetSummary->ObjectExports[0]->ClassName;
+				if (File->AssetSummary->ObjectExports.Num() == 1)
+				{
+					MainObjectClassName = File->AssetSummary->ObjectExports[0]->ClassName;
+				}
+				else if (!AssetClass.IsNone())
+				{
+					MainObjectClassName = AssetClass;
+				}
 			}
 
 			if (MainObjectClassName != NAME_None || MainClassObjectClassName != NAME_None)

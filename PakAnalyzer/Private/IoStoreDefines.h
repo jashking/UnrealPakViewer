@@ -279,6 +279,7 @@ struct FStorePackageInfo
 	TArray<FIoStoreExport> Exports;
 	FAssetSummaryPtr AssetSummary;
 	TArray<FPackageId> DependencyPackages;
+	FName DefaultClassName;
 
 	inline bool operator ==(const FStorePackageInfo& Rhs) const
 	{
