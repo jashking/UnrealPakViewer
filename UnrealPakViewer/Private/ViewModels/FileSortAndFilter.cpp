@@ -41,15 +41,14 @@ void FFileSortAndFilterTask::DoWork()
 		Result = MoveTemp(FilterResult);
 	}
 
-	OnWorkFinished.ExecuteIfBound(CurrentSortedColumn, CurrentSortMode, CurrentSearchText, CurrentLoadGuid);
+	OnWorkFinished.ExecuteIfBound(CurrentSortedColumn, CurrentSortMode, CurrentSearchText);
 }
 
-void FFileSortAndFilterTask::SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid, const TMap<FName, bool>& InClassFilterMap, const TMap<int32, bool>& InIndexFilterMap)
+void FFileSortAndFilterTask::SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const TMap<FName, bool>& InClassFilterMap, const TMap<int32, bool>& InIndexFilterMap)
 {
 	CurrentSortedColumn = InSortedColumn;
 	CurrentSortMode = InSortMode;
 	CurrentSearchText = InSearchText;
-	CurrentLoadGuid = InLoadGuid;
 	ClassFilterMap = InClassFilterMap;
 	IndexFilterMap = InIndexFilterMap;
 }

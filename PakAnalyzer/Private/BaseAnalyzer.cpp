@@ -22,6 +22,7 @@ FBaseAnalyzer::~FBaseAnalyzer()
 
 bool FBaseAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys)
 {
+	Reset();
 	return false;
 }
 
@@ -35,16 +36,6 @@ void FBaseAnalyzer::GetFiles(const FString& InFilterText, const TMap<FName, bool
 	}
 }
 
-FString FBaseAnalyzer::GetLastLoadGuid() const
-{
-	return LoadGuid.ToString();
-}
-
-bool FBaseAnalyzer::IsLoadDirty(const FString& InGuid) const
-{
-	return !InGuid.Equals(LoadGuid.ToString(), ESearchCase::IgnoreCase) && LoadGuid.IsValid();
-}
-
 const TArray<FPakFileSumaryPtr>& FBaseAnalyzer::GetPakFileSumary() const
 {
 	return PakFileSummaries;
@@ -55,18 +46,8 @@ const TArray<FPakTreeEntryPtr>& FBaseAnalyzer::GetPakTreeRootNode() const
 	return PakTreeRoots;
 }
 
-bool FBaseAnalyzer::HasPakLoaded() const
-{
-	return bHasPakLoaded;
-}
-
 bool FBaseAnalyzer::LoadAssetRegistry(const FString& InRegristryPath)
 {
-	if (!bHasPakLoaded)
-	{
-		return false;
-	}
-
 	FArrayReader ContentReader;
 	if (!FFileHelper::LoadFileToArray(ContentReader, *InRegristryPath))
 	{
@@ -83,6 +64,7 @@ bool FBaseAnalyzer::LoadAssetRegistry(const FString& InRegristryPath)
 	for (FPakTreeEntryPtr TreeRoot : PakTreeRoots)
 	{
 		RefreshClassMap(TreeRoot, TreeRoot);
+		RefreshPackageDependency(TreeRoot, TreeRoot);
 	}
 	
 	return true;
@@ -91,7 +73,9 @@ bool FBaseAnalyzer::LoadAssetRegistry(const FString& InRegristryPath)
 bool FBaseAnalyzer::LoadAssetRegistry(FArrayReader& InData)
 {
 	FAssetRegistrySerializationOptions LoadOptions;
-	LoadOptions.bSerializeDependencies = false;
+	LoadOptions.bSerializeDependencies = true;
+	LoadOptions.bSerializeSearchableNameDependencies = true;
+	LoadOptions.bSerializeManageDependencies = true;
 	LoadOptions.bSerializePackageData = false;
 
 	TSharedPtr<FAssetRegistryState> NewAssetRegistryState = MakeShared<FAssetRegistryState>();
@@ -102,6 +86,76 @@ bool FBaseAnalyzer::LoadAssetRegistry(FArrayReader& InData)
 	}
 
 	return false;
+}
+
+void FBaseAnalyzer::RefreshPackageDependency(FPakTreeEntryPtr InTreeRoot, FPakTreeEntryPtr InRoot)
+{
+	if (!AssetRegistryState.IsValid())
+	{
+		return;
+	}
+
+	for (auto& Pair : InRoot->ChildrenMap)
+	{
+		FPakTreeEntryPtr Child = Pair.Value;
+
+		if (Child->bIsDirectory)
+		{
+			RefreshPackageDependency(InTreeRoot, Child);
+		}
+		else
+		{
+			TArray<FAssetIdentifier> Dependencies;
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
+			if (AssetRegistryState->GetDependencies(Child->PackagePath, Dependencies, UE::AssetRegistry::EDependencyCategory::All))
+#else
+			if (AssetRegistryState->GetDependencies(Child->PackagePath, Dependencies, EAssetRegistryDependencyType::All))
+#endif
+			{
+				if (!Child->AssetSummary.IsValid())
+				{
+					Child->AssetSummary = MakeShared<FAssetSummary>();
+				}
+				else
+				{
+					Child->AssetSummary->DependencyList.Empty();
+				}
+
+				for (const FAssetIdentifier& Identifier : Dependencies)
+				{
+					FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
+					Depends->PackageName = Identifier.PackageName;
+
+					Child->AssetSummary->DependencyList.Add(Depends);
+				}
+			}
+
+			TArray<FAssetIdentifier> Dependents;
+#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
+			if (AssetRegistryState->GetReferencers(Child->PackagePath, Dependents, UE::AssetRegistry::EDependencyCategory::All))
+#else
+			if (AssetRegistryState->GetReferencers(Child->PackagePath, Dependents, EAssetRegistryDependencyType::All))
+#endif
+			{
+				if (!Child->AssetSummary.IsValid())
+				{
+					Child->AssetSummary = MakeShared<FAssetSummary>();
+				}
+				else
+				{
+					Child->AssetSummary->DependentList.Empty();
+				}
+
+				for (const FAssetIdentifier& Identifier : Dependents)
+				{
+					FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
+					Depends->PackageName = Identifier.PackageName;
+
+					Child->AssetSummary->DependentList.Add(Depends);
+				}
+			}
+		}
+	}
 }
 
 bool FBaseAnalyzer::ExportToJson(const FString& InOutputPath, const TArray<FPakFileEntryPtr>& InFiles)
@@ -262,7 +316,6 @@ void FBaseAnalyzer::RefreshClassMap(FPakTreeEntryPtr InTreeRoot, FPakTreeEntryPt
 		{
 			Child->Class = GetAssetClass(Child->Path, Child->PackagePath);
 			InsertClassInfo(InTreeRoot, InRoot, Child->Class, 1, Child->Size, Child->CompressedSize);
-
 		}
 	}
 }
@@ -382,6 +435,7 @@ void FBaseAnalyzer::InsertClassInfo(FPakTreeEntryPtr InTreeRoot, FPakTreeEntryPt
 
 FName FBaseAnalyzer::GetAssetClass(const FString& InFilename, FName InPackagePath)
 {
+	bool bFoundClassInRegistry = false;
 	FName AssetClass = *FPaths::GetExtension(InFilename);
 	if (AssetRegistryState.IsValid())
 	{
@@ -392,7 +446,17 @@ FName FBaseAnalyzer::GetAssetClass(const FString& InFilename, FName InPackagePat
 #endif
 		if (AssetDataArray.Num() > 0)
 		{
+			bFoundClassInRegistry = true;
 			AssetClass = AssetDataArray[0]->AssetClass;
+		}
+	}
+	
+	if (!bFoundClassInRegistry)
+	{
+		const FName* ClassName = DefaultClassMap.Find(InPackagePath);
+		if (ClassName)
+		{
+			AssetClass = *ClassName;
 		}
 	}
 
@@ -407,7 +471,10 @@ FName FBaseAnalyzer::GetPackagePath(const FString& InFilePath)
 		const FString Prefix = FPaths::GetPathLeaf(Left);
 		const bool bNotUseGamePrefix = Prefix == TEXT("Engine") || InFilePath.Contains(TEXT("Plugin"));
 
-		return *FPaths::SetExtension(bNotUseGamePrefix ? TEXT("/") / Prefix / Right : TEXT("/Game") / Right, TEXT(""));
+		const FString RemoveFirstExtension = FPaths::SetExtension(Right, TEXT(""));
+		const FString RemoveSecondExtension = FPaths::SetExtension(RemoveFirstExtension, TEXT(""));
+
+		return *FString(bNotUseGamePrefix ? TEXT("/") / Prefix / RemoveSecondExtension : TEXT("/Game") / RemoveSecondExtension);
 	}
 	else
 	{
@@ -417,8 +484,6 @@ FName FBaseAnalyzer::GetPackagePath(const FString& InFilePath)
 
 void FBaseAnalyzer::Reset()
 {
-	LoadGuid.Invalidate();
-
 	for (FPakFileSumaryPtr Summary : PakFileSummaries)
 	{
 		Summary.Reset();
@@ -434,9 +499,8 @@ void FBaseAnalyzer::Reset()
 
 	AssetRegistryState.Reset();
 
-	bHasPakLoaded = false;
-
 	AssetRegistryPath = TEXT("");
+	DefaultClassMap.Empty();
 }
 
 FString FBaseAnalyzer::ResolveCompressionMethod(const FPakFileSumary& Summary, const FPakEntry* InPakEntry) const

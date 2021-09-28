@@ -17,10 +17,14 @@ public:
 	DECLARE_DELEGATE_OneParam(FOnLoadPakFailed, const FString&)
 	DECLARE_DELEGATE_ThreeParams(FOnUpdateExtractProgress, int32 /*CompleteCount*/, int32 /*ErrorCount*/, int32 /*TotalCount*/);
 	DECLARE_DELEGATE(FOnExtractStart);
+	DECLARE_MULTICAST_DELEGATE(FOnAssetParseFinish);
+	DECLARE_MULTICAST_DELEGATE(FOnPakLoadFinish);
 
 public:
 	static FOnGetAESKey OnGetAESKey;
 	static FOnLoadPakFailed OnLoadPakFailed;
 	static FOnUpdateExtractProgress OnUpdateExtractProgress;
 	static FOnExtractStart OnExtractStart;
-}; 
+	static FOnAssetParseFinish OnAssetParseFinish;
+	static FOnPakLoadFinish OnPakLoadFinish;
+};

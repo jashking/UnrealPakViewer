@@ -53,9 +53,6 @@ bool FFolderAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArr
 
 	Reset();
 
-	// Generate unique id
-	LoadGuid = FGuid::NewGuid();
-
 	FPakFileSumaryPtr Summary = MakeShared<FPakFileSumary>();
 	PakFileSummaries.Add(Summary);
 
@@ -98,18 +95,19 @@ bool FFolderAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArr
 
 	RefreshTreeNode(TreeRoot);
 	RefreshTreeNodeSizePercent(TreeRoot, TreeRoot);
-	ParseAssetFile(TreeRoot);
 
 	PakTreeRoots.Add(TreeRoot);
-
-	bHasPakLoaded = true;
 
 	if (!AssetRegistryPath.IsEmpty())
 	{
 		LoadAssetRegistry(AssetRegistryPath);
 	}
 
+	ParseAssetFile(TreeRoot);
+
 	UE_LOG(LogPakAnalyzer, Log, TEXT("Finish load pak file: %s."), *InPakPath);
+
+	FPakAnalyzerDelegates::OnPakLoadFinish.Broadcast();
 
 	return true;
 }
@@ -146,6 +144,7 @@ void FFolderAnalyzer::InitializeAssetParseWorker()
 	{
 		AssetParseWorker = MakeShared<FAssetParseThreadWorker>();
 		AssetParseWorker->OnReadAssetContent.BindRaw(this, &FFolderAnalyzer::OnReadAssetContent);
+		AssetParseWorker->OnParseFinish.BindRaw(this, &FFolderAnalyzer::OnAssetParseFinish);
 	}
 }
 
@@ -169,4 +168,29 @@ void FFolderAnalyzer::OnReadAssetContent(FPakFileEntryPtr InFile, bool& bOutSucc
 
 	const FString FilePath = PakFileSummaries[0]->MountPoint / InFile->Path;
 	bOutSuccess = FFileHelper::LoadFileToArray(OutContent, *FilePath);
+}
+
+void FFolderAnalyzer::OnAssetParseFinish(bool bCancel, const TMap<FName, FName>& ClassMap)
+{
+	if (bCancel)
+	{
+		return;
+	}
+
+	DefaultClassMap = ClassMap;
+	const bool bRefreshClass = ClassMap.Num() > 0;
+
+	FFunctionGraphTask::CreateAndDispatchWhenReady([this, bRefreshClass]()
+		{
+			if (bRefreshClass)
+			{
+				for (const FPakTreeEntryPtr& PakTreeRoot : PakTreeRoots)
+				{
+					RefreshClassMap(PakTreeRoot, PakTreeRoot);
+				}
+			}
+
+			FPakAnalyzerDelegates::OnAssetParseFinish.Broadcast();
+		},
+		TStatId(), nullptr, ENamedThreads::GameThread);
 }

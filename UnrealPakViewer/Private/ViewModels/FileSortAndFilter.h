@@ -7,7 +7,7 @@
 
 #include "PakFileEntry.h"
 
-DECLARE_DELEGATE_FourParams(FOnSortAndFilterFinished, const FName, EColumnSortMode::Type, const FString&, const FString&);
+DECLARE_DELEGATE_ThreeParams(FOnSortAndFilterFinished, const FName, EColumnSortMode::Type, const FString&);
 
 class SPakFileView;
 
@@ -18,14 +18,13 @@ public:
 		: CurrentSortedColumn(InSortedColumn)
 		, CurrentSortMode(InSortMode)
 		, CurrentSearchText(TEXT(""))
-		, CurrentLoadGuid(TEXT(""))
 		, WeakPakFileView(InPakFileView)
 	{
 
 	}
 
 	void DoWork();
-	void SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid, const TMap<FName, bool>& InClassFilterMap, const TMap<int32, bool>& InIndexFilterMap);
+	void SetWorkInfo(FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const TMap<FName, bool>& InClassFilterMap, const TMap<int32, bool>& InIndexFilterMap);
 	FOnSortAndFilterFinished& GetOnSortAndFilterFinishedDelegate() { return OnWorkFinished; }
 
 	FORCEINLINE TStatId GetStatId() const
@@ -39,7 +38,6 @@ protected:
 	FName CurrentSortedColumn;
 	EColumnSortMode::Type CurrentSortMode;
 	FString CurrentSearchText;
-	FString CurrentLoadGuid;
 
 	/** Shared pointer to parent PakFileView widget. Used for accesing the cache and to check if cancel is requested. */
 	TWeakPtr<SPakFileView> WeakPakFileView;

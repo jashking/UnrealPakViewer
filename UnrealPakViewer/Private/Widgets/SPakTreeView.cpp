@@ -12,6 +12,7 @@
 #include "Widgets/Notifications/SProgressBar.h"
 #include "Widgets/SOverlay.h"
 
+#include "CommonDefines.h"
 #include "PakAnalyzerModule.h"
 #include "SKeyValueRow.h"
 #include "SPakClassView.h"
@@ -24,11 +25,15 @@
 SPakTreeView::SPakTreeView()
 {
 	FWidgetDelegates::GetOnLoadAssetRegistryFinishedDelegate().AddRaw(this, &SPakTreeView::OnLoadAssetReigstryFinished);
+	FPakAnalyzerDelegates::OnPakLoadFinish.AddRaw(this, &SPakTreeView::OnLoadPakFinished);
+	FPakAnalyzerDelegates::OnAssetParseFinish.AddRaw(this, &SPakTreeView::OnParseAssetFinished);
 }
 
 SPakTreeView::~SPakTreeView()
 {
 	FWidgetDelegates::GetOnLoadAssetRegistryFinishedDelegate().RemoveAll(this);
+	FPakAnalyzerDelegates::OnPakLoadFinish.RemoveAll(this);
+	FPakAnalyzerDelegates::OnAssetParseFinish.RemoveAll(this);
 }
 
 void SPakTreeView::Construct(const FArguments& InArgs)
@@ -192,28 +197,10 @@ void SPakTreeView::Construct(const FArguments& InArgs)
 			]
 		]
 	];
-
-	LastLoadGuid = LexToString(FGuid());
 }
 
 void SPakTreeView::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 {
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-
-	if (PakAnalyzer && (bIsDirty || PakAnalyzer->IsLoadDirty(LastLoadGuid)))
-	{
-		bIsDirty = false;
-		LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
-
-		TreeNodes.Empty();
-		TreeNodes = PakAnalyzer->GetPakTreeRootNode();
-
-		if (TreeView.IsValid())
-		{
-			TreeView->RequestTreeRefresh();
-		}
-	}
-
 	if (!DelayHighlightItem.IsEmpty())
 	{
 		ExpandTreeItem(DelayHighlightItem, DelayHighlightItemPakIndex);
@@ -723,13 +710,36 @@ void SPakTreeView::RetriveFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileEntryPtr
 	}
 }
 
+void SPakTreeView::OnLoadPakFinished()
+{
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+
+	TreeNodes.Empty();
+	if (PakAnalyzer)
+	{
+		TreeNodes = PakAnalyzer->GetPakTreeRootNode();
+	}
+
+	if (TreeView.IsValid())
+	{
+		TreeView->RequestTreeRefresh();
+	}
+}
+
 void SPakTreeView::OnLoadAssetReigstryFinished()
 {
-	bIsDirty = true;
-	//if (CurrentSelectedItem.IsValid() && CurrentSelectedItem->bIsDirectory)
-	//{
-	//	ClassView->Reload(CurrentSelectedItem);
-	//}
+	if (TreeView.IsValid())
+	{
+		TreeView->RequestTreeRefresh();
+	}
+}
+
+void SPakTreeView::OnParseAssetFinished()
+{
+	if (TreeView.IsValid())
+	{
+		TreeView->RequestTreeRefresh();
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -102,7 +102,7 @@ protected:
 	void OnJumpToTreeViewExecute();
 
 	void MarkDirty(bool bInIsDirty);
-	void OnSortAndFilterFinihed(const FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid);
+	void OnSortAndFilterFinihed(const FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText);
 
 	FText GetFileCount() const;
 
@@ -115,6 +115,8 @@ protected:
 	void ScrollToItem(const FString& InPath, int32 PakIndex);
 
 	void OnLoadAssetReigstryFinished();
+	void OnLoadPakFinished();
+	void OnParseAssetFinished();
 
 	void FillFilesSummary();
 	bool GetSelectedItems(TArray<FPakFileEntryPtr>& OutSelectedItems) const;
@@ -144,8 +146,6 @@ protected:
 	FString CurrentSearchText;
 
 	bool bIsDirty = false;
-
-	FString LastLoadGuid;
 
 	FString DelayHighlightItem;
 	int32 DelayHighlightItemPakIndex = -1;

@@ -70,15 +70,12 @@ bool FIoStoreAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TAr
 
 	if (!InitializeReaders(UcasFiles, DefaultAESKeys))
 	{
-		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Read iostore files failed!")));
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Read iostore files failed!"));
-		return false;
 	}
 
 	if (StoreContainers.Num() <= 0)
 	{
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Read iostore files failed! Create containers failed!"));
-		return false;
 	}
 
 	// Make tree roots
@@ -130,9 +127,6 @@ bool FIoStoreAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TAr
 		}
 	}
 
-	// Generate unique id
-	LoadGuid = FGuid::NewGuid();
-
 	for (const FPakTreeEntryPtr TreeRoot : PakTreeRoots)
 	{
 		RefreshTreeNode(TreeRoot);
@@ -140,9 +134,9 @@ bool FIoStoreAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TAr
 		RefreshClassMap(TreeRoot, TreeRoot);
 	}
 
-	bHasPakLoaded = true;
-
 	UE_LOG(LogPakAnalyzer, Log, TEXT("Finish load iostore file count: %d."), UcasFiles.Num());
+
+	FPakAnalyzerDelegates::OnPakLoadFinish.Broadcast();
 
 	return true;
 }

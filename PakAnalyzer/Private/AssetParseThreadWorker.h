@@ -7,7 +7,9 @@
 #include "Misc/Guid.h"
 #include "PakFileEntry.h"
 
+typedef TMap<FName, FName> ClassTypeMap;
 DECLARE_DELEGATE_ThreeParams(FOnReadAssetContent, FPakFileEntryPtr /*InFile*/, bool& /*bOutSuccess*/, TArray<uint8>& /*OutContent*/);
+DECLARE_DELEGATE_TwoParams(FOnParseFinish, bool/* bCancel*/, const ClassTypeMap&/* ClassMap*/);
 
 class FAssetParseThreadWorker : public FRunnable
 {
@@ -25,6 +27,7 @@ public:
 	void StartParse(TArray<FPakFileEntryPtr>& InFiles, TArray<FPakFileSumary>& InSummaries);
 
 	FOnReadAssetContent OnReadAssetContent;
+	FOnParseFinish OnParseFinish;
 
 protected:
 	bool ParseObjectName(const TArray<FObjectImport>& Imports, const TArray<FObjectExport>& Exports, FPackageIndex Index, FName& OutObjectName);

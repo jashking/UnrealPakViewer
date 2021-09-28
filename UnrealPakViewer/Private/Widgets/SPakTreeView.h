@@ -83,7 +83,9 @@ protected:
 
 	void RetriveFiles(FPakTreeEntryPtr InRoot, TArray<FPakFileEntryPtr>& OutFiles);
 
+	void OnLoadPakFinished();
 	void OnLoadAssetReigstryFinished();
+	void OnParseAssetFinished();
 
 protected:
 	TSharedPtr<STreeView<FPakTreeEntryPtr>> TreeView;
@@ -91,8 +93,6 @@ protected:
 
 	/** The root node(s) of the tree. */
 	TArray<FPakTreeEntryPtr> TreeNodes;
-
-	FString LastLoadGuid;
 
 	TSharedPtr<SVerticalBox> KeyValueBox;
 	TSharedPtr<SKeyValueRow> OffsetRow;
@@ -109,6 +109,4 @@ protected:
 
 	FString DelayHighlightItem;
 	int32 DelayHighlightItemPakIndex = -1;
-
-	bool bIsDirty = false;
 };

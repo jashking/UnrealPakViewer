@@ -88,14 +88,17 @@ bool FAssetParseThreadWorker::Init()
 
 uint32 FAssetParseThreadWorker::Run()
 {
+	UE_LOG(LogPakAnalyzer, Display, TEXT("Asset parse worker starts."));
+
 	FCriticalSection Mutex;
 	const static bool bForceSingleThread = false;
 	const int32 TotalCount = Files.Num();
 	
 	TMultiMap<FName, FName> DependsMap;
+	TMap<FName, FName> ClassMap;
 
 	// Parse assets
-	ParallelFor(TotalCount, [this, &DependsMap, &Mutex](int32 InIndex){
+	ParallelFor(TotalCount, [this, &DependsMap, &ClassMap, &Mutex](int32 InIndex){
 		if (StopTaskCounter.GetValue() > 0)
 		{
 			return;
@@ -246,6 +249,11 @@ uint32 FAssetParseThreadWorker::Run()
 			}
 			File->AssetSummary->ObjectImports.Shrink();
 
+			FName MainObjectName = *FPaths::GetBaseFilename(File->Filename.ToString());
+			FName MainClassObjectName = *FString::Printf(TEXT("%s_C"), *MainObjectName.ToString());
+			FName MainObjectClassName = NAME_None;
+			FName MainClassObjectClassName = NAME_None;
+
 			// Parse Export Object Path
 			for (int32 i = 0; i < File->AssetSummary->ObjectExports.Num(); ++i)
 			{
@@ -256,8 +264,30 @@ uint32 FAssetParseThreadWorker::Run()
 				ParseObjectName(Imports, Exports, Export.ClassIndex, ExportEx->ClassName);
 				ParseObjectName(Imports, Exports, Export.TemplateIndex, ExportEx->TemplateObject);
 				ParseObjectName(Imports, Exports, Export.SuperIndex, ExportEx->Super);
+
+				FName ObjectName = *FPaths::GetBaseFilename(ExportEx->ObjectPath.ToString());
+				if (ObjectName == MainObjectName)
+				{
+					MainObjectClassName = ExportEx->ClassName;
+				}
+				else if (ObjectName == MainClassObjectName)
+				{
+					MainClassObjectClassName = ExportEx->ClassName;
+				}
 			}
 			
+			if (MainObjectClassName == NAME_None && MainClassObjectClassName == NAME_None && File->AssetSummary->ObjectExports.Num() == 1)
+			{
+				MainObjectClassName = File->AssetSummary->ObjectExports[0]->ClassName;
+			}
+
+			if (MainObjectClassName != NAME_None || MainClassObjectClassName != NAME_None)
+			{
+				FScopeLock ScopeLock(&Mutex);
+				ClassMap.Add(File->PackagePath, MainObjectClassName != NAME_None ? MainObjectClassName : MainClassObjectClassName);
+			}
+
+			const bool bFillDependency = File->AssetSummary->DependencyList.Num() <= 0;
 			for (int32 i = 0; i < File->AssetSummary->ObjectImports.Num(); ++i)
 			{
 				const FObjectImport& Import = Imports[i];
@@ -265,7 +295,7 @@ uint32 FAssetParseThreadWorker::Run()
 
 				ImportEx->ObjectPath = *FindFullPath(Imports, i);
 
-				if (Import.ClassName == "Package" && !ImportEx->ObjectPath.ToString().StartsWith(TEXT("/Script")))
+				if (bFillDependency && Import.ClassName == "Package" && !ImportEx->ObjectPath.ToString().StartsWith(TEXT("/Script")))
 				{
 					FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
 					Depends->PackageName = ImportEx->ObjectPath;
@@ -366,6 +396,10 @@ uint32 FAssetParseThreadWorker::Run()
 		}
 
 		FPakFileEntryPtr File = Files[InIndex];
+		if (File->AssetSummary->DependentList.Num() > 0)
+		{
+			return;
+		}
 
 		TArray<FName> Assets;
 		DependsMap.MultiFind(File->PackagePath, Assets);
@@ -379,7 +413,12 @@ uint32 FAssetParseThreadWorker::Run()
 		File->AssetSummary->DependentList.Shrink();
 	}, bForceSingleThread);
 
+	OnParseFinish.ExecuteIfBound(StopTaskCounter.GetValue() > 0, ClassMap);
+
 	StopTaskCounter.Reset();
+
+	UE_LOG(LogPakAnalyzer, Display, TEXT("Asset parse worker exits."));
+
 	return 0;
 }
 

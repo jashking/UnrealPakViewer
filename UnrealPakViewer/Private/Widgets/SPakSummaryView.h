@@ -22,11 +22,10 @@ public:
 	/** Constructs this widget. */
 	void Construct(const FArguments& InArgs);
 
-	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
-
 protected:
 	FORCEINLINE FText GetAssetRegistryPath() const;
 
+	void OnLoadPakFinished();
 	FReply OnLoadAssetRegistry();
 
 	TSharedRef<ITableRow> OnGenerateSummaryRow(FPakFileSumaryPtr InSummary, const TSharedRef<class STableViewBase>& OwnerTable);
@@ -34,5 +33,4 @@ protected:
 protected:
 	TSharedPtr<SListView<FPakFileSumaryPtr>> SummaryListView;
 	TArray<FPakFileSumaryPtr> Summaries;
-	FString LastLoadGuid;
 };

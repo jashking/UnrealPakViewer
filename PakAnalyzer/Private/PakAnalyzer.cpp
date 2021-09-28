@@ -211,16 +211,18 @@ bool FPakAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<
 		}
 	}
 
-	for (const FPakTreeEntryPtr& PakTreeRoot : PakTreeRoots)
+	if (!AssetRegistryPath.IsEmpty())
 	{
-		RefreshClassMap(PakTreeRoot, PakTreeRoot);
+		for (const FPakTreeEntryPtr& PakTreeRoot : PakTreeRoots)
+		{
+			RefreshClassMap(PakTreeRoot, PakTreeRoot);
+			RefreshPackageDependency(PakTreeRoot, PakTreeRoot);
+		}
 	}
 
 	ParseAssetFile();
 
-	// Generate unique id
-	LoadGuid = FGuid::NewGuid();
-	bHasPakLoaded = true;
+	FPakAnalyzerDelegates::OnPakLoadFinish.Broadcast();
 
 	return true;
 }
@@ -585,6 +587,7 @@ void FPakAnalyzer::InitializeAssetParseWorker()
 	if (!AssetParseWorker.IsValid())
 	{
 		AssetParseWorker = MakeShared<FAssetParseThreadWorker>();
+		AssetParseWorker->OnParseFinish.BindRaw(this, &FPakAnalyzer::OnAssetParseFinish);
 	}
 }
 
@@ -594,6 +597,31 @@ void FPakAnalyzer::ShutdownAssetParseWorker()
 	{
 		AssetParseWorker->Shutdown();
 	}
+}
+
+void FPakAnalyzer::OnAssetParseFinish(bool bCancel, const TMap<FName, FName>& ClassMap)
+{
+	if (bCancel)
+	{
+		return;
+	}
+
+	DefaultClassMap = ClassMap;
+	const bool bRefreshClass = ClassMap.Num() > 0;
+
+	FFunctionGraphTask::CreateAndDispatchWhenReady([this, bRefreshClass]()
+		{
+			if (bRefreshClass)
+			{
+				for (const FPakTreeEntryPtr& PakTreeRoot : PakTreeRoots)
+				{
+					RefreshClassMap(PakTreeRoot, PakTreeRoot);
+				}
+			}
+
+			FPakAnalyzerDelegates::OnAssetParseFinish.Broadcast();
+		},
+		TStatId(), nullptr, ENamedThreads::GameThread);
 }
 
 void FPakAnalyzer::OnUpdateExtractProgress(const FGuid& WorkerGuid, int32 CompleteCount, int32 ErrorCount, int32 TotalCount)

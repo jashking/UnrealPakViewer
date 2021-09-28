@@ -9,6 +9,7 @@
 #include "Widgets/Layout/SExpandableArea.h"
 #include "Widgets/Views/STableRow.h"
 
+#include "CommonDefines.h"
 #include "PakAnalyzerModule.h"
 #include "SKeyValueRow.h"
 #include "ViewModels/WidgetDelegates.h"
@@ -110,12 +111,12 @@ protected:
 
 SPakSummaryView::SPakSummaryView()
 {
-
+	FPakAnalyzerDelegates::OnPakLoadFinish.AddRaw(this, &SPakSummaryView::OnLoadPakFinished);
 }
 
 SPakSummaryView::~SPakSummaryView()
 {
-
+	FPakAnalyzerDelegates::OnPakLoadFinish.RemoveAll(this);
 }
 
 void SPakSummaryView::Construct(const FArguments& InArgs)
@@ -214,30 +215,6 @@ void SPakSummaryView::Construct(const FArguments& InArgs)
 			]
 		]
 	];
-
-	LastLoadGuid = LexToString(FGuid());
-}
-
-void SPakSummaryView::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
-{
-	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	if (PakAnalyzer)
-	{
-		const bool bLoadDirty = PakAnalyzer->IsLoadDirty(LastLoadGuid);
-
-		if (bLoadDirty)
-		{
-			LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
-			Summaries = PakAnalyzer->GetPakFileSumary();
-
-			if (SummaryListView.IsValid())
-			{
-				SummaryListView->RebuildList();
-			}
-		}
-	}
-
-	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 }
 
 FORCEINLINE FText SPakSummaryView::GetAssetRegistryPath() const
@@ -247,10 +224,24 @@ FORCEINLINE FText SPakSummaryView::GetAssetRegistryPath() const
 	return PakAnalyzer ? FText::FromString(PakAnalyzer->GetAssetRegistryPath()) : FText();
 }
 
+void SPakSummaryView::OnLoadPakFinished()
+{
+	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
+	if (PakAnalyzer)
+	{
+		Summaries = PakAnalyzer->GetPakFileSumary();
+
+		if (SummaryListView.IsValid())
+		{
+			SummaryListView->RebuildList();
+		}
+	}
+}
+
 FReply SPakSummaryView::OnLoadAssetRegistry()
 {
 	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
-	if (!PakAnalyzer || !PakAnalyzer->HasPakLoaded())
+	if (!PakAnalyzer)
 	{
 		return FReply::Handled();
 	}

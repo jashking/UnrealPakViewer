@@ -6,6 +6,7 @@
 #include "Misc/Paths.h"
 #include "Modules/ModuleManager.h"
 
+#include "BaseAnalyzer.h"
 #include "CommonDefines.h"
 #include "FolderAnalyzer.h"
 #include "PakAnalyzer.h"
@@ -17,6 +18,8 @@ FPakAnalyzerDelegates::FOnGetAESKey FPakAnalyzerDelegates::OnGetAESKey;
 FPakAnalyzerDelegates::FOnLoadPakFailed FPakAnalyzerDelegates::OnLoadPakFailed;
 FPakAnalyzerDelegates::FOnUpdateExtractProgress FPakAnalyzerDelegates::OnUpdateExtractProgress;
 FPakAnalyzerDelegates::FOnExtractStart FPakAnalyzerDelegates::OnExtractStart;
+FPakAnalyzerDelegates::FOnAssetParseFinish FPakAnalyzerDelegates::OnAssetParseFinish;
+FPakAnalyzerDelegates::FOnPakLoadFinish FPakAnalyzerDelegates::OnPakLoadFinish;
 
 class FPakAnalyzerModule : public IPakAnalyzerModule
 {
@@ -36,6 +39,7 @@ IMPLEMENT_MODULE(FPakAnalyzerModule, PakAnalyzer);
 
 void FPakAnalyzerModule::StartupModule()
 {
+	AnalyzerInstance = MakeShared<FBaseAnalyzer>();
 }
 
 void FPakAnalyzerModule::ShutdownModule()

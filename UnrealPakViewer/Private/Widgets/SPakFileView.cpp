@@ -18,6 +18,7 @@
 #include "Widgets/Views/STableRow.h"
 #include "Widgets/Views/STableViewBase.h"
 
+#include "CommonDefines.h"
 #include "PakAnalyzerModule.h"
 #include "UnrealPakViewerStyle.h"
 #include "ViewModels/ClassColumn.h"
@@ -448,11 +449,15 @@ protected:
 SPakFileView::SPakFileView()
 {
 	FWidgetDelegates::GetOnLoadAssetRegistryFinishedDelegate().AddRaw(this, &SPakFileView::OnLoadAssetReigstryFinished);
+	FPakAnalyzerDelegates::OnPakLoadFinish.AddRaw(this, &SPakFileView::OnLoadPakFinished);
+	FPakAnalyzerDelegates::OnAssetParseFinish.AddRaw(this, &SPakFileView::OnParseAssetFinished);
 }
 
 SPakFileView::~SPakFileView()
 {
 	FWidgetDelegates::GetOnLoadAssetRegistryFinishedDelegate().RemoveAll(this);
+	FPakAnalyzerDelegates::OnPakLoadFinish.RemoveAll(this);
+	FPakAnalyzerDelegates::OnAssetParseFinish.RemoveAll(this);
 
 	if (SortAndFilterTask.IsValid())
 	{
@@ -577,8 +582,6 @@ void SPakFileView::Construct(const FArguments& InArgs)
 
 	InnderTask->GetOnSortAndFilterFinishedDelegate().BindRaw(this, &SPakFileView::OnSortAndFilterFinihed);
 
-	LastLoadGuid = LexToString(FGuid());
-
 	FilesSummary = MakeShared<FPakFileEntry>(TEXT("Total"), TEXT("Total"));
 }
 
@@ -587,19 +590,11 @@ void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 	IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 	if (PakAnalyzer)
 	{
-		const bool bLoadDirty = PakAnalyzer->IsLoadDirty(LastLoadGuid);
-
-		if (bIsDirty || bLoadDirty)
+		if (bIsDirty)
 		{
 			if (SortAndFilterTask->IsDone())
 			{
-				if (bLoadDirty)
-				{
-					FillClassesFilter();
-					FillPaksFilter();
-				}
-
-				LastLoadGuid = PakAnalyzer->GetLastLoadGuid();
+				MarkDirty(false);
 
 				TMap<int32, bool> IndexFilterMap;
 				for (int32 i = 0; i < PakFilterMap.Num(); ++i)
@@ -607,7 +602,7 @@ void SPakFileView::Tick(const FGeometry& AllottedGeometry, const double InCurren
 					IndexFilterMap.Add(i, PakFilterMap[i].bShow);
 				}
 
-				InnderTask->SetWorkInfo(CurrentSortedColumn, CurrentSortMode, CurrentSearchText, LastLoadGuid, ClassFilterMap, IndexFilterMap);
+				InnderTask->SetWorkInfo(CurrentSortedColumn, CurrentSortMode, CurrentSearchText, ClassFilterMap, IndexFilterMap);
 				SortAndFilterTask->StartBackgroundTask();
 			}
 		}
@@ -1578,9 +1573,9 @@ void SPakFileView::MarkDirty(bool bInIsDirty)
 	bIsDirty = bInIsDirty;
 }
 
-void SPakFileView::OnSortAndFilterFinihed(const FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText, const FString& InLoadGuid)
+void SPakFileView::OnSortAndFilterFinihed(const FName InSortedColumn, EColumnSortMode::Type InSortMode, const FString& InSearchText)
 {
-	FFunctionGraphTask::CreateAndDispatchWhenReady([this, InLoadGuid, InSearchText]()
+	FFunctionGraphTask::CreateAndDispatchWhenReady([this, InSearchText]()
 		{
 			IPakAnalyzer* PakAnalyzer = IPakAnalyzerModule::Get().GetPakAnalyzer();
 
@@ -1589,15 +1584,10 @@ void SPakFileView::OnSortAndFilterFinihed(const FName InSortedColumn, EColumnSor
 
 			FileListView->RebuildList();
 
-			if (PakAnalyzer->IsLoadDirty(InLoadGuid) || !InSearchText.Equals(CurrentSearchText, ESearchCase::IgnoreCase))
+			if (!InSearchText.Equals(CurrentSearchText, ESearchCase::IgnoreCase))
 			{
-				// Load another pak during sort or filter
 				// Search text changed during sort or filter
 				MarkDirty(true);
-			}
-			else
-			{
-				MarkDirty(false);
 			}
 		},
 		TStatId(), nullptr, ENamedThreads::GameThread);
@@ -1731,6 +1721,21 @@ void SPakFileView::ScrollToItem(const FString& InPath, int32 PakIndex)
 }
 
 void SPakFileView::OnLoadAssetReigstryFinished()
+{
+	FillClassesFilter();
+
+	MarkDirty(true);
+}
+
+void SPakFileView::OnLoadPakFinished()
+{
+	FillClassesFilter();
+	FillPaksFilter();
+
+	MarkDirty(true);
+}
+
+void SPakFileView::OnParseAssetFinished()
 {
 	FillClassesFilter();
 

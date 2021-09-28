@@ -41,6 +41,7 @@ protected:
 	void ParseAssetFile();
 	void InitializeAssetParseWorker();
 	void ShutdownAssetParseWorker();
+	void OnAssetParseFinish(bool bCancel, const TMap<FName, FName>& ClassMap);
 
 	// Extract progress
 	void OnUpdateExtractProgress(const FGuid& WorkerGuid, int32 CompleteCount, int32 ErrorCount, int32 TotalCount);
