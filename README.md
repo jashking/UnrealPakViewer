@@ -30,7 +30,8 @@ After entering the Base64 format of the corresponding AES key, you can open the 
 
 ![LoadAssetRegistry.png](Resources/Images/LoadAssetRegistry.png)
 
-After cooking completes, it will dump resource registry information in *Saved/Cooked/[Platform]/[Project]/Metadata/DevelopmentAssetRegistry.bin*, which contains resource type, reference relationship and other information
+After cooking completes, it will dump resource registry information in *Saved/Cooked/[Platform]/[Project]/Metadata/DevelopmentAssetRegistry.bin*, which contains resource type, reference relationship and other information.
+
 It can be loaded through Load Asset Registry to analyze the size ratio information of each resource type
 
 ### File tree view ###
