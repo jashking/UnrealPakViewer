@@ -24,7 +24,7 @@ SAboutWindow::~SAboutWindow()
 void SAboutWindow::Construct(const FArguments& Args)
 {
 	const float DPIScaleFactor = FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(10.0f, 10.0f);
-	const FVector2D InitialWindowDimensions(360, 70);
+	const FVector2D InitialWindowDimensions(360, 80);
 
 	SWindow::Construct(SWindow::FArguments()
 		.Title(LOCTEXT("WindowTitle", "About"))

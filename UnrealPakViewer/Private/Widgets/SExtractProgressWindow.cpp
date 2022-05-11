@@ -27,7 +27,7 @@ SExtractProgressWindow::~SExtractProgressWindow()
 void SExtractProgressWindow::Construct(const FArguments& Args)
 {
 	const float DPIScaleFactor = FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(10.0f, 10.0f);
-	const FVector2D InitialWindowDimensions(600, 50);
+	const FVector2D InitialWindowDimensions(600, 60);
 
 	SWindow::Construct(SWindow::FArguments()
 		.Title(LOCTEXT("WindowTitle", "Extracting..."))

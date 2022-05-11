@@ -25,7 +25,7 @@ void SKeyInputWindow::Construct(const FArguments& Args)
 	PakGuid = Args._PakGuid;
 
 	const float DPIScaleFactor = FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(10.0f, 10.0f);
-	const FVector2D InitialWindowDimensions(600, 60);
+	const FVector2D InitialWindowDimensions(600, 70);
 
 	SWindow::Construct(SWindow::FArguments()
 		.Title(LOCTEXT("WindowTitle", "Please input encryption key(Base64 string or Hex string:"))
