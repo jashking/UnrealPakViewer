@@ -14,7 +14,6 @@
 
 #include "UnrealPakViewerStyle.h"
 #include "Widgets/SMainWindow.h"
-#include "OodleModule.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,9 +67,6 @@ void FUnrealPakViewerApplication::InitializeApplication()
 
 	// Load optional modules.
 	FModuleManager::Get().LoadModule("SettingsEditor");
-
-	// Load oodle module.
-	IOodleModule::Get();
 
 	// Crank up a normal Slate application using the platform's standalone renderer.
 	FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer());

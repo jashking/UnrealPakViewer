@@ -333,14 +333,22 @@ bool FPakAnalyzer::LoadAssetRegistryFromPak(FPakFile* InPakFile, FPakFileEntryPt
 
 	if (EntryInfo.CompressionMethodIndex == 0)
 	{
+#if ENGINE_MAJOR_VERSION >= 5
+		if (!FExtractThreadWorker::BufferedCopyFile(ContentWriter, InPakFile->GetSharedReader(nullptr).GetArchive(), EntryInfo, Buffer, BufferSize, DecryptAESKey))
+#else
 		if (!FExtractThreadWorker::BufferedCopyFile(ContentWriter, *InPakFile->GetSharedReader(nullptr), EntryInfo, Buffer, BufferSize, DecryptAESKey))
+#endif
 		{
 			bReadResult = false;
 		}
 	}
 	else
 	{
+#if ENGINE_MAJOR_VERSION >= 5
+		if (!FExtractThreadWorker::UncompressCopyFile(ContentWriter, InPakFile->GetSharedReader(nullptr).GetArchive(), EntryInfo, PersistantCompressionBuffer, CompressionBufferSize, DecryptAESKey, InPakFileEntry->CompressionMethod, bHasRelativeCompressedChunkOffsets))
+#else
 		if (!FExtractThreadWorker::UncompressCopyFile(ContentWriter, *InPakFile->GetSharedReader(nullptr), EntryInfo, PersistantCompressionBuffer, CompressionBufferSize, DecryptAESKey, InPakFileEntry->CompressionMethod, bHasRelativeCompressedChunkOffsets))
+#endif
 		{
 			bReadResult = false;
 		}
