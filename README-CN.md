@@ -1,5 +1,7 @@
 # UnrealPakViewer ##
 
+Find the english translation of the README [here](README-EN.md)
+
 可视化查看 Pak 文件内容，支持以下特性
 
 * 支持树形视图和列表视图查看 pak/ucas 中的文件
