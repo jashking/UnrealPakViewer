@@ -412,6 +412,10 @@ uint32 FAssetParseThreadWorker::Run()
 		}
 
 		FPakFileEntryPtr File = Files[InIndex];
+		if (!File->AssetSummary.IsValid())
+		{
+			return;
+		}
 		if (File->AssetSummary->DependentList.Num() > 0)
 		{
 			return;
