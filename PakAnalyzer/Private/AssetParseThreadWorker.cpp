@@ -322,80 +322,83 @@ uint32 FAssetParseThreadWorker::Run()
 
 			// Serialize Preload Dependency
 			TArray<FPackageIndex> PreloadDependencies;
-			PreloadDependencies.AddZeroed(File->AssetSummary->PackageSummary.PreloadDependencyCount);
-			Reader.Seek(File->AssetSummary->PackageSummary.PreloadDependencyOffset);
-			for (int32 i = 0; i < File->AssetSummary->PackageSummary.PreloadDependencyCount; ++i)
+			if (File->AssetSummary->PackageSummary.PreloadDependencyCount > 0)
 			{
-				Reader << PreloadDependencies[i];
-			}
-			
-			// Parse Preload Dependency
-			for (int32 i = 0; i < File->AssetSummary->ObjectExports.Num(); ++i)
-			{
-				const FObjectExport& Export = Exports[i];
-				FObjectExportPtrType& ExportEx = File->AssetSummary->ObjectExports[i];
-
-				if (Export.FirstExportDependency >= 0)
+				PreloadDependencies.AddZeroed(File->AssetSummary->PackageSummary.PreloadDependencyCount);
+				Reader.Seek(File->AssetSummary->PackageSummary.PreloadDependencyOffset);
+				for (int32 i = 0; i < File->AssetSummary->PackageSummary.PreloadDependencyCount; ++i)
 				{
-					FName ObjectName;
-					int32 RunningIndex = Export.FirstExportDependency;
-					for (int32 Index = Export.SerializationBeforeSerializationDependencies; Index > 0; Index--)
+					Reader << PreloadDependencies[i];
+				}
+
+				// Parse Preload Dependency
+				for (int32 i = 0; i < File->AssetSummary->ObjectExports.Num(); ++i)
+				{
+					const FObjectExport& Export = Exports[i];
+					FObjectExportPtrType& ExportEx = File->AssetSummary->ObjectExports[i];
+
+					if (Export.FirstExportDependency >= 0)
 					{
-						FPackageIndex Dep = PreloadDependencies[RunningIndex++];
-
-						if (ParseObjectPath(File->AssetSummary, Dep, ObjectName))
+						FName ObjectName;
+						int32 RunningIndex = Export.FirstExportDependency;
+						for (int32 Index = Export.SerializationBeforeSerializationDependencies; Index > 0; Index--)
 						{
-							FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
-							Depends->PackageName = ObjectName;
-							Depends->ExtraInfo = TEXT("Serialization Before Serialization");
+							FPackageIndex Dep = PreloadDependencies[RunningIndex++];
 
-							ExportEx->DependencyList.Add(Depends);
+							if (ParseObjectPath(File->AssetSummary, Dep, ObjectName))
+							{
+								FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
+								Depends->PackageName = ObjectName;
+								Depends->ExtraInfo = TEXT("Serialization Before Serialization");
+
+								ExportEx->DependencyList.Add(Depends);
+							}
 						}
-					}
 
-					for (int32 Index = Export.CreateBeforeSerializationDependencies; Index > 0; Index--)
-					{
-						FPackageIndex Dep = PreloadDependencies[RunningIndex++];
-
-						if (ParseObjectPath(File->AssetSummary, Dep, ObjectName))
+						for (int32 Index = Export.CreateBeforeSerializationDependencies; Index > 0; Index--)
 						{
-							FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
-							Depends->PackageName = ObjectName;
-							Depends->ExtraInfo = TEXT("Create Before Serialization");
+							FPackageIndex Dep = PreloadDependencies[RunningIndex++];
 
-							ExportEx->DependencyList.Add(Depends);
+							if (ParseObjectPath(File->AssetSummary, Dep, ObjectName))
+							{
+								FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
+								Depends->PackageName = ObjectName;
+								Depends->ExtraInfo = TEXT("Create Before Serialization");
+
+								ExportEx->DependencyList.Add(Depends);
+							}
 						}
-					}
 
-					for (int32 Index = Export.SerializationBeforeCreateDependencies; Index > 0; Index--)
-					{
-						FPackageIndex Dep = PreloadDependencies[RunningIndex++];
-
-						if (ParseObjectPath(File->AssetSummary, Dep, ObjectName))
+						for (int32 Index = Export.SerializationBeforeCreateDependencies; Index > 0; Index--)
 						{
-							FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
-							Depends->PackageName = ObjectName;
-							Depends->ExtraInfo = TEXT("Serialization Before Create");
+							FPackageIndex Dep = PreloadDependencies[RunningIndex++];
 
-							ExportEx->DependencyList.Add(Depends);
+							if (ParseObjectPath(File->AssetSummary, Dep, ObjectName))
+							{
+								FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
+								Depends->PackageName = ObjectName;
+								Depends->ExtraInfo = TEXT("Serialization Before Create");
+
+								ExportEx->DependencyList.Add(Depends);
+							}
 						}
-					}
 
-					for (int32 Index = Export.CreateBeforeCreateDependencies; Index > 0; Index--)
-					{
-						FPackageIndex Dep = PreloadDependencies[RunningIndex++];
-
-						if (ParseObjectPath(File->AssetSummary, Dep, ObjectName))
+						for (int32 Index = Export.CreateBeforeCreateDependencies; Index > 0; Index--)
 						{
-							FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
-							Depends->PackageName = ObjectName;
-							Depends->ExtraInfo = TEXT("Create Before Create");
+							FPackageIndex Dep = PreloadDependencies[RunningIndex++];
 
-							ExportEx->DependencyList.Add(Depends);
+							if (ParseObjectPath(File->AssetSummary, Dep, ObjectName))
+							{
+								FPackageInfoPtr Depends = MakeShared<FPackageInfo>();
+								Depends->PackageName = ObjectName;
+								Depends->ExtraInfo = TEXT("Create Before Create");
+
+								ExportEx->DependencyList.Add(Depends);
+							}
 						}
-					}
 
-					ExportEx->DependencyList.Shrink();
+						ExportEx->DependencyList.Shrink();
+					}
 				}
 			}
 		}
