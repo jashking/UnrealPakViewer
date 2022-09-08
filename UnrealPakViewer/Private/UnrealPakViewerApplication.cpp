@@ -36,7 +36,11 @@ void FUnrealPakViewerApplication::Exec()
 
 		FSlateApplication::Get().PumpMessages();
 		FSlateApplication::Get().Tick();
+#if ENGINE_MAJOR_VERSION >= 5
+		FTSTicker::GetCoreTicker().Tick(DeltaTime);
+#else
 		FTicker::GetCoreTicker().Tick(DeltaTime);
+#endif
 
 		// Throttle frame rate.
 		FPlatformProcess::Sleep(FMath::Max<float>(0.0f, IdealFrameTime - (FPlatformTime::Seconds() - LastTime)));
