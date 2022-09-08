@@ -51,7 +51,10 @@ void FUnrealPakViewerApplication::Exec()
 
 		FStats::AdvanceFrame(false);
 
+		FCoreDelegates::OnEndFrame.Broadcast();
 		GLog->FlushThreadedLogs(); //im: ???
+
+		GFrameCounter++;
 	}
 
 	ShutdownApplication();
@@ -59,8 +62,10 @@ void FUnrealPakViewerApplication::Exec()
 
 void FUnrealPakViewerApplication::InitializeApplication()
 {
-	FCoreStyle::ResetToDefault();
-	FUnrealPakViewerStyle::Initialize();
+	//FCoreStyle::ResetToDefault();
+
+	// Crank up a normal Slate application using the platform's standalone renderer.
+	FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer());
 
 	// Load required modules.
 	FModuleManager::Get().LoadModuleChecked("EditorStyle");
@@ -68,25 +73,29 @@ void FUnrealPakViewerApplication::InitializeApplication()
 	// Load plug-ins.
 	// @todo: allow for better plug-in support in standalone Slate applications
 	IPluginManager::Get().LoadModulesForEnabledPlugins(ELoadingPhase::PreDefault);
+	IPluginManager::Get().LoadModulesForEnabledPlugins(ELoadingPhase::Default);
 
 	// Load optional modules.
-	FModuleManager::Get().LoadModule("SettingsEditor");
-
-	// Crank up a normal Slate application using the platform's standalone renderer.
-	FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer());
+	if (FModuleManager::Get().ModuleExists(TEXT("SettingsEditor")))
+	{
+		FModuleManager::Get().LoadModule("SettingsEditor");
+	}
 
 #if ENGINE_MAJOR_VERSION <= 4
 	// Menu anims aren't supported. See Runtime\Slate\Private\Framework\Application\MenuStack.cpp.
 	FSlateApplication::Get().EnableMenuAnimations(false);
 #endif
 
+	FSlateApplication::InitHighDPI(true);
+	FUnrealPakViewerStyle::Initialize();
+
 	FSlateApplication::Get().AddWindow(SNew(SMainWindow));
 }
 
 void FUnrealPakViewerApplication::ShutdownApplication()
 {
+	FUnrealPakViewerStyle::Shutdown();
+
 	// Shut down application.
 	FSlateApplication::Shutdown();
-
-	FUnrealPakViewerStyle::Shutdown();
 }

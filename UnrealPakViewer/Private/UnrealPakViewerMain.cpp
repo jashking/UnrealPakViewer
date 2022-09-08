@@ -37,15 +37,6 @@ int32 UnrealPakViewerMain(const TCHAR* CommandLine)
 	FEngineLoop::AppPreExit(); //im: ???
 
 	FModuleManager::Get().UnloadModulesAtShutdown();
-	
-
-#if STATS
-	FThreadStats::StopThread();
-#endif
-
-	FTaskGraphInterface::Shutdown(); //im: ???
-
-	FEngineLoop::AppExit();
 
 	return 0;
 }
