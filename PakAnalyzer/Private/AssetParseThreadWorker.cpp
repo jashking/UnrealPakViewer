@@ -110,7 +110,7 @@ uint32 FAssetParseThreadWorker::Run()
 		bool SerializeSuccess = false;
 
 		FPakFileEntryPtr File = Files[InIndex];
-		if (!Summaries.IsValidIndex(File->OwnerPakIndex))
+		if (!Summaries.IsValidIndex(File->OwnerPakIndex) || File->PakEntry.IsDeleteRecord())
 		{
 			return;
 		}
