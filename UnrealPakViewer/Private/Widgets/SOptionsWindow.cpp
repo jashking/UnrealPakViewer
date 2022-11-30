@@ -1,6 +1,6 @@
 #include "SOptionsWindow.h"
 
-#include "EditorStyleSet.h"
+//#include "EditorStyleSet.h"
 #include "HAL/PlatformMisc.h"
 #include "HAL/PlatformApplicationMisc.h"
 
@@ -34,7 +34,7 @@ void SOptionsWindow::Construct(const FArguments& Args)
 		.ClientSize(InitialWindowDimensions * DPIScaleFactor)
 		[
 			SNew(SBorder)
-			.BorderImage(FEditorStyle::GetBrush("NotificationList.ItemBackground"))
+			//.BorderImage(FEditorStyle::GetBrush("NotificationList.ItemBackground"))
 			.Padding(FMargin(5.f, 10.f))
 			[
 				SNew(SVerticalBox)

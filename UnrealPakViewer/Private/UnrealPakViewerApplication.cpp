@@ -68,7 +68,7 @@ void FUnrealPakViewerApplication::InitializeApplication()
 	FSlateApplication::InitializeAsStandaloneApplication(GetStandardStandaloneRenderer());
 
 	// Load required modules.
-	FModuleManager::Get().LoadModuleChecked("EditorStyle");
+	//FModuleManager::Get().LoadModuleChecked("EditorStyle");
 
 	// Load plug-ins.
 	// @todo: allow for better plug-in support in standalone Slate applications

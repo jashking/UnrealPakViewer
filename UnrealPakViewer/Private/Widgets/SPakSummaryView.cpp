@@ -1,7 +1,7 @@
 #include "SPakSummaryView.h"
 
 #include "DesktopPlatformModule.h"
-#include "EditorStyle.h"
+//#include "EditorStyle.h"
 #include "Framework/Application/SlateApplication.h"
 #include "IPlatformFilePak.h"
 #include "Misc/Paths.h"

@@ -14,10 +14,11 @@ public class UnrealPakViewerTarget : TargetRules
         SolutionDirectory = "ExternalPrograms";
         DefaultBuildSettings = BuildSettingsVersion.V2;
 
-        ExtraModuleNames.Add("EditorStyle");
+		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_1;
+		//ExtraModuleNames.Add("EditorStyle");
 
-        // Lean and mean
-        bBuildDeveloperTools = true;
+		// Lean and mean
+		bBuildDeveloperTools = true;
 
         // Currently this app is not linking against the engine, so we'll compile out references from Core to the rest of the engine
         bCompileAgainstEngine = false;

@@ -28,7 +28,7 @@ public class UnrealPakViewer : ModuleRules
 				"StandaloneRenderer",
 				"DesktopPlatform",
 				"Projects",
-				"EditorStyle",
+				//"EditorStyle",
 				"PakAnalyzer",
 				"Json",
 			}

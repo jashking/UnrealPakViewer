@@ -3,7 +3,7 @@
 #include "Async/AsyncWork.h"
 #include "Async/TaskGraphInterfaces.h"
 #include "DesktopPlatformModule.h"
-#include "EditorStyle.h"
+//#include "EditorStyle.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Json.h"
 #include "HAL/PlatformApplicationMisc.h"
@@ -474,7 +474,8 @@ void SPakFileView::Construct(const FArguments& InArgs)
 
 		+ SVerticalBox::Slot().VAlign(VAlign_Center).AutoHeight()
 		[
-			SNew(SBorder).BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder")).Padding(2.0f)
+			SNew(SBorder)//.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+			.Padding(2.0f)
 			[
 				SNew(SVerticalBox)
 
@@ -485,7 +486,7 @@ void SPakFileView::Construct(const FArguments& InArgs)
 					+ SHorizontalBox::Slot().Padding(0.f, 0.f, 5.f, 0.f).VAlign(VAlign_Center)
 					[
 						SNew(SComboButton)
-						.ComboButtonStyle(FEditorStyle::Get(), "GenericFilters.ComboButtonStyle")
+						//.ComboButtonStyle(FEditorStyle::Get(), "GenericFilters.ComboButtonStyle")
 						.ForegroundColor(FLinearColor::White)
 						.ContentPadding(0)
 						.ToolTipText(LOCTEXT("ClassFilterToolTip", "Filter files by class."))
@@ -508,7 +509,7 @@ void SPakFileView::Construct(const FArguments& InArgs)
 					+ SHorizontalBox::Slot().Padding(0.f, 0.f, 5.f, 0.f).VAlign(VAlign_Center)
 					[
 						SNew(SComboButton)
-						.ComboButtonStyle(FEditorStyle::Get(), "GenericFilters.ComboButtonStyle")
+						//.ComboButtonStyle(FEditorStyle::Get(), "GenericFilters.ComboButtonStyle")
 						.ForegroundColor(FLinearColor::White)
 						.ContentPadding(0)
 						.ToolTipText(LOCTEXT("PakFilterToolTip", "Filter files by pak."))
@@ -553,7 +554,8 @@ void SPakFileView::Construct(const FArguments& InArgs)
 
 		+ SVerticalBox::Slot().FillHeight(1.f)
 		[
-			SNew(SBorder).BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder")).Padding(0.f)
+			SNew(SBorder)//.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+			.Padding(0.f)
 			[
 				SAssignNew(FileListView, SListView<FPakFileEntryPtr>)
 				.ItemHeight(20.f)

@@ -1,8 +1,9 @@
 #include "SExtractProgressWindow.h"
 
-#include "EditorStyle.h"
+//#include "EditorStyle.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "Misc/Timespan.h"
+#include "Widgets/Notifications/SProgressBar.h"
 
 #include "CommonDefines.h"
 #include "PakAnalyzerModule.h"
@@ -38,7 +39,7 @@ void SExtractProgressWindow::Construct(const FArguments& Args)
 		.ClientSize(InitialWindowDimensions * DPIScaleFactor)
 		[
 			SNew(SBorder)
-			.BorderImage(FEditorStyle::GetBrush("NotificationList.ItemBackground"))
+			//.BorderImage(FEditorStyle::GetBrush("NotificationList.ItemBackground"))
 			.Padding(FMargin(5.f, 10.f))
 			[
 				SNew(SVerticalBox)

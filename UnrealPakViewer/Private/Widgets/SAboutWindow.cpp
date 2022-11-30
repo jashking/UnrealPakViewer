@@ -1,6 +1,6 @@
 #include "SAboutWindow.h"
 
-#include "EditorStyleSet.h"
+//#include "EditorStyleSet.h"
 #include "Framework/Application/SlateApplication.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "HAL/PlatformProcess.h"
@@ -35,7 +35,7 @@ void SAboutWindow::Construct(const FArguments& Args)
 		.ClientSize(InitialWindowDimensions * DPIScaleFactor)
 		[
 			SNew(SBorder)
-			.BorderImage(FEditorStyle::GetBrush("NotificationList.ItemBackground"))
+			//.BorderImage(FEditorStyle::GetBrush("NotificationList.ItemBackground"))
 			.Padding(FMargin(5.f, 5.f))
 			[
 				SNew(SVerticalBox)

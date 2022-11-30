@@ -1,6 +1,6 @@
 #include "SKeyInputWindow.h"
 
-#include "EditorStyle.h"
+//#include "EditorStyle.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "Misc/Base64.h"
 #include "Misc/Char.h"
@@ -36,7 +36,7 @@ void SKeyInputWindow::Construct(const FArguments& Args)
 		.ClientSize(InitialWindowDimensions * DPIScaleFactor)
 		[
 			SNew(SBorder)
-			.BorderImage(FEditorStyle::GetBrush("NotificationList.ItemBackground"))
+			//.BorderImage(FEditorStyle::GetBrush("NotificationList.ItemBackground"))
 			.Padding(FMargin(5.f, 10.f))
 			[
 				SNew(SVerticalBox)

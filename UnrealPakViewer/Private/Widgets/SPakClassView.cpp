@@ -1,9 +1,10 @@
 #include "SPakClassView.h"
 
-#include "EditorStyle.h"
+//#include "EditorStyle.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScrollBar.h"
+#include "Widgets/Notifications/SProgressBar.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Views/STableRow.h"
 #include "Widgets/Views/STableViewBase.h"
@@ -302,7 +303,8 @@ void SPakClassView::Construct(const FArguments& InArgs)
 
 					+ SScrollBox::Slot().VAlign(VAlign_Fill)
 					[
-						SNew(SBorder).BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder")).Padding(0.f)
+						SNew(SBorder)//.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+						.Padding(0.f)
 						[
 							SAssignNew(ClassListView, SListView<FPakClassEntryPtr>)
 							.ExternalScrollbar(ExternalScrollbar)

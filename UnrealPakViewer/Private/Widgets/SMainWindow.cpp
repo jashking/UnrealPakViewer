@@ -2,7 +2,7 @@
 
 #include "Async/TaskGraphInterfaces.h"
 #include "DesktopPlatformModule.h"
-#include "EditorStyleSet.h"
+//#include "EditorStyleSet.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Docking/TabManager.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
@@ -108,7 +108,7 @@ void SMainWindow::Construct(const FArguments& Args)
 			.FillHeight(1.f)
 			[
 				SNew(SBorder)
-				.BorderImage(FEditorStyle::GetBrush("NotificationList.ItemBackground"))
+				//.BorderImage(FEditorStyle::GetBrush("NotificationList.ItemBackground"))
 				[
 					TabManager->RestoreFrom(Layout, TSharedPtr<SWindow>()).ToSharedRef()
 				]

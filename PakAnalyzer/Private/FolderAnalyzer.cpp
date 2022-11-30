@@ -2,9 +2,15 @@
 
 #include "FolderAnalyzer.h"
 
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
+#include "AssetRegistry/ARFilter.h"
+#include "AssetRegistry/AssetData.h"
+#include "AssetRegistry/AssetRegistryState.h"
+#else
 #include "ARFilter.h"
 #include "AssetData.h"
 #include "AssetRegistryState.h"
+#endif
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFile.h"
 #include "HAL/PlatformMisc.h"

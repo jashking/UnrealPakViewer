@@ -1,6 +1,10 @@
 #include "BaseAnalyzer.h"
 
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
+#include "AssetRegistry/AssetRegistryState.h"
+#else
 #include "AssetRegistryState.h"
+#endif
 #include "Json.h"
 #include "Launch/Resources/Version.h"
 #include "Misc/Base64.h"
@@ -447,7 +451,12 @@ FName FBaseAnalyzer::GetAssetClass(const FString& InFilename, FName InPackagePat
 		if (AssetDataArray.Num() > 0)
 		{
 			bFoundClassInRegistry = true;
+
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
+			AssetClass = AssetDataArray[0]->AssetClassPath.GetAssetName();
+#else
 			AssetClass = AssetDataArray[0]->AssetClass;
+#endif
 		}
 	}
 	
