@@ -14,7 +14,7 @@
 #include "Misc/AES.h"
 #include "Misc/Guid.h"
 #include "Misc/SecureHash.h"
-#include "UObject/PackageId.h"
+#include "IO/PackageId.h"
 #include "Templates/SharedPointer.h"
 
 #include "BaseAnalyzer.h"
@@ -48,7 +48,7 @@ protected:
 
 protected:
 	TSharedPtr<FIoStoreReader> GlobalIoStoreReader;
-	TArray<FNameEntryId> GlobalNameMap;
+	TArray<FDisplayNameEntryId> GlobalNameMap;
 	TArray<FContainerInfo> StoreContainers;
 	TArray<FStorePackageInfo> PackageInfos;
 	TMap<FString, int32> FileToPackageIndex;

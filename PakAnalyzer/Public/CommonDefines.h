@@ -6,7 +6,7 @@
 #include "Launch/Resources/Version.h"
 #include "Logging/LogMacros.h"
 
-#define ENABLE_IO_STORE_ANALYZER 0//(ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26)
+#define ENABLE_IO_STORE_ANALYZER (ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26)
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPakAnalyzer, Log, All);
 

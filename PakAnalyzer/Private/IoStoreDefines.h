@@ -7,19 +7,41 @@
 #if ENABLE_IO_STORE_ANALYZER
 
 #include "IO/IoDispatcher.h"
+#include "IO/IoContainerHeader.h"
 #include "Serialization/AsyncLoading2.h"
+
 #if ENGINE_MAJOR_VERSION >= 5
-#include "Serialization/PackageStore.h"
+#include "IO/PackageStore.h"
 #endif // ENGINE_MAJOR_VERSION >= 5
 
 #include "PakFileEntry.h"
 
+/**
+ * I/O store container format version
+ */
+enum class EIoStoreTocVersion : uint8
+{
+	Invalid = 0,
+	Initial,
+	DirectoryIndex,
+	PartitionSize,
+	PerfectHash,
+	PerfectHashWithOverflow,
+	LatestPlusOne,
+	Latest = LatestPlusOne - 1
+};
+
+/**
+ * I/O Store TOC header.
+ */
 struct FIoStoreTocHeader
 {
 	static constexpr char TocMagicImg[] = "-==--==--==--==-";
 
 	uint8	TocMagic[16];
 	uint8	Version;
+	uint8	Reserved0 = 0;
+	uint16	Reserved1 = 0;
 	uint32	TocHeaderSize;
 	uint32	TocEntryCount;
 	uint32	TocCompressedBlockEntryCount;
@@ -28,10 +50,17 @@ struct FIoStoreTocHeader
 	uint32	CompressionMethodNameLength;
 	uint32	CompressionBlockSize;
 	uint32	DirectoryIndexSize;
+	uint32	PartitionCount = 0;
 	FIoContainerId ContainerId;
 	FGuid	EncryptionKeyGuid;
 	EIoContainerFlags ContainerFlags;
-	uint8	Pad[60];
+	uint8	Reserved3 = 0;
+	uint16	Reserved4 = 0;
+	uint32	TocChunkPerfectHashSeedsCount = 0;
+	uint64	PartitionSize = 0;
+	uint32	TocChunksWithoutPerfectHashCount = 0;
+	uint32	Reserved7 = 0;
+	uint64	Reserved8[5] = { 0 };
 
 	void MakeMagic()
 	{
@@ -172,6 +201,7 @@ ENUM_CLASS_FLAGS(FIoStoreTocEntryMetaFlags);
  */
 struct FIoStoreTocEntryMeta
 {
+	// Source data hash (i.e. not the on disk data)
 	FIoChunkHash ChunkHash;
 	FIoStoreTocEntryMetaFlags Flags;
 };
@@ -201,12 +231,12 @@ struct FScriptObjectDesc
 
 struct FPackageStoreExportEntry
 {
-	FPackageStoreExportEntry(const FPackageStoreEntry& InEntry)
-		: ExportBundlesSize(InEntry.ExportBundlesSize)
-		, ExportCount(InEntry.ExportCount)
+	FPackageStoreExportEntry(const FFilePackageStoreEntry& InEntry)
+		//: ExportBundlesSize(InEntry.ExportBundlesSize)
+		: ExportCount(InEntry.ExportCount)
 		, ExportBundleCount(InEntry.ExportBundleCount)
-		, LoadOrder(InEntry.LoadOrder)
-		, Pad(InEntry.Pad)
+		//, LoadOrder(InEntry.LoadOrder)
+		//, Pad(InEntry.Pad)
 	{
 		DependencyPackages.SetNum(InEntry.ImportedPackages.Num());
 		for (uint32 i = 0; i < InEntry.ImportedPackages.Num(); ++i)
@@ -215,11 +245,11 @@ struct FPackageStoreExportEntry
 		}
 	}
 
-	uint64 ExportBundlesSize = 0;
+	//uint64 ExportBundlesSize = 0;
 	int32 ExportCount = 0;
 	int32 ExportBundleCount = 0;
-	uint32 LoadOrder = 0;
-	uint32 Pad = 0;
+	//uint32 LoadOrder = 0;
+	//uint32 Pad = 0;
 	TArray<FPackageId> DependencyPackages;
 };
 
@@ -246,7 +276,7 @@ struct FIoStoreExport
 	FPackageObjectIndex ClassIndex;
 	FPackageObjectIndex SuperIndex;
 	FPackageObjectIndex TemplateIndex;
-	FPackageObjectIndex GlobalImportIndex;
+	//FPackageObjectIndex GlobalImportIndex;
 	uint64 SerialOffset = 0;
 	uint64 SerialSize = 0;
 	EObjectFlags ObjectFlags = EObjectFlags::RF_NoFlags;

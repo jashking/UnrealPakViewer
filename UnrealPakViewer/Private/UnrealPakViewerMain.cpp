@@ -13,6 +13,8 @@ IMPLEMENT_APPLICATION(UnrealPakViewer, "UnrealPakViewer");
  */
 int32 UnrealPakViewerMain(const TCHAR* CommandLine)
 {
+	FTaskTagScope Scope(ETaskTag::EGameThread);
+
 #if defined(ParentProjectName)
 	const FString ProjectDir = FString::Printf(TEXT("../../../%s/Programs/%s/"), ParentProjectName, FApp::GetProjectName());
 	FPlatformMisc::SetOverrideProjectDir(ProjectDir);

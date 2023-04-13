@@ -21,7 +21,7 @@
 #include "UObject/ObjectVersion.h"
 
 #if ENGINE_MAJOR_VERSION >= 5
-#include "Serialization/PackageStore.h"
+#include "IO/PackageStore.h"
 #endif // ENGINE_MAJOR_VERSION >= 5
 
 #include "CommonDefines.h"
@@ -191,12 +191,12 @@ void FIoStoreAnalyzer::Reset()
 	TocResources.Empty();
 	ExportByGlobalIdMap.Empty();
 
-	for (FContainerInfo& Container : StoreContainers)
-	{
-		Container.Reader.Reset();
-	}
+	//for (FContainerInfo& Container : StoreContainers)
+	//{
+	//	Container.Reader.Reset();
+	//}
 
-	StoreContainers.Empty();
+	//StoreContainers.Empty();
 	PackageInfos.Empty();
 	FileToPackageIndex.Empty();
 
@@ -221,7 +221,7 @@ TSharedPtr<FIoStoreReader> FIoStoreAnalyzer::CreateIoStoreReader(const FString& 
 #if ENGINE_MAJOR_VERSION <= 4
 	FIoStatus Status = Reader->Initialize(IoEnvironment, DecryptionKeys);
 #else
-	FIoStatus Status = Reader->Initialize(*FPaths::SetExtension(InPath, TEXT("")), DecryptionKeys);
+	FIoStatus Status = Reader->Initialize(*FPaths::ChangeExtension(InPath, TEXT("")), DecryptionKeys);
 #endif
 	if (Status.IsOk())
 	{
@@ -245,51 +245,30 @@ bool FIoStoreAnalyzer::InitializeGlobalReader(const FString& InPakPath)
 		return false;
 	}
 
-	UE_LOG(LogPakAnalyzer, Display, TEXT("IoStore loading global name map..."));
+	UE_LOG(LogPakAnalyzer, Display, TEXT("Loading script imports..."));
 
-	TIoStatusOr<FIoBuffer> GlobalNamesIoBuffer = GlobalIoStoreReader->Read(CreateIoChunkId(0, 0, EIoChunkType::LoaderGlobalNames), FIoReadOptions());
-	if (!GlobalNamesIoBuffer.IsOk())
-	{
-		UE_LOG(LogPakAnalyzer, Warning, TEXT("IoStore failed reading names chunk from global container '%s'"), *GlobalContainerPath);
-		return false;
-	}
-
-	TIoStatusOr<FIoBuffer> GlobalNameHashesIoBuffer = GlobalIoStoreReader->Read(CreateIoChunkId(0, 0, EIoChunkType::LoaderGlobalNameHashes), FIoReadOptions());
-	if (!GlobalNameHashesIoBuffer.IsOk())
-	{
-		UE_LOG(LogPakAnalyzer, Warning, TEXT("IoStore failed reading name hashes chunk from global container '%s'"), *GlobalContainerPath);
-		return false;
-	}
-
-	LoadNameBatch(
-		GlobalNameMap,
-		TArrayView<const uint8>(GlobalNamesIoBuffer.ValueOrDie().Data(), GlobalNamesIoBuffer.ValueOrDie().DataSize()),
-		TArrayView<const uint8>(GlobalNameHashesIoBuffer.ValueOrDie().Data(), GlobalNameHashesIoBuffer.ValueOrDie().DataSize()));
-
-	UE_LOG(LogPakAnalyzer, Display, TEXT("IoStore loading script imports..."));
-
-	TIoStatusOr<FIoBuffer> InitialLoadIoBuffer = GlobalIoStoreReader->Read(CreateIoChunkId(0, 0, EIoChunkType::LoaderInitialLoadMeta), FIoReadOptions());
-	if (!InitialLoadIoBuffer.IsOk())
+	TIoStatusOr<FIoBuffer> ScriptObjectsBuffer = GlobalIoStoreReader->Read(CreateIoChunkId(0, 0, EIoChunkType::ScriptObjects), FIoReadOptions());
+	if (!ScriptObjectsBuffer.IsOk())
 	{
 		UE_LOG(LogPakAnalyzer, Warning, TEXT("IoStore failed reading initial load meta chunk from global container '%s'"), *GlobalContainerPath);
 		return false;
 	}
 
-	FLargeMemoryReader InitialLoadArchive(InitialLoadIoBuffer.ValueOrDie().Data(), InitialLoadIoBuffer.ValueOrDie().DataSize());
+	FLargeMemoryReader ScriptObjectsArchive(ScriptObjectsBuffer.ValueOrDie().Data(), ScriptObjectsBuffer.ValueOrDie().DataSize());
+	GlobalNameMap = LoadNameBatch(ScriptObjectsArchive);
 	int32 NumScriptObjects = 0;
-	InitialLoadArchive << NumScriptObjects;
-	const FScriptObjectEntry* ScriptObjectEntries = reinterpret_cast<const FScriptObjectEntry*>(InitialLoadIoBuffer.ValueOrDie().Data() + InitialLoadArchive.Tell());
+	ScriptObjectsArchive << NumScriptObjects;
+	const FScriptObjectEntry* ScriptObjectEntries = reinterpret_cast<const FScriptObjectEntry*>(ScriptObjectsBuffer.ValueOrDie().Data() + ScriptObjectsArchive.Tell());
 	for (int32 ScriptObjectIndex = 0; ScriptObjectIndex < NumScriptObjects; ++ScriptObjectIndex)
 	{
 		const FScriptObjectEntry& ScriptObjectEntry = ScriptObjectEntries[ScriptObjectIndex];
-		const FMappedName& MappedName = FMappedName::FromMinimalName(ScriptObjectEntry.ObjectName);
+		FMappedName MappedName = ScriptObjectEntry.Mapped;
 		check(MappedName.IsGlobal());
 		FScriptObjectDesc& ScriptObjectDesc = ScriptObjectByGlobalIdMap.Add(ScriptObjectEntry.GlobalIndex);
-		ScriptObjectDesc.Name = FName::CreateFromDisplayId(GlobalNameMap[MappedName.GetIndex()], MappedName.GetNumber());
+		ScriptObjectDesc.Name = GlobalNameMap[MappedName.GetIndex()].ToName(MappedName.GetNumber());
 		ScriptObjectDesc.GlobalImportIndex = ScriptObjectEntry.GlobalIndex;
 		ScriptObjectDesc.OuterIndex = ScriptObjectEntry.OuterIndex;
 	}
-
 	for (auto& KV : ScriptObjectByGlobalIdMap)
 	{
 		FScriptObjectDesc& ScriptObjectDesc = KV.Get<1>();
@@ -317,12 +296,85 @@ bool FIoStoreAnalyzer::InitializeGlobalReader(const FString& InPakPath)
 		}
 	}
 
+	//UE_LOG(LogPakAnalyzer, Display, TEXT("IoStore loading global name map..."));
+
+	//TIoStatusOr<FIoBuffer> GlobalNamesIoBuffer = GlobalIoStoreReader->Read(CreateIoChunkId(0, 0, EIoChunkType::LoaderGlobalNames), FIoReadOptions());
+	//if (!GlobalNamesIoBuffer.IsOk())
+	//{
+	//	UE_LOG(LogPakAnalyzer, Warning, TEXT("IoStore failed reading names chunk from global container '%s'"), *GlobalContainerPath);
+	//	return false;
+	//}
+
+	//TIoStatusOr<FIoBuffer> GlobalNameHashesIoBuffer = GlobalIoStoreReader->Read(CreateIoChunkId(0, 0, EIoChunkType::LoaderGlobalNameHashes), FIoReadOptions());
+	//if (!GlobalNameHashesIoBuffer.IsOk())
+	//{
+	//	UE_LOG(LogPakAnalyzer, Warning, TEXT("IoStore failed reading name hashes chunk from global container '%s'"), *GlobalContainerPath);
+	//	return false;
+	//}
+
+	//LoadNameBatch(
+	//	GlobalNameMap,
+	//	TArrayView<const uint8>(GlobalNamesIoBuffer.ValueOrDie().Data(), GlobalNamesIoBuffer.ValueOrDie().DataSize()),
+	//	TArrayView<const uint8>(GlobalNameHashesIoBuffer.ValueOrDie().Data(), GlobalNameHashesIoBuffer.ValueOrDie().DataSize()));
+
+	//UE_LOG(LogPakAnalyzer, Display, TEXT("IoStore loading script imports..."));
+
+	//TIoStatusOr<FIoBuffer> InitialLoadIoBuffer = GlobalIoStoreReader->Read(CreateIoChunkId(0, 0, EIoChunkType::LoaderInitialLoadMeta), FIoReadOptions());
+	//if (!InitialLoadIoBuffer.IsOk())
+	//{
+	//	UE_LOG(LogPakAnalyzer, Warning, TEXT("IoStore failed reading initial load meta chunk from global container '%s'"), *GlobalContainerPath);
+	//	return false;
+	//}
+
+	//FLargeMemoryReader InitialLoadArchive(InitialLoadIoBuffer.ValueOrDie().Data(), InitialLoadIoBuffer.ValueOrDie().DataSize());
+	//int32 NumScriptObjects = 0;
+	//InitialLoadArchive << NumScriptObjects;
+	//const FScriptObjectEntry* ScriptObjectEntries = reinterpret_cast<const FScriptObjectEntry*>(InitialLoadIoBuffer.ValueOrDie().Data() + InitialLoadArchive.Tell());
+	//for (int32 ScriptObjectIndex = 0; ScriptObjectIndex < NumScriptObjects; ++ScriptObjectIndex)
+	//{
+	//	const FScriptObjectEntry& ScriptObjectEntry = ScriptObjectEntries[ScriptObjectIndex];
+	//	const FMappedName& MappedName = FMappedName::FromMinimalName(ScriptObjectEntry.ObjectName);
+	//	check(MappedName.IsGlobal());
+	//	FScriptObjectDesc& ScriptObjectDesc = ScriptObjectByGlobalIdMap.Add(ScriptObjectEntry.GlobalIndex);
+	//	ScriptObjectDesc.Name = FName::CreateFromDisplayId(GlobalNameMap[MappedName.GetIndex()], MappedName.GetNumber());
+	//	ScriptObjectDesc.GlobalImportIndex = ScriptObjectEntry.GlobalIndex;
+	//	ScriptObjectDesc.OuterIndex = ScriptObjectEntry.OuterIndex;
+	//}
+
+	//for (auto& KV : ScriptObjectByGlobalIdMap)
+	//{
+	//	FScriptObjectDesc& ScriptObjectDesc = KV.Get<1>();
+	//	if (ScriptObjectDesc.FullName.IsNone())
+	//	{
+	//		TArray<FScriptObjectDesc*> ScriptObjectStack;
+	//		FScriptObjectDesc* Current = &ScriptObjectDesc;
+	//		FString FullName;
+	//		while (Current)
+	//		{
+	//			if (!Current->FullName.IsNone())
+	//			{
+	//				FullName = Current->FullName.ToString();
+	//				break;
+	//			}
+	//			ScriptObjectStack.Push(Current);
+	//			Current = ScriptObjectByGlobalIdMap.Find(Current->OuterIndex);
+	//		}
+	//		while (ScriptObjectStack.Num() > 0)
+	//		{
+	//			Current = ScriptObjectStack.Pop();
+	//			FullName /= Current->Name.ToString();
+	//			Current->FullName = FName(FullName);
+	//		}
+	//	}
+	//}
+
 	return true;
 }
 
 bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TArray<FString>& InDefaultAESKeys)
 {
-	static const EParallelForFlags ParallelForFlags = EParallelForFlags::Unbalanced /*| EParallelForFlags::ForceSingleThread*/;
+	//static const EParallelForFlags ParallelForFlags = EParallelForFlags::ForceSingleThread;
+	static const EParallelForFlags ParallelForFlags = EParallelForFlags::Unbalanced;
 
 	UE_LOG(LogPakAnalyzer, Display, TEXT("IoStore creating container readers..."));
 
@@ -389,13 +441,42 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 		if (IoBuffer.IsOk())
 		{
 			FMemoryReaderView Ar(MakeArrayView(IoBuffer.ValueOrDie().Data(), IoBuffer.ValueOrDie().DataSize()));
-			FContainerHeader ContainerHeader;
-			Ar << ContainerHeader;
+			FIoContainerHeader ContainerHeader;
+			
+			// FArchive& operator<<(FArchive& Ar, FIoContainerHeader& ContainerHeader) in IoContainerHeader.cpp
+
+			uint32 Signature = FIoContainerHeader::Signature;
+			Ar << Signature;
+			if (Signature != FIoContainerHeader::Signature)
+			{
+				UE_LOG(LogPakAnalyzer, Warning, TEXT("Failed to read container header '%s', signature not match!"), *ContainerFilePath);
+				continue;
+			}
+
+			EIoContainerHeaderVersion Version = EIoContainerHeaderVersion::Latest;
+			Ar << Version;
+			Ar << ContainerHeader.ContainerId;
+			if (Version <= EIoContainerHeaderVersion::LocalizedPackages)
+			{
+				uint32 PackageCount = 0;
+				Ar << PackageCount;
+			}
+
+			Ar << ContainerHeader.PackageIds;
+			Ar << ContainerHeader.StoreEntries;
+			if (Version >= EIoContainerHeaderVersion::OptionalSegmentPackages)
+			{
+				Ar << ContainerHeader.OptionalSegmentPackageIds;
+				Ar << ContainerHeader.OptionalSegmentStoreEntries;
+			}
+			ContainerHeader.RedirectsNameMap = LoadNameBatch(Ar);
+			Ar << ContainerHeader.LocalizedPackages;
+			Ar << ContainerHeader.PackageRedirects;
 
 			// RawCulturePackageMap = ContainerHeader.CulturePackageMap;
 			// RawPackageRedirects = ContainerHeader.PackageRedirects;
 
-			TArrayView<FPackageStoreEntry> StoreEntries(reinterpret_cast<FPackageStoreEntry*>(ContainerHeader.StoreEntries.GetData()), ContainerHeader.PackageCount);
+			TArrayView<FFilePackageStoreEntry> StoreEntries(reinterpret_cast<FFilePackageStoreEntry*>(ContainerHeader.StoreEntries.GetData()), ContainerHeader.PackageIds.Num());
 
 			for (int32 PackageIndex = 0; PackageIndex < StoreEntries.Num(); ++PackageIndex)
 			{
@@ -418,8 +499,8 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 		EIoChunkType ChunkType;
 		ParseChunkInfo(ChunkId, PackageId, ChunkType);
 
-		if (ChunkType == EIoChunkType::ExportBundleData || ChunkType == EIoChunkType::BulkData ||
-			ChunkType == EIoChunkType::OptionalBulkData || ChunkType == EIoChunkType::MemoryMappedBulkData)
+		//if (ChunkType == EIoChunkType::ExportBundleData || ChunkType == EIoChunkType::BulkData ||
+		//	ChunkType == EIoChunkType::OptionalBulkData || ChunkType == EIoChunkType::MemoryMappedBulkData)
 		{
 			FStorePackageInfo& PackageInfo = PackageInfos[Index];
 			PackageInfo.PackageId = PackageId;
@@ -466,22 +547,31 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 			TIoStatusOr<FIoBuffer> IoBuffer = Reader->Read(PackageInfo.ChunkId, ReadOptions);
 
 			const uint8* PackageSummaryData = IoBuffer.ValueOrDie().Data();
-			const FPackageSummary* PackageSummary = reinterpret_cast<const FPackageSummary*>(PackageSummaryData);
-			const uint64 PackageSummarySize = PackageSummary->GraphDataOffset + PackageSummary->GraphDataSize;
-
-			TArray<FNameEntryId> PackageFNames;
-			if (PackageSummary->NameMapNamesSize)
+			const FZenPackageSummary* PackageSummary = reinterpret_cast<const FZenPackageSummary*>(PackageSummaryData);
+			if (PackageSummary->HeaderSize > IoBuffer.ValueOrDie().DataSize())
 			{
-				const uint8* NameMapNamesData = PackageSummaryData + PackageSummary->NameMapNamesOffset;
-				const uint8* NameMapHashesData = PackageSummaryData + PackageSummary->NameMapHashesOffset;
-				LoadNameBatch(
-					PackageFNames,
-					TArrayView<const uint8>(NameMapNamesData, PackageSummary->NameMapNamesSize),
-					TArrayView<const uint8>(NameMapHashesData, PackageSummary->NameMapHashesSize));
+				ReadOptions.SetRange(0, PackageSummary->HeaderSize);
+				IoBuffer = Reader->Read(PackageInfo.ChunkId, ReadOptions);
+				PackageSummaryData = IoBuffer.ValueOrDie().Data();
+				PackageSummary = reinterpret_cast<const FZenPackageSummary*>(PackageSummaryData);
+			}
+
+			TArrayView<const uint8> HeaderDataView(PackageSummaryData + sizeof(FZenPackageSummary), PackageSummary->HeaderSize - sizeof(FZenPackageSummary));
+			FMemoryReaderView HeaderDataReader(HeaderDataView);
+
+			FZenPackageVersioningInfo VersioningInfo;
+			if (PackageSummary->bHasVersioningInfo)
+			{
+				HeaderDataReader << VersioningInfo;
+			}
+
+			TArray<FDisplayNameEntryId> PackageNameMap;
+			{
+				PackageNameMap = LoadNameBatch(HeaderDataReader);
 			}
 
 			PackageInfo.CookedHeaderSize = PackageSummary->CookedHeaderSize;
-			PackageInfo.PackageName = FName::CreateFromDisplayId(PackageFNames[PackageSummary->Name.GetIndex()], PackageSummary->Name.GetNumber());
+			PackageInfo.PackageName = PackageNameMap[PackageSummary->Name.GetIndex()].ToName(PackageSummary->Name.GetNumber());
 
 			const FPackageObjectIndex* ImportMap = reinterpret_cast<const FPackageObjectIndex*>(PackageSummaryData + PackageSummary->ImportMapOffset);
 			PackageInfo.Imports.SetNum((PackageSummary->ExportMapOffset - PackageSummary->ImportMapOffset) / sizeof(FPackageObjectIndex));
@@ -501,12 +591,12 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 				{
 					const FExportMapEntry& ExportMapEntry = ExportMap[ExportIndex];
 					FIoStoreExport& Export = PackageInfo.Exports[ExportIndex];
-					Export.Name = FName::CreateFromDisplayId(PackageFNames[ExportMapEntry.ObjectName.GetIndex()], ExportMapEntry.ObjectName.GetNumber());
+					Export.Name = PackageNameMap[ExportMapEntry.ObjectName.GetIndex()].ToName(ExportMapEntry.ObjectName.GetNumber());
 					Export.OuterIndex = ExportMapEntry.OuterIndex;
 					Export.ClassIndex = ExportMapEntry.ClassIndex;
 					Export.SuperIndex = ExportMapEntry.SuperIndex;
 					Export.TemplateIndex = ExportMapEntry.TemplateIndex;
-					Export.GlobalImportIndex = ExportMapEntry.GlobalImportIndex;
+					//Export.GlobalImportIndex = ExportMapEntry.GlobalImportIndex;
 					Export.SerialSize = ExportMapEntry.CookedSerialSize;
 					Export.SerialOffset = ExportMapEntry.CookedSerialOffset;
 					Export.ObjectFlags = ExportMapEntry.ObjectFlags;
@@ -520,16 +610,17 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 			FMemory::Memzero(&AssetPackageSummary, sizeof(AssetPackageSummary));
 
 			AssetPackageSummary.Tag = PACKAGE_FILE_TAG;
-			AssetPackageSummary.PackageFlags = PackageSummary->PackageFlags;
+			//AssetPackageSummary.PackageFlags = PackageSummary->PackageFlags;
+			AssetPackageSummary.SetPackageFlags(PackageSummary->PackageFlags);
 			AssetPackageSummary.TotalHeaderSize = PackageSummary->CookedHeaderSize;
 
 			// FNames
-			PackageInfo.AssetSummary->Names.SetNum(PackageFNames.Num());
-			AssetPackageSummary.NameCount = PackageFNames.Num();
+			PackageInfo.AssetSummary->Names.SetNum(PackageNameMap.Num());
+			AssetPackageSummary.NameCount = PackageNameMap.Num();
 			AssetPackageSummary.NameOffset = 0;
-			for (int32 i = 0; i < PackageFNames.Num(); ++i)
+			for (int32 i = 0; i < PackageNameMap.Num(); ++i)
 			{
-				PackageInfo.AssetSummary->Names[i] = MakeShared<FName>(FName::CreateFromDisplayId(PackageFNames[i], 0));
+				PackageInfo.AssetSummary->Names[i] = MakeShared<FName>(PackageNameMap[i].ToName(0));
 			}
 
 			// Imports
@@ -585,16 +676,16 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 			PackageNameMap.Add(PackageInfo.PackageId, PackageInfo.PackageName);
 		}
 
-		if (PackageInfo.PackageId.IsValid())
-		{
-			for (const FIoStoreExport& Export : PackageInfo.Exports)
-			{
-				if (!Export.GlobalImportIndex.IsNull())
-				{
-					ExportByGlobalIdMap.Add(Export.GlobalImportIndex, &Export);
-				}
-			}
-		}
+		//if (PackageInfo.PackageId.IsValid())
+		//{
+		//	for (const FIoStoreExport& Export : PackageInfo.Exports)
+		//	{
+		//		if (!Export.GlobalImportIndex.IsNull())
+		//		{
+		//			ExportByGlobalIdMap.Add(Export.GlobalImportIndex, &Export);
+		//		}
+		//	}
+		//}
 	}
 
 	ParallelFor(PackageInfos.Num(), [this, &PackageNameMap](int32 Index)
@@ -864,6 +955,18 @@ bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, const FString& I
 		return false;
 	}
 
+	if (Header.Version < static_cast<uint8>(EIoStoreTocVersion::DirectoryIndex))
+	{
+		UE_LOG(LogPakAnalyzer, Error, TEXT("Preload toc file failed! TOC header version outdated! Path: %s."), *InTocPath);
+		return false;
+	}
+
+	if (Header.Version > static_cast<uint8>(EIoStoreTocVersion::Latest))
+	{
+		UE_LOG(LogPakAnalyzer, Error, TEXT("Preload toc file failed! TOC header version too new! Path: %s."), *InTocPath);
+		return false;
+	}
+
 	const uint64 TotalTocSize = TocFileHandle->Size() - sizeof(FIoStoreTocHeader);
 	TUniquePtr<uint8[]> TocBuffer = MakeUnique<uint8[]>(TotalTocSize);
 	if (!TocFileHandle->Read(TocBuffer.Get(), TotalTocSize))
@@ -877,7 +980,8 @@ bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, const FString& I
 	TocResource.Header = Header;
 
 	// Chunk IDs
-	const FIoChunkId* ChunkIds = reinterpret_cast<const FIoChunkId*>(TocBuffer.Get());
+	const uint8* DataPtr = TocBuffer.Get();
+	const FIoChunkId* ChunkIds = reinterpret_cast<const FIoChunkId*>(DataPtr);
 	TocResource.ChunkIds = MakeArrayView<FIoChunkId const>(ChunkIds, Header.TocEntryCount);
 	if (TocResource.ChunkIds.Num() <= 0)
 	{
@@ -888,29 +992,58 @@ bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, const FString& I
 	{
 		TocResource.ChunkIdToIndex.Add(TocResource.ChunkIds[ChunkIndex], ChunkIndex);
 	}
+	DataPtr += Header.TocEntryCount * sizeof(FIoChunkId);
 
 	// Chunk offsets
 	TArray<FIoOffsetAndLength> ChunkOffsetLengthsArray;
-	const FIoOffsetAndLength* ChunkOffsetLengths = reinterpret_cast<const FIoOffsetAndLength*>(ChunkIds + Header.TocEntryCount);
+	const FIoOffsetAndLength* ChunkOffsetLengths = reinterpret_cast<const FIoOffsetAndLength*>(DataPtr);
 	ChunkOffsetLengthsArray = MakeArrayView<FIoOffsetAndLength const>(ChunkOffsetLengths, Header.TocEntryCount);
+	DataPtr += Header.TocEntryCount * sizeof(FIoOffsetAndLength);
+
+	// Chunk perfect hash map
+	uint32 PerfectHashSeedsCount = 0;
+	uint32 ChunksWithoutPerfectHashCount = 0;
+	if (Header.Version >= static_cast<uint8>(EIoStoreTocVersion::PerfectHashWithOverflow))
+	{
+		PerfectHashSeedsCount = Header.TocChunkPerfectHashSeedsCount;
+		ChunksWithoutPerfectHashCount = Header.TocChunksWithoutPerfectHashCount;
+	}
+	else if (Header.Version >= static_cast<uint8>(EIoStoreTocVersion::PerfectHash))
+	{
+		PerfectHashSeedsCount = Header.TocChunkPerfectHashSeedsCount;
+	}
+	if (PerfectHashSeedsCount)
+	{
+		const int32* ChunkPerfectHashSeeds = reinterpret_cast<const int32*>(DataPtr);
+		//OutTocResource.ChunkPerfectHashSeeds = MakeArrayView<int32 const>(ChunkPerfectHashSeeds, PerfectHashSeedsCount);
+		DataPtr += PerfectHashSeedsCount * sizeof(int32);
+	}
+	if (ChunksWithoutPerfectHashCount)
+	{
+		const int32* ChunkIndicesWithoutPerfectHash = reinterpret_cast<const int32*>(DataPtr);
+		//OutTocResource.ChunkIndicesWithoutPerfectHash = MakeArrayView<int32 const>(ChunkIndicesWithoutPerfectHash, ChunksWithoutPerfectHashCount);
+		DataPtr += ChunksWithoutPerfectHashCount * sizeof(int32);
+	}
 
 	// Compression blocks
-	const FIoStoreTocCompressedBlockEntry* CompressionBlocks = reinterpret_cast<const FIoStoreTocCompressedBlockEntry*>(ChunkOffsetLengths + Header.TocEntryCount);
+	const FIoStoreTocCompressedBlockEntry* CompressionBlocks = reinterpret_cast<const FIoStoreTocCompressedBlockEntry*>(DataPtr);
 	TocResource.CompressionBlocks = MakeArrayView<FIoStoreTocCompressedBlockEntry const>(CompressionBlocks, Header.TocCompressedBlockEntryCount);
+	DataPtr += Header.TocCompressedBlockEntryCount * sizeof(FIoStoreTocCompressedBlockEntry);
 
 	// Compression methods
 	TocResource.CompressionMethods.Reserve(Header.CompressionMethodNameCount + 1);
 	TocResource.CompressionMethods.Add(NAME_None);
 
-	const ANSICHAR* AnsiCompressionMethodNames = reinterpret_cast<const ANSICHAR*>(CompressionBlocks + Header.TocCompressedBlockEntryCount);
+	const ANSICHAR* AnsiCompressionMethodNames = reinterpret_cast<const ANSICHAR*>(DataPtr);
 	for (uint32 CompressonNameIndex = 0; CompressonNameIndex < Header.CompressionMethodNameCount; CompressonNameIndex++)
 	{
 		const ANSICHAR* AnsiCompressionMethodName = AnsiCompressionMethodNames + CompressonNameIndex * Header.CompressionMethodNameLength;
 		TocResource.CompressionMethods.Add(FName(AnsiCompressionMethodName));
 	}
+	DataPtr += Header.CompressionMethodNameCount * Header.CompressionMethodNameLength;
 
 	// Chunk block signatures
-	const uint8* SignatureBuffer = reinterpret_cast<const uint8*>(AnsiCompressionMethodNames + Header.CompressionMethodNameCount * Header.CompressionMethodNameLength);
+	const uint8* SignatureBuffer = reinterpret_cast<const uint8*>(DataPtr);
 	const uint8* DirectoryIndexBuffer = SignatureBuffer;
 
 	const bool bIsSigned = EnumHasAnyFlags(Header.ContainerFlags, EIoContainerFlags::Signed);
@@ -919,16 +1052,34 @@ bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, const FString& I
 		const int32* HashSize = reinterpret_cast<const int32*>(SignatureBuffer);
 		TArrayView<const uint8> TocSignature = MakeArrayView<const uint8>(reinterpret_cast<const uint8*>(HashSize + 1), *HashSize);
 		TArrayView<const uint8> BlockSignature = MakeArrayView<const uint8>(TocSignature.GetData() + *HashSize, *HashSize);
+		TArrayView<const uint8> BothSignatures = MakeArrayView<const uint8>(TocSignature.GetData(), *HashSize * 2);
+		//FSHA1::HashBuffer(BothSignatures.GetData(), BothSignatures.Num(), OutTocResource.SignatureHash.Hash);
 		TArrayView<const FSHAHash> ChunkBlockSignatures = MakeArrayView<const FSHAHash>(reinterpret_cast<const FSHAHash*>(BlockSignature.GetData() + *HashSize), Header.TocCompressedBlockEntryCount);
 
 		// Adjust address to meta data
 		DirectoryIndexBuffer = reinterpret_cast<const uint8*>(ChunkBlockSignatures.GetData() + ChunkBlockSignatures.Num());
+
+		//OutTocResource.ChunkBlockSignatures = ChunkBlockSignatures;
 	}
+
+	// Directory index
+	//if (EnumHasAnyFlags(ReadOptions, EIoStoreTocReadOptions::ReadDirectoryIndex) &&
+	//	EnumHasAnyFlags(Header.ContainerFlags, EIoContainerFlags::Indexed) &&
+	//	Header.DirectoryIndexSize > 0)
+	//{
+	//	OutTocResource.DirectoryIndexBuffer = MakeArrayView<const uint8>(DirectoryIndexBuffer, Header.DirectoryIndexSize);
+	//}
 
 	// Meta
 	const uint8* TocMeta = DirectoryIndexBuffer + Header.DirectoryIndexSize;
 	const FIoStoreTocEntryMeta* ChunkMetas = reinterpret_cast<const FIoStoreTocEntryMeta*>(TocMeta);
 	TocResource.ChunkMetas = MakeArrayView<FIoStoreTocEntryMeta const>(ChunkMetas, Header.TocEntryCount);
+
+	if (Header.Version < static_cast<uint8>(EIoStoreTocVersion::PartitionSize))
+	{
+		Header.PartitionCount = 1;
+		Header.PartitionSize = MAX_uint64;
+	}
 
 	bool bShouldLoad = true;
 	if (Header.EncryptionKeyGuid.IsValid() || EnumHasAnyFlags(Header.ContainerFlags, EIoContainerFlags::Encrypted))
@@ -1104,87 +1255,87 @@ bool FIoStoreAnalyzer::FillPackageInfo(const FIoStoreTocResourceInfo& TocResourc
 
 void FIoStoreAnalyzer::OnExtractFiles()
 {
-	TAtomic<int32> TotalErrorCount{ 0 };
-	TAtomic<int32> TotalCompleteCount{ 0 };
-	const int32 TotalTotalCount = PendingExtracePackages.Num();
+	//TAtomic<int32> TotalErrorCount{ 0 };
+	//TAtomic<int32> TotalCompleteCount{ 0 };
+	//const int32 TotalTotalCount = PendingExtracePackages.Num();
 
-	ParallelFor(PendingExtracePackages.Num(), [this, TotalTotalCount, &TotalErrorCount, &TotalCompleteCount](int32 Index)
-	{
-		if (IsStopExtract)
-		{
-			return;
-		}
+	//ParallelFor(PendingExtracePackages.Num(), [this, TotalTotalCount, &TotalErrorCount, &TotalCompleteCount](int32 Index)
+	//{
+	//	if (IsStopExtract)
+	//	{
+	//		return;
+	//	}
 
-		const int32 PackageIndex = PendingExtracePackages[Index];
-		if (!PackageInfos.IsValidIndex(PackageIndex))
-		{
-			TotalCompleteCount.IncrementExchange();
-			TotalErrorCount.IncrementExchange();
-			UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
-			return;
-		}
+	//	const int32 PackageIndex = PendingExtracePackages[Index];
+	//	if (!PackageInfos.IsValidIndex(PackageIndex))
+	//	{
+	//		TotalCompleteCount.IncrementExchange();
+	//		TotalErrorCount.IncrementExchange();
+	//		UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+	//		return;
+	//	}
 
-		const FStorePackageInfo& PackageInfo = PackageInfos[PackageIndex];
-		TSharedPtr<FIoStoreReader>& Reader = StoreContainers[PackageInfo.ContainerIndex].Reader;
-		if (!Reader.IsValid())
-		{
-			TotalCompleteCount.IncrementExchange();
-			TotalErrorCount.IncrementExchange();
-			UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
-			return;
-		}
+	//	const FStorePackageInfo& PackageInfo = PackageInfos[PackageIndex];
+	//	TSharedPtr<FIoStoreReader>& Reader = StoreContainers[PackageInfo.ContainerIndex].Reader;
+	//	if (!Reader.IsValid())
+	//	{
+	//		TotalCompleteCount.IncrementExchange();
+	//		TotalErrorCount.IncrementExchange();
+	//		UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+	//		return;
+	//	}
 
-		FIoReadOptions ReadOptions;
-		TIoStatusOr<FIoBuffer> IoBuffer = Reader->Read(PackageInfo.ChunkId, ReadOptions);
-		if (!IoBuffer.IsOk())
-		{
-			TotalCompleteCount.IncrementExchange();
-			TotalErrorCount.IncrementExchange();
-			UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
-			return;
-		}
+	//	FIoReadOptions ReadOptions;
+	//	TIoStatusOr<FIoBuffer> IoBuffer = Reader->Read(PackageInfo.ChunkId, ReadOptions);
+	//	if (!IoBuffer.IsOk())
+	//	{
+	//		TotalCompleteCount.IncrementExchange();
+	//		TotalErrorCount.IncrementExchange();
+	//		UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+	//		return;
+	//	}
 
-		const FString OutputFilePath = ExtractOutputPath / PackageInfo.PackageName.ToString() + TEXT(".") + PackageInfo.Extension.ToString();
-		const FString BasePath = FPaths::GetPath(OutputFilePath);
-		if (!FPaths::DirectoryExists(BasePath))
-		{
-			IFileManager::Get().MakeDirectory(*BasePath, true);
-		}
+	//	const FString OutputFilePath = ExtractOutputPath / PackageInfo.PackageName.ToString() + TEXT(".") + PackageInfo.Extension.ToString();
+	//	const FString BasePath = FPaths::GetPath(OutputFilePath);
+	//	if (!FPaths::DirectoryExists(BasePath))
+	//	{
+	//		IFileManager::Get().MakeDirectory(*BasePath, true);
+	//	}
 
-		IPlatformFile& PlatformFile = IPlatformFile::GetPlatformPhysical();
-		TUniquePtr<IFileHandle>	FileHandle(PlatformFile.OpenWrite(*OutputFilePath));
-		if (!FileHandle.IsValid())
-		{
-			TotalCompleteCount.IncrementExchange();
-			TotalErrorCount.IncrementExchange();
-			UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
-			return;
-		}
+	//	IPlatformFile& PlatformFile = IPlatformFile::GetPlatformPhysical();
+	//	TUniquePtr<IFileHandle>	FileHandle(PlatformFile.OpenWrite(*OutputFilePath));
+	//	if (!FileHandle.IsValid())
+	//	{
+	//		TotalCompleteCount.IncrementExchange();
+	//		TotalErrorCount.IncrementExchange();
+	//		UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+	//		return;
+	//	}
 
-		if (PackageInfo.ChunkType == EIoChunkType::ExportBundleData)
-		{
-			const uint8* PackageSummaryData = IoBuffer.ValueOrDie().Data();
-			const FPackageSummary* PackageSummary = reinterpret_cast<const FPackageSummary*>(PackageSummaryData);
+	//	if (PackageInfo.ChunkType == EIoChunkType::ExportBundleData)
+	//	{
+	//		const uint8* PackageSummaryData = IoBuffer.ValueOrDie().Data();
+	//		const FPackageSummary* PackageSummary = reinterpret_cast<const FPackageSummary*>(PackageSummaryData);
 
-			const uint8* Start = PackageSummaryData + PackageSummary->GraphDataOffset + PackageSummary->GraphDataSize;
-			const uint8* End = PackageSummaryData + IoBuffer.ValueOrDie().DataSize();
+	//		const uint8* Start = PackageSummaryData + PackageSummary->GraphDataOffset + PackageSummary->GraphDataSize;
+	//		const uint8* End = PackageSummaryData + IoBuffer.ValueOrDie().DataSize();
 
-			FileHandle->Write(Start, End - Start);
+	//		FileHandle->Write(Start, End - Start);
 
-			const uint32 PackageTag = PACKAGE_FILE_TAG;
-			FileHandle->Write((const uint8*)&PackageTag, 4);
-		}
-		else
-		{
-			FileHandle->Write(IoBuffer.ValueOrDie().Data(), IoBuffer.ValueOrDie().DataSize());
-		}
+	//		const uint32 PackageTag = PACKAGE_FILE_TAG;
+	//		FileHandle->Write((const uint8*)&PackageTag, 4);
+	//	}
+	//	else
+	//	{
+	//		FileHandle->Write(IoBuffer.ValueOrDie().Data(), IoBuffer.ValueOrDie().DataSize());
+	//	}
 
-		FileHandle->Flush();
+	//	FileHandle->Flush();
 
-		TotalCompleteCount.IncrementExchange();
+	//	TotalCompleteCount.IncrementExchange();
 
-		UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
-	}, EParallelForFlags::Unbalanced);
+	//	UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+	//}, EParallelForFlags::Unbalanced);
 }
 
 void FIoStoreAnalyzer::StopExtract()
