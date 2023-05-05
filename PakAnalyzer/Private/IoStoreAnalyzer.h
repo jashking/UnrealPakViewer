@@ -48,7 +48,11 @@ protected:
 
 protected:
 	TSharedPtr<FIoStoreReader> GlobalIoStoreReader;
+#if (ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1)
 	TArray<FDisplayNameEntryId> GlobalNameMap;
+#else
+	TArray<FNameEntryId> GlobalNameMap;
+#endif
 	TArray<FContainerInfo> StoreContainers;
 	TArray<FStorePackageInfo> PackageInfos;
 	TMap<FString, int32> FileToPackageIndex;

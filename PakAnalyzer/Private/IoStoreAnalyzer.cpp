@@ -262,10 +262,18 @@ bool FIoStoreAnalyzer::InitializeGlobalReader(const FString& InPakPath)
 	for (int32 ScriptObjectIndex = 0; ScriptObjectIndex < NumScriptObjects; ++ScriptObjectIndex)
 	{
 		const FScriptObjectEntry& ScriptObjectEntry = ScriptObjectEntries[ScriptObjectIndex];
+#if (ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1)
 		FMappedName MappedName = ScriptObjectEntry.Mapped;
+#else
+		const FMappedName& MappedName = FMappedName::FromMinimalName(ScriptObjectEntry.ObjectName);
+#endif
 		check(MappedName.IsGlobal());
 		FScriptObjectDesc& ScriptObjectDesc = ScriptObjectByGlobalIdMap.Add(ScriptObjectEntry.GlobalIndex);
+#if (ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1)
 		ScriptObjectDesc.Name = GlobalNameMap[MappedName.GetIndex()].ToName(MappedName.GetNumber());
+#else
+		ScriptObjectDesc.Name = FName::CreateFromDisplayId(GlobalNameMap[MappedName.GetIndex()], MappedName.GetNumber());
+#endif
 		ScriptObjectDesc.GlobalImportIndex = ScriptObjectEntry.GlobalIndex;
 		ScriptObjectDesc.OuterIndex = ScriptObjectEntry.OuterIndex;
 	}
@@ -464,10 +472,20 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 
 			Ar << ContainerHeader.PackageIds;
 			Ar << ContainerHeader.StoreEntries;
+#if (ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1)
 			if (Version >= EIoContainerHeaderVersion::OptionalSegmentPackages)
 			{
 				Ar << ContainerHeader.OptionalSegmentPackageIds;
 				Ar << ContainerHeader.OptionalSegmentStoreEntries;
+#else
+			if ((int32)Version >= 2)
+			{
+				TArray<FPackageId> OptionalSegmentPackageIds;
+				TArray<uint8> OptionalSegmentStoreEntries; //FPackageStoreEntry[OptionalSegmentPackageIds.Num()]
+
+				Ar << OptionalSegmentPackageIds;
+				Ar << OptionalSegmentStoreEntries;
+#endif
 			}
 			ContainerHeader.RedirectsNameMap = LoadNameBatch(Ar);
 			Ar << ContainerHeader.LocalizedPackages;
@@ -565,14 +583,21 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 				HeaderDataReader << VersioningInfo;
 			}
 
+#if (ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1)
 			TArray<FDisplayNameEntryId> PackageNameMap;
+#else
+			TArray<FNameEntryId> PackageNameMap;
+#endif
 			{
 				PackageNameMap = LoadNameBatch(HeaderDataReader);
 			}
 
 			PackageInfo.CookedHeaderSize = PackageSummary->CookedHeaderSize;
+#if (ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1)
 			PackageInfo.PackageName = PackageNameMap[PackageSummary->Name.GetIndex()].ToName(PackageSummary->Name.GetNumber());
-
+#else
+			PackageInfo.PackageName = FName::CreateFromDisplayId(PackageNameMap[PackageSummary->Name.GetIndex()], PackageSummary->Name.GetNumber());
+#endif
 			const FPackageObjectIndex* ImportMap = reinterpret_cast<const FPackageObjectIndex*>(PackageSummaryData + PackageSummary->ImportMapOffset);
 			PackageInfo.Imports.SetNum((PackageSummary->ExportMapOffset - PackageSummary->ImportMapOffset) / sizeof(FPackageObjectIndex));
 			for (int32 ImportIndex = 0; ImportIndex < PackageInfo.Imports.Num(); ++ImportIndex)
@@ -591,7 +616,11 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 				{
 					const FExportMapEntry& ExportMapEntry = ExportMap[ExportIndex];
 					FIoStoreExport& Export = PackageInfo.Exports[ExportIndex];
+#if (ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1)
 					Export.Name = PackageNameMap[ExportMapEntry.ObjectName.GetIndex()].ToName(ExportMapEntry.ObjectName.GetNumber());
+#else			
+					Export.Name = FName::CreateFromDisplayId(PackageNameMap[ExportMapEntry.ObjectName.GetIndex()], ExportMapEntry.ObjectName.GetNumber());
+#endif
 					Export.OuterIndex = ExportMapEntry.OuterIndex;
 					Export.ClassIndex = ExportMapEntry.ClassIndex;
 					Export.SuperIndex = ExportMapEntry.SuperIndex;
@@ -620,7 +649,11 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 			AssetPackageSummary.NameOffset = 0;
 			for (int32 i = 0; i < PackageNameMap.Num(); ++i)
 			{
+#if (ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1)
 				PackageInfo.AssetSummary->Names[i] = MakeShared<FName>(PackageNameMap[i].ToName(0));
+#else			
+				PackageInfo.AssetSummary->Names[i] = MakeShared<FName>(FName::CreateFromDisplayId(PackageNameMap[i], 0));
+#endif
 			}
 
 			// Imports
