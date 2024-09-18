@@ -1,12 +1,7 @@
 #include "BaseAnalyzer.h"
 
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
 #include "AssetRegistry/AssetRegistryState.h"
-#else
-#include "AssetRegistryState.h"
-#endif
 #include "Json.h"
-#include "Launch/Resources/Version.h"
 #include "Misc/Base64.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -24,7 +19,7 @@ FBaseAnalyzer::~FBaseAnalyzer()
 
 }
 
-bool FBaseAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys)
+bool FBaseAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys, int32 ContainerStartIndex)
 {
 	Reset();
 	return false;
@@ -110,11 +105,7 @@ void FBaseAnalyzer::RefreshPackageDependency(FPakTreeEntryPtr InTreeRoot, FPakTr
 		else
 		{
 			TArray<FAssetIdentifier> Dependencies;
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 			if (AssetRegistryState->GetDependencies(Child->PackagePath, Dependencies, UE::AssetRegistry::EDependencyCategory::All))
-#else
-			if (AssetRegistryState->GetDependencies(Child->PackagePath, Dependencies, EAssetRegistryDependencyType::All))
-#endif
 			{
 				if (!Child->AssetSummary.IsValid())
 				{
@@ -135,11 +126,7 @@ void FBaseAnalyzer::RefreshPackageDependency(FPakTreeEntryPtr InTreeRoot, FPakTr
 			}
 
 			TArray<FAssetIdentifier> Dependents;
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 			if (AssetRegistryState->GetReferencers(Child->PackagePath, Dependents, UE::AssetRegistry::EDependencyCategory::All))
-#else
-			if (AssetRegistryState->GetReferencers(Child->PackagePath, Dependents, EAssetRegistryDependencyType::All))
-#endif
 			{
 				if (!Child->AssetSummary.IsValid())
 				{
@@ -443,20 +430,11 @@ FName FBaseAnalyzer::GetAssetClass(const FString& InFilename, FName InPackagePat
 	FName AssetClass = *FPaths::GetExtension(InFilename);
 	if (AssetRegistryState.IsValid())
 	{
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
 		TArrayView<FAssetData const* const> AssetDataArray = AssetRegistryState->GetAssetsByPackageName(InPackagePath);
-#else
-		const TArray<const FAssetData*>& AssetDataArray = AssetRegistryState->GetAssetsByPackageName(InPackagePath);
-#endif
 		if (AssetDataArray.Num() > 0)
 		{
 			bFoundClassInRegistry = true;
-
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
 			AssetClass = AssetDataArray[0]->AssetClassPath.GetAssetName();
-#else
-			AssetClass = AssetDataArray[0]->AssetClass;
-#endif
 		}
 	}
 	
@@ -514,7 +492,6 @@ void FBaseAnalyzer::Reset()
 
 FString FBaseAnalyzer::ResolveCompressionMethod(const FPakFileSumary& Summary, const FPakEntry* InPakEntry) const
 {
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 22
 	if (InPakEntry->CompressionMethodIndex >= 0 && InPakEntry->CompressionMethodIndex < (uint32)Summary.PakInfo.CompressionMethods.Num())
 	{
 		return Summary.PakInfo.CompressionMethods[InPakEntry->CompressionMethodIndex].ToString();
@@ -523,18 +500,6 @@ FString FBaseAnalyzer::ResolveCompressionMethod(const FPakFileSumary& Summary, c
 	{
 		return TEXT("Unknown");
 	}
-#else
-	static const TArray<FString> CompressionMethods({ TEXT("None"), TEXT("Zlib"), TEXT("Gzip"), TEXT("Unknown"), TEXT("Custom") });
-
-	if (InPakEntry->CompressionMethod >= 0 && InPakEntry->CompressionMethod < CompressionMethods.Num())
-	{
-		return CompressionMethods[InPakEntry->CompressionMethod];
-	}
-	else
-	{
-		return TEXT("Unknown");
-	}
-#endif
 }
 
 FPakTreeEntryPtr FBaseAnalyzer::InsertFileToTree(FPakTreeEntryPtr InRoot, const FPakFileSumary& Summary, const FString& InFullPath, const FPakEntry& InPakEntry)

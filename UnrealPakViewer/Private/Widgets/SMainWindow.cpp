@@ -6,9 +6,9 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Docking/TabManager.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
+#include "HAL/FileManager.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "HAL/PlatformFile.h"
-#include "Launch/Resources/Version.h"
 #include "Misc/DateTime.h"
 #include "Misc/MessageDialog.h"
 #include "Misc/Paths.h"
@@ -166,11 +166,7 @@ TSharedRef<SWidget> SMainWindow::MakeMainMenu()
 	TSharedRef<SWidget> MenuBarWidget = MenuBarBuilder.MakeWidget();
 
 	// Tell tab-manager about the multi-box for platforms with a global menu bar
-#if ENGINE_MAJOR_VERSION >= 5
 	TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox(), MenuBarWidget);
-#else
-	TabManager->SetMenuMultiBox(MenuBarBuilder.GetMultiBox());
-#endif
 
 	return MenuBarWidget;
 }
@@ -180,8 +176,8 @@ void SMainWindow::FillFileMenu(class FMenuBuilder& MenuBuilder)
 	MenuBuilder.BeginSection("Load and Save", LOCTEXT("LoadText", "Load"));
 	{
 		MenuBuilder.AddMenuEntry(
-			LOCTEXT("Open", "Open pak..."),
-			LOCTEXT("Open_ToolTip", "Open an unreal pak file."),
+			LOCTEXT("LoadPak", "Load pak/ucas files..."),
+			LOCTEXT("LoadPak_ToolTip", "Load unreal pak/ucas files."),
 			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "LoadPak"),
 			FUIAction(
 				FExecuteAction::CreateSP(this, &SMainWindow::OnLoadPakFile),
@@ -192,8 +188,20 @@ void SMainWindow::FillFileMenu(class FMenuBuilder& MenuBuilder)
 		);
 
 		MenuBuilder.AddMenuEntry(
-			LOCTEXT("OpenFolder", "Open folder..."),
-			LOCTEXT("OpenFolder_ToolTip", "Open an cooked output folder."),
+			LOCTEXT("LoadDirectory", "Load directory..."),
+			LOCTEXT("LoadDirectory_ToolTip", "Load all pak/ucas files in directory."),
+			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "FolderClosed"),
+			FUIAction(
+				FExecuteAction::CreateSP(this, &SMainWindow::OnLoadAllFilesInFolder),
+				FCanExecuteAction()
+			),
+			NAME_None,
+			EUserInterfaceActionType::Button
+		);
+		
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("LoadCookedFolder", "Load cooked folder..."),
+			LOCTEXT("LoadCookedFolder_ToolTip", "Load an cooked output folder."),
 			FSlateIcon(FUnrealPakViewerStyle::GetStyleSetName(), "FolderClosed"),
 			FUIAction(
 				FExecuteAction::CreateSP(this, &SMainWindow::OnLoadFolder),
@@ -311,6 +319,47 @@ void SMainWindow::OnLoadPakFile()
 	}
 }
 
+void SMainWindow::OnLoadAllFilesInFolder()
+{
+	FString OutFolder;
+	bool bOpened = false;
+
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (DesktopPlatform)
+	{
+		FSlateApplication::Get().CloseToolTip();
+
+		bOpened = DesktopPlatform->OpenDirectoryDialog
+		(
+			FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr),
+			LOCTEXT("LoadAlllFiles_FolderDesc", "Load all pak/ucas files...").ToString(),
+			TEXT(""),
+			OutFolder
+		);
+	}
+
+	if (bOpened)
+	{
+		TArray<FString> ContainerFilePaths;
+		
+		TArray<FString> FoundContainerFiles;
+		IFileManager::Get().FindFilesRecursive(FoundContainerFiles, *OutFolder, TEXT("*.ucas"), true, false);
+		for (const FString& Filename : FoundContainerFiles)
+		{
+			ContainerFilePaths.Emplace(Filename);
+		}
+
+		TArray<FString> FoundPakFiles;
+		IFileManager::Get().FindFilesRecursive(FoundPakFiles, *OutFolder, TEXT("*.pak"), true, false);
+		for (const FString& Filename : FoundPakFiles)
+		{
+			ContainerFilePaths.Emplace(Filename);
+		}
+		
+		LoadPakFile(ContainerFilePaths);
+	}
+}
+
 void SMainWindow::OnLoadFolder()
 {
 	FString OutFolder;
@@ -360,11 +409,7 @@ FString SMainWindow::OnGetAESKey(const FString& InPakPath, const FGuid& PakGuid,
 
 void SMainWindow::OnSwitchToTreeView(const FString& InPath, int32 PakIndex)
 {
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 	TSharedPtr<SDockTab> TreeViewTab = TabManager->TryInvokeTab(TreeViewTabId);
-#else
-	TSharedPtr<SDockTab> TreeViewTab = TabManager->InvokeTab(TreeViewTabId);
-#endif
 	if (TreeViewTab.IsValid())
 	{
 		TSharedRef<SPakTreeView> TreeView = StaticCastSharedRef<SPakTreeView>(TreeViewTab->GetContent());
@@ -374,11 +419,7 @@ void SMainWindow::OnSwitchToTreeView(const FString& InPath, int32 PakIndex)
 
 void SMainWindow::OnSwitchToFileView(const FString& InPath, int32 PakIndex)
 {
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 	TSharedPtr<SDockTab> FileViewTab = TabManager->TryInvokeTab(FileViewTabId);
-#else
-	TSharedPtr<SDockTab> FileViewTab = TabManager->InvokeTab(FileViewTabId);
-#endif
 	if (FileViewTab.IsValid())
 	{
 		TSharedRef<SPakFileView> FileView = StaticCastSharedRef<SPakFileView>(FileViewTab->GetContent());

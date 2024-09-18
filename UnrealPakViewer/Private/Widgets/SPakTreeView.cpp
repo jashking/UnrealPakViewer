@@ -4,7 +4,6 @@
 //#include "EditorStyle.h"
 #include "Framework/Application/SlateApplication.h"
 #include "IPlatformFilePak.h"
-#include "Launch/Resources/Version.h"
 #include "Misc/Guid.h"
 #include "Misc/Paths.h"
 #include "Styling/CoreStyle.h"
@@ -256,9 +255,7 @@ TSharedRef<ITableRow> SPakTreeView::OnGenerateTreeRow(FPakTreeEntryPtr TreeNode,
 						[
 							SNew(STextBlock)
 							.Text(FText::FromString(FString::Printf(TEXT("%.2f%%"), TreeNode->CompressedSizePercentOfTotal * 100)))
-#if ENGINE_MAJOR_VERSION < 5
 							.ColorAndOpacity(FLinearColor::Black)
-#endif
 						]
 					]
 				]

@@ -10,9 +10,7 @@
 #include "IO/IoContainerHeader.h"
 #include "Serialization/AsyncLoading2.h"
 
-#if ENGINE_MAJOR_VERSION >= 5
 #include "IO/PackageStore.h"
-#endif // ENGINE_MAJOR_VERSION >= 5
 
 #include "PakFileEntry.h"
 
@@ -27,6 +25,7 @@ enum class EIoStoreTocVersion : uint8
 	PartitionSize,
 	PerfectHash,
 	PerfectHashWithOverflow,
+	OnDemandMetaData,
 	LatestPlusOne,
 	Latest = LatestPlusOne - 1
 };
@@ -233,8 +232,8 @@ struct FPackageStoreExportEntry
 {
 	FPackageStoreExportEntry(const FFilePackageStoreEntry& InEntry)
 		//: ExportBundlesSize(InEntry.ExportBundlesSize)
-		: ExportCount(InEntry.ExportCount)
-		, ExportBundleCount(InEntry.ExportBundleCount)
+		// : ExportCount(InEntry.ExportCount)
+		// , ExportBundleCount(InEntry.ExportBundleCount)
 		//, LoadOrder(InEntry.LoadOrder)
 		//, Pad(InEntry.Pad)
 	{
@@ -264,7 +263,7 @@ struct FContainerInfo
 
 	FPakFileSumary Summary;
 	TSharedPtr<FIoStoreReader> Reader;
-
+	
 	TMap<FPackageId, FPackageStoreExportEntry> StoreEntryMap;
 };
 
@@ -272,6 +271,7 @@ struct FIoStoreExport
 {
 	FName Name;
 	FName FullName;
+	uint64 PublicExportHash = 0;
 	FPackageObjectIndex OuterIndex;
 	FPackageObjectIndex ClassIndex;
 	FPackageObjectIndex SuperIndex;
@@ -310,6 +310,7 @@ struct FStorePackageInfo
 	FAssetSummaryPtr AssetSummary;
 	TArray<FPackageId> DependencyPackages;
 	FName DefaultClassName;
+	TArray<uint64> ImportedPublicExportHashes;
 
 	inline bool operator ==(const FStorePackageInfo& Rhs) const
 	{

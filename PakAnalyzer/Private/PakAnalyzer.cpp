@@ -2,35 +2,24 @@
 
 #include "PakAnalyzer.h"
 
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1
 #include "AssetRegistry/ARFilter.h"
 #include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/AssetRegistryState.h"
-#else
-#include "ARFilter.h"
-#include "AssetData.h"
-#include "AssetRegistryState.h"
-#endif
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFile.h"
 #include "HAL/PlatformMisc.h"
 #include "Json.h"
-#include "Launch/Resources/Version.h"
 #include "Misc/Base64.h"
 #include "Misc/Paths.h"
 #include "Misc/ScopeLock.h"
-#include "Serialization/Archive.h"
-#include "Serialization/MemoryWriter.h"
+// #include "Serialization/Archive.h"
+// #include "Serialization/MemoryWriter.h"
 
 #include "AssetParseThreadWorker.h"
 #include "CommonDefines.h"
 #include "ExtractThreadWorker.h"
 
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 typedef FPakFile::FPakEntryIterator RecordIterator;
-#else
-typedef FPakFile::FFileIterator RecordIterator;
-#endif
 
 FPakAnalyzer::FPakAnalyzer()
 	: ExtractWorkerCount(DEFAULT_EXTRACT_THREAD_COUNT)
@@ -71,14 +60,9 @@ FPakTreeEntryPtr FPakAnalyzer::LoadPakFile(const FString& InPakPath, const FStri
 		UE_LOG(LogPakAnalyzer, Error, TEXT("Load pak file failed! Pre load pak file failed! Path: %s."), *InPakPath);
 		return nullptr;
 	}
-
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
+	
 	TRefCountPtr<FPakFile> PakFile = new FPakFile(*InPakPath, false);
 	FPakFile* PakFilePtr = PakFile.GetReference();
-#else
-	TSharedPtr<FPakFile> PakFile = MakeShared<FPakFile>(*InPakPath, false);
-	FPakFile* PakFilePtr = PakFile.Get();
-#endif // ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 27
 	if (!PakFilePtr)
 	{
 		FPakAnalyzerDelegates::OnLoadPakFailed.ExecuteIfBound(FString::Printf(TEXT("Load pak file failed! Create PakFile failed! Path: %s."), *InPakPath));
@@ -132,12 +116,7 @@ FPakTreeEntryPtr FPakAnalyzer::LoadPakFile(const FString& InPakPath, const FStri
 	TArray<FPakEntryWithFilename> Records;
 	for (RecordIterator It(*PakFilePtr, true); It; ++It)
 	{
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 		const FString& Filename = *It.TryGetFilename();
-#else
-		const FString& Filename = It.Filename();
-#endif
-
 		Records.Add({ It.Info(), Filename });
 	}
 
@@ -154,10 +133,8 @@ FPakTreeEntryPtr FPakAnalyzer::LoadPakFile(const FString& InPakPath, const FStri
 			{
 				PakEntry.CompressionBlockSize = PakEntry.UncompressedSize;
 			}
-
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
+			
 			PakFilePtr->ReadHashFromPayload(PakEntry, PakEntry.Hash);
-#endif
 
 			FString FullFilePath = Summary->MountPoint / Record.Filename;
 			FullFilePath.ReplaceInline(TEXT("../"), TEXT(""));
@@ -182,7 +159,7 @@ FPakTreeEntryPtr FPakAnalyzer::LoadPakFile(const FString& InPakPath, const FStri
 	return PakTreeRoot;
 }
 
-bool FPakAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys)
+bool FPakAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys, int32 ContainerStartIndex)
 {
 	TArray<FString> PakFiles;
 	TArray<FString> UsedDefaultAESKeys;
@@ -228,7 +205,7 @@ bool FPakAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<
 
 	ParseAssetFile();
 
-	FPakAnalyzerDelegates::OnPakLoadFinish.Broadcast();
+	//FPakAnalyzerDelegates::OnPakLoadFinish.Broadcast();
 
 	return true;
 }
@@ -321,59 +298,51 @@ bool FPakAnalyzer::LoadAssetRegistryFromPak(FPakFile* InPakFile, FPakFileEntryPt
 	{
 		return false;
 	}
-
+	
 	const bool bHasRelativeCompressedChunkOffsets = InPakFile->GetInfo().Version >= FPakInfo::PakFile_Version_RelativeChunkOffsets;
-
+	
 	const int64 BufferSize = 8 * 1024 * 1024; // 8MB buffer for extracting
 	void* Buffer = FMemory::Malloc(BufferSize);
 	uint8* PersistantCompressionBuffer = NULL;
 	int64 CompressionBufferSize = 0;
-
+	
 	bool bReadResult = true;
 	const FPakEntry& EntryInfo = InPakFileEntry->PakEntry;
-
+	
 	FArrayReader ContentReader;
 	ContentReader.AddZeroed(InPakFileEntry->PakEntry.UncompressedSize);
-
+	
 	FMemoryWriter ContentWriter(ContentReader);
-
+	
 	if (EntryInfo.CompressionMethodIndex == 0)
 	{
-#if ENGINE_MAJOR_VERSION >= 5
 		if (!FExtractThreadWorker::BufferedCopyFile(ContentWriter, InPakFile->GetSharedReader(nullptr).GetArchive(), EntryInfo, Buffer, BufferSize, DecryptAESKey))
-#else
-		if (!FExtractThreadWorker::BufferedCopyFile(ContentWriter, *InPakFile->GetSharedReader(nullptr), EntryInfo, Buffer, BufferSize, DecryptAESKey))
-#endif
 		{
 			bReadResult = false;
 		}
 	}
 	else
 	{
-#if ENGINE_MAJOR_VERSION >= 5
 		if (!FExtractThreadWorker::UncompressCopyFile(ContentWriter, InPakFile->GetSharedReader(nullptr).GetArchive(), EntryInfo, PersistantCompressionBuffer, CompressionBufferSize, DecryptAESKey, InPakFileEntry->CompressionMethod, bHasRelativeCompressedChunkOffsets))
-#else
-		if (!FExtractThreadWorker::UncompressCopyFile(ContentWriter, *InPakFile->GetSharedReader(nullptr), EntryInfo, PersistantCompressionBuffer, CompressionBufferSize, DecryptAESKey, InPakFileEntry->CompressionMethod, bHasRelativeCompressedChunkOffsets))
-#endif
 		{
 			bReadResult = false;
 		}
 	}
-
+	
 	FMemory::Free(Buffer);
 	FMemory::Free(PersistantCompressionBuffer);
-
+	
 	if (!bReadResult)
 	{
 		return false;
 	}
-
+	
 	const bool bLoadResult = LoadAssetRegistry(ContentReader);
 	if (bLoadResult)
 	{
 		AssetRegistryPath = InPakFileEntry->Path;
 	}
-
+	
 	return bLoadResult;
 }
 
@@ -531,11 +500,7 @@ bool FPakAnalyzer::TryDecryptPak(FArchive* InReader, const FPakInfo& InPakInfo, 
 
 			if (InPakInfo.EncryptionKeyGuid.IsValid())
 			{
-#if ENGINE_MAJOR_VERSION >= 5 || ENGINE_MINOR_VERSION >= 26
 				FCoreDelegates::GetRegisterEncryptionKeyMulticastDelegate().Broadcast(InPakInfo.EncryptionKeyGuid, AESKey);
-#else
-				FCoreDelegates::GetRegisterEncryptionKeyDelegate().ExecuteIfBound(InPakInfo.EncryptionKeyGuid, AESKey);
-#endif
 			}
 		}
 	}

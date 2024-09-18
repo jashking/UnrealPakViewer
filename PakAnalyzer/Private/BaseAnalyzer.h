@@ -19,7 +19,7 @@ public:
 	FBaseAnalyzer();
 	virtual ~FBaseAnalyzer();
 
-	virtual bool LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys) override;
+	virtual bool LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys, int32 ContainerStartIndex = 0) override;
 	virtual void GetFiles(const FString& InFilterText, const TMap<FName, bool>& InClassFilterMap, const TMap<int32, bool>& InPakIndexFilter, TArray<FPakFileEntryPtr>& OutFiles) const override;
 	virtual const TArray<FPakFileSumaryPtr>& GetPakFileSumary() const override;
 	virtual const TArray<FPakTreeEntryPtr>& GetPakTreeRootNode() const override;

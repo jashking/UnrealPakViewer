@@ -28,6 +28,7 @@ protected:
 
 	void OnExit(const TSharedRef<SWindow>& InWindow);
 	void OnLoadPakFile();
+	void OnLoadAllFilesInFolder();
 	void OnLoadFolder();
 	void OnLoadPakFailed(const FString& InReason);
 	FString OnGetAESKey(const FString& InPakPath, const FGuid& PakGuid, bool& bCancel);

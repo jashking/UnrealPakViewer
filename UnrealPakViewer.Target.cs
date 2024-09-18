@@ -12,9 +12,9 @@ public class UnrealPakViewerTarget : TargetRules
         LinkType = TargetLinkType.Monolithic;
         LaunchModuleName = "UnrealPakViewer";
         SolutionDirectory = "ExternalPrograms";
-        DefaultBuildSettings = BuildSettingsVersion.V2;
+        DefaultBuildSettings = BuildSettingsVersion.Latest;
 
-		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_1;
+		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
 		//ExtraModuleNames.Add("EditorStyle");
 
 		// Lean and mean
@@ -31,6 +31,6 @@ public class UnrealPakViewerTarget : TargetRules
 
 		GlobalDefinitions.Add("NOINITCRASHREPORTER=1");
 		GlobalDefinitions.Add("WITH_CASE_PRESERVING_NAME=0");
-		GlobalDefinitions.Add(string.Format("UNREAL_PAK_VIEWER_VERSION=TEXT(\"{0}\")", "1.4"));
+		GlobalDefinitions.Add(string.Format("UNREAL_PAK_VIEWER_VERSION=TEXT(\"{0}\")", "1.5"));
 	}
 }

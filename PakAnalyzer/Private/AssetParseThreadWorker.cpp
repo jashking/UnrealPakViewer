@@ -6,7 +6,6 @@
 #include "HAL/PlatformProcess.h"
 #include "HAL/RunnableThread.h"
 #include "IPlatformFilePak.h"
-#include "Launch/Resources/Version.h"
 #include "Misc/Compression.h"
 #include "Misc/Paths.h"
 #include "Misc/ScopeLock.h"
@@ -185,8 +184,7 @@ uint32 FAssetParseThreadWorker::Run()
 
 			// Serialize summary
 			Reader << File->AssetSummary->PackageSummary;
-
-#if ENGINE_MAJOR_VERSION >= 5
+			
 			Reader.Seek(0);
 			int32 Tag = 0;
 			Reader << Tag;
@@ -210,8 +208,7 @@ uint32 FAssetParseThreadWorker::Run()
 				// UE4 pak
 				Reader.SetUEVer(FPackageFileVersion(VER_LATEST_ENGINE_UE4, EUnrealEngineObjectUE5Version::INITIAL_VERSION));
 			}
-#endif
-
+			
 			// Serialize Names
 			const int32 NameCount = File->AssetSummary->PackageSummary.NameCount;
 			if (NameCount > 0)

@@ -6,7 +6,6 @@
 #include "HAL/PlatformProcess.h"
 #include "HAL/PlatformTime.h"
 #include "Interfaces/IPluginManager.h"
-#include "Launch/Resources/Version.h"
 #include "Modules/ModuleManager.h"
 #include "StandaloneRenderer.h"
 #include "Stats/Stats2.h"
@@ -36,11 +35,7 @@ void FUnrealPakViewerApplication::Exec()
 
 		FSlateApplication::Get().PumpMessages();
 		FSlateApplication::Get().Tick();
-#if ENGINE_MAJOR_VERSION >= 5
 		FTSTicker::GetCoreTicker().Tick(DeltaTime);
-#else
-		FTicker::GetCoreTicker().Tick(DeltaTime);
-#endif
 
 		// Throttle frame rate.
 		FPlatformProcess::Sleep(FMath::Max<float>(0.0f, IdealFrameTime - (FPlatformTime::Seconds() - LastTime)));
@@ -80,11 +75,6 @@ void FUnrealPakViewerApplication::InitializeApplication()
 	{
 		FModuleManager::Get().LoadModule("SettingsEditor");
 	}
-
-#if ENGINE_MAJOR_VERSION <= 4
-	// Menu anims aren't supported. See Runtime\Slate\Private\Framework\Application\MenuStack.cpp.
-	FSlateApplication::Get().EnableMenuAnimations(false);
-#endif
 
 	FSlateApplication::InitHighDPI(true);
 	FUnrealPakViewerStyle::Initialize();

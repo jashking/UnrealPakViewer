@@ -12,27 +12,24 @@
 #include "Serialization/ArrayReader.h"
 
 #include "BaseAnalyzer.h"
+#include "IoStoreAnalyzer.h"
+#include "PakAnalyzer.h"
 
 struct FPakEntry;
 
-class FFolderAnalyzer : public FBaseAnalyzer, public TSharedFromThis<FFolderAnalyzer>
+class FUnrealAnalyzer : public FBaseAnalyzer, public TSharedFromThis<FUnrealAnalyzer>
 {
 public:
-	FFolderAnalyzer();
-	virtual ~FFolderAnalyzer();
+	FUnrealAnalyzer();
+	virtual ~FUnrealAnalyzer();
 
 	virtual bool LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys, int32 ContainerStartIndex = 0) override;
 	virtual void ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles) override;
 	virtual void CancelExtract() override;
 	virtual void SetExtractThreadCount(int32 InThreadCount) override;
+	virtual void Reset() override;
 
 protected:
-	void ParseAssetFile(FPakTreeEntryPtr InRoot);
-	void InitializeAssetParseWorker();
-	void ShutdownAssetParseWorker();
-	void OnReadAssetContent(FPakFileEntryPtr InFile, bool& bOutSuccess, TArray<uint8>& OutContent);
-	void OnAssetParseFinish(bool bCancel, const TMap<FName, FName>& ClassMap);
-
-protected:
-	TSharedPtr<class FAssetParseThreadWorker> AssetParseWorker;
+	TSharedPtr<FPakAnalyzer> PakAnalyzer;
+	TSharedPtr<FIoStoreAnalyzer> IoStoreAnalyzer;
 };

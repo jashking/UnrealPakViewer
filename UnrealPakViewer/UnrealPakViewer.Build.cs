@@ -8,6 +8,7 @@ using Tools.DotNETCommon;
 #endif
 
 using System.IO;
+using Microsoft.Extensions.Logging;
 
 public class UnrealPakViewer : ModuleRules
 {
@@ -48,7 +49,7 @@ public class UnrealPakViewer : ModuleRules
 		if (!CurrentModuleDirectory.IsUnderDirectory(EngineSourceProgramsDirectory))
 		{
 			string ProjectName = Target.ProjectFile.GetFileNameWithoutExtension();
-			Log.TraceInformation("UnrealPakViewer is outside engine source directory, parent project is: {0}", ProjectName);
+			Logger.LogInformation("UnrealPakViewer is outside engine source directory, parent project is: {ProjectName}", ProjectName);
 
 			PrivateDefinitions.Add(string.Format("ParentProjectName=TEXT(\"{0}\")", ProjectName));
 		}

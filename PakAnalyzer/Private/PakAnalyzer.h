@@ -21,7 +21,7 @@ public:
 	FPakAnalyzer();
 	virtual ~FPakAnalyzer();
 
-	virtual bool LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys) override;
+	virtual bool LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys, int32 ContainerStartIndex = 0) override;
 	virtual void ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles) override;
 	virtual void CancelExtract() override;
 	virtual void SetExtractThreadCount(int32 InThreadCount) override;

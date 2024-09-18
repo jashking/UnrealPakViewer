@@ -26,13 +26,13 @@ public:
 	FIoStoreAnalyzer();
 	virtual ~FIoStoreAnalyzer();
 
-	virtual bool LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys) override;
+	virtual bool LoadPakFiles(const TArray<FString>& InPakPaths, const TArray<FString>& InDefaultAESKeys, int32 ContainerStartIndex = 0) override;
 	virtual void ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles) override;
 	virtual void CancelExtract() override;
 	virtual void SetExtractThreadCount(int32 InThreadCount) override;
-
-protected:
 	virtual void Reset() override;
+	
+protected:
 	TSharedPtr<FIoStoreReader> CreateIoStoreReader(const FString& InPath, const FString& InDefaultAESKey, FString& OutDecryptKey);
 
 	bool InitializeGlobalReader(const FString& InPakPath);
@@ -48,11 +48,7 @@ protected:
 
 protected:
 	TSharedPtr<FIoStoreReader> GlobalIoStoreReader;
-#if (ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 1)
 	TArray<FDisplayNameEntryId> GlobalNameMap;
-#else
-	TArray<FNameEntryId> GlobalNameMap;
-#endif
 	TArray<FContainerInfo> StoreContainers;
 	TArray<FStorePackageInfo> PackageInfos;
 	TMap<FString, int32> FileToPackageIndex;

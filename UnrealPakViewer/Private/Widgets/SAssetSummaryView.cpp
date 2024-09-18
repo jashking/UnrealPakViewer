@@ -1,7 +1,6 @@
 #include "SAssetSummaryView.h"
 
 //#include "EditorStyle.h"
-#include "Launch/Resources/Version.h"
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
@@ -238,15 +237,13 @@ void SAssetSummaryView::Construct(const FArguments& InArgs)
 		[
 			SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_FileVersionUE4", "FileVersionUE4:")).ValueText(this, &SAssetSummaryView::GetFileVersionUE4)
 		]
-
-#if ENGINE_MAJOR_VERSION >= 5
+		
 		+ SVerticalBox::Slot()
 		.AutoHeight()
 		.Padding(0.f, 2.f)
 		[
 			SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_FileVersionUE5", "FileVersionUE5:")).ValueText(this, &SAssetSummaryView::GetFileVersionUE5)
 		]
-#endif
 
 		+ SVerticalBox::Slot()
 		.AutoHeight()
@@ -728,38 +725,22 @@ FORCEINLINE FText SAssetSummaryView::GetIsUnversioned() const
 
 FORCEINLINE FText SAssetSummaryView::GetFileVersionUE4() const
 {
-#if ENGINE_MAJOR_VERSION >= 5
 	return ViewingPackage.IsValid() ? FText::AsNumber(ViewingPackage->AssetSummary->PackageSummary.GetFileVersionUE().FileVersionUE4) : FText();
-#else
-	return ViewingPackage.IsValid() ? FText::AsNumber(ViewingPackage->AssetSummary->PackageSummary.GetFileVersionUE4()) : FText();
-#endif
 }
 
 FORCEINLINE FText SAssetSummaryView::GetFileVersionUE5() const
 {
-#if ENGINE_MAJOR_VERSION >= 5
 	return ViewingPackage.IsValid() ? FText::AsNumber(ViewingPackage->AssetSummary->PackageSummary.GetFileVersionUE().FileVersionUE5) : FText();
-#else
-	return FText();
-#endif
 }
 
 FORCEINLINE FText SAssetSummaryView::GetFileVersionLicenseeUE() const
 {
-#if ENGINE_MAJOR_VERSION >= 5
 	return ViewingPackage.IsValid() ? FText::AsNumber(ViewingPackage->AssetSummary->PackageSummary.GetFileVersionLicenseeUE()) : FText();
-#else
-	return ViewingPackage.IsValid() ? FText::AsNumber(ViewingPackage->AssetSummary->PackageSummary.GetFileVersionLicenseeUE4()) : FText();
-#endif
 }
 
 FORCEINLINE FText SAssetSummaryView::GetPackageFlags() const
 {
-#if ENGINE_MAJOR_VERSION >= 5
 	return ViewingPackage.IsValid() ? FText::FromString(FString::Printf(TEXT("0x%X"), ViewingPackage->AssetSummary->PackageSummary.GetPackageFlags())) : FText();
-#else
-	return ViewingPackage.IsValid() ? FText::FromString(FString::Printf(TEXT("0x%X"), ViewingPackage->AssetSummary->PackageSummary.PackageFlags)) : FText();
-#endif
 }
 
 FORCEINLINE FText SAssetSummaryView::GetExportSize() const

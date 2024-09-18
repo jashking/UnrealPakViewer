@@ -11,6 +11,7 @@
 #include "FolderAnalyzer.h"
 #include "PakAnalyzer.h"
 #include "IoStoreAnalyzer.h"
+#include "UnrealAnalyzer.h"
 
 DEFINE_LOG_CATEGORY(LogPakAnalyzer);
 
@@ -57,15 +58,9 @@ void FPakAnalyzerModule::InitializeAnalyzerBackend(const FString& InFullPath)
 	{
 		AnalyzerInstance = MakeShared<FFolderAnalyzer>();
 	}
-#if ENABLE_IO_STORE_ANALYZER
-	else if (Extension.Equals(TEXT("ucas")) || Extension.Equals(TEXT("utoc")))
-	{
-		AnalyzerInstance = MakeShared<FIoStoreAnalyzer>();
-	}
-#endif // ENABLE_IO_STORE_ANALYZER
 	else
 	{
-		AnalyzerInstance = MakeShared<FPakAnalyzer>();
+		AnalyzerInstance = MakeShared<FUnrealAnalyzer>();
 	}
 }
 
