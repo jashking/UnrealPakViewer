@@ -26,9 +26,12 @@ enum class EIoStoreTocVersion : uint8
 	PerfectHash,
 	PerfectHashWithOverflow,
 	OnDemandMetaData,
+	RemovedOnDemandMetaData,
+	ReplaceIoChunkHashWithIoHash,
 	LatestPlusOne,
 	Latest = LatestPlusOne - 1
 };
+
 
 /**
  * I/O Store TOC header.
@@ -195,16 +198,22 @@ enum class FIoStoreTocEntryMetaFlags : uint8
 
 ENUM_CLASS_FLAGS(FIoStoreTocEntryMetaFlags);
 
+
 /**
  * TOC entry meta data
  */
 struct FIoStoreTocEntryMeta
 {
 	// Source data hash (i.e. not the on disk data)
-	FIoChunkHash ChunkHash;
-	FIoStoreTocEntryMetaFlags Flags;
+	FIoHash ChunkHash;
+	FIoStoreTocEntryMetaFlags Flags = FIoStoreTocEntryMetaFlags::None;
+	uint8 Pad[3] = { 0 };
 };
 
+
+/**
+ * Container TOC data.
+ */
 struct FIoStoreTocResourceInfo
 {
 	enum { CompressionMethodNameLen = 32 };
@@ -213,12 +222,31 @@ struct FIoStoreTocResourceInfo
 	int64 TocFileSize = 0;
 
 	TArray<FIoChunkId> ChunkIds;
-	TMap<FIoChunkId, int32> ChunkIdToIndex;
+	TArray<FIoOffsetAndLength> ChunkOffsetLengths; // Added field
+	TArray<int32> ChunkPerfectHashSeeds; // Used for Perfect Hash lookups
+	TArray<int32> ChunkIndicesWithoutPerfectHash; // Fallback lookup
+
 	TArray<FIoStoreTocCompressedBlockEntry> CompressionBlocks;
+	TArray<FName> CompressionMethods;
+
+	FSHAHash SignatureHash; // Added field
+	TArray<FSHAHash> ChunkBlockSignatures;
+
+	TArray<uint8> DirectoryIndexBuffer;
 	TArray<FIoStoreTocEntryMeta> ChunkMetas;
 
-	TArray<FName> CompressionMethods;
+	static int32 HashChunkIdWithSeed(const FIoChunkId& ChunkId, const TArray<int32>& Seeds)
+	{
+		if (Seeds.Num() == 0)
+		{
+			return INDEX_NONE;
+		}
+
+		uint32 HashValue = GetTypeHash(ChunkId); // Hash the chunk ID
+		return HashValue % Seeds.Num(); // Get index using modulus
+	}
 };
+
 
 struct FScriptObjectDesc
 {

@@ -527,7 +527,7 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 		TSharedPtr<FIoStoreReader>& Reader = ContainerInfo.Reader;
 
 		TIoStatusOr<FIoStoreTocChunkInfo> ChunkInfo = Reader->GetChunkInfo(PackageInfo.ChunkId);
-		PackageInfo.ChunkInfo = ChunkInfo.ValueOrDie();
+		PackageInfo.ChunkInfo = FIoStoreTocChunkInfo(ChunkInfo.ValueOrDie());
 
 		FIoStoreTocResourceInfo* TocResource = TocResources.Find(ContainerInfo.Id.Value());
 		if (TocResource)
@@ -1002,8 +1002,20 @@ bool FIoStoreAnalyzer::PreLoadIoStore(const FString& InTocPath, const FString& I
 
 	for (int32 ChunkIndex = 0; ChunkIndex < TocResource.ChunkIds.Num(); ++ChunkIndex)
 	{
-		TocResource.ChunkIdToIndex.Add(TocResource.ChunkIds[ChunkIndex], ChunkIndex);
+		int32 PerfectHashSeedIndex = TocResource.ChunkPerfectHashSeeds.IsValidIndex(ChunkIndex) ? TocResource.ChunkPerfectHashSeeds[ChunkIndex] : INDEX_NONE;
+
+		if (PerfectHashSeedIndex != INDEX_NONE)
+		{
+			// If a perfect hash seed exists, use it for indexing
+			int32 HashIndex = TocResource.ChunkPerfectHashSeeds[ChunkIndex];
+		}
+		else
+		{
+			// If no perfect hash seed, fall back to a standard index lookup
+			int32 FallbackIndex = TocResource.ChunkIndicesWithoutPerfectHash.Find(ChunkIndex);
+		}
 	}
+
 	DataPtr += Header.TocEntryCount * sizeof(FIoChunkId);
 
 	// Chunk offsets
@@ -1219,7 +1231,7 @@ bool FIoStoreAnalyzer::TryDecryptIoStore(const FIoStoreTocResourceInfo& TocResou
 		Dst += SizeInBlock;
 	}
 
-	FIoChunkHash ChunkHash = FIoChunkHash::HashBuffer(RawData.GetData(), RawData.Num());
+	FIoHash ChunkHash = FIoHash::HashBuffer(RawData.GetData(), RawData.Num());
 	if (ChunkHash != Meta.ChunkHash)
 	{
 		return false;
@@ -1256,10 +1268,38 @@ bool FIoStoreAnalyzer::FillPackageInfo(const FIoStoreTocResourceInfo& TocResourc
 		OutPackageInfo.CompressionBlockCount += 1;
 	}
 
-	const int32* Index = TocResource.ChunkIdToIndex.Find(OutPackageInfo.ChunkId);
-	if (Index && TocResource.ChunkMetas.IsValidIndex(*Index))
+	int32 Index = INDEX_NONE;
+
+	// First, try to find the chunk using the Perfect Hash system
+	if (TocResource.ChunkPerfectHashSeeds.Num() > 0)
 	{
-		OutPackageInfo.ChunkHash = TocResource.ChunkMetas[*Index].ChunkHash.ToString();
+		int32 Seed = FIoStoreTocResourceInfo::HashChunkIdWithSeed(OutPackageInfo.ChunkId, TocResource.ChunkPerfectHashSeeds);
+		Index = TocResource.ChunkPerfectHashSeeds.IsValidIndex(Seed) ? Seed : INDEX_NONE;
+	}
+
+	// If the perfect hash lookup fails, fallback to a linear search
+	if (Index == INDEX_NONE)
+	{
+		int32 FallbackIndex = INDEX_NONE;
+		for (int32 i = 0; i < TocResource.ChunkIds.Num(); ++i)
+		{
+			if (TocResource.ChunkIds[i] == OutPackageInfo.ChunkId)
+			{
+				FallbackIndex = i;
+				break;
+			}
+		}
+
+		if (FallbackIndex != INDEX_NONE)
+		{
+			Index = FallbackIndex;
+		}
+	}
+
+	// Check if the index is valid and assign the chunk hash
+	if (Index != INDEX_NONE && TocResource.ChunkMetas.IsValidIndex(Index))
+	{
+		OutPackageInfo.ChunkHash = LexToString(TocResource.ChunkMetas[Index].ChunkHash);
 	}
 
 	return true;
