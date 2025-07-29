@@ -217,12 +217,15 @@ void SAssetSummaryView::Construct(const FArguments& InArgs)
 			SNew(STextBlock).Text(LOCTEXT("Tree_View_Summary", "Asset Summary:"))
 		]
 
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6
+#else
 		+ SVerticalBox::Slot()
 		.AutoHeight()
 		.Padding(0.f, 2.f)
 		[
 			SNew(SKeyValueRow).KeyText(LOCTEXT("Tree_View_Summary_Guid", "Guid:")).ValueText(this, &SAssetSummaryView::GetGuid)
 		]
+#endif
 
 		+ SVerticalBox::Slot()
 		.AutoHeight()
@@ -711,12 +714,15 @@ void SAssetSummaryView::OnSortExportObjects()
 	}
 }
 
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6
+#else
 FORCEINLINE FText SAssetSummaryView::GetGuid() const
 {
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	return ViewingPackage.IsValid() ? FText::FromString(ViewingPackage->AssetSummary->PackageSummary.Guid.ToString()) : FText();
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 }
+#endif
 
 FORCEINLINE FText SAssetSummaryView::GetIsUnversioned() const
 {

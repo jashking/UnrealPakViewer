@@ -558,6 +558,18 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 			{
 				HeaderDataReader << VersioningInfo;
 			}
+
+			FZenPackageCellOffsets CellOffsets;
+			if (!PackageSummary->bHasVersioningInfo || VersioningInfo.PackageVersion >= EUnrealEngineObjectUE5Version::VERSE_CELLS)
+			{
+				HeaderDataReader << CellOffsets.CellImportMapOffset;
+				HeaderDataReader << CellOffsets.CellExportMapOffset;
+			}
+			else
+			{
+				CellOffsets.CellImportMapOffset = PackageSummary->ExportBundleEntriesOffset;
+				CellOffsets.CellExportMapOffset = PackageSummary->ExportBundleEntriesOffset;
+			}
 			
 			TArray<FDisplayNameEntryId> PackageNameMap;
 			{
