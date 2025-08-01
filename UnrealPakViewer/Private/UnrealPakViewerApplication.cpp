@@ -12,6 +12,7 @@
 #include "Styling/CoreStyle.h"
 
 #include "UnrealPakViewerStyle.h"
+#include "Stats/StatsSystem.h"
 #include "Widgets/SMainWindow.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +45,7 @@ void FUnrealPakViewerApplication::Exec()
 		DeltaTime = CurrentTime - LastTime;
 		LastTime = CurrentTime;
 
-		FStats::AdvanceFrame(false);
+		UE::Stats::FStats::AdvanceFrame(false);
 
 		FCoreDelegates::OnEndFrame.Broadcast();
 		GLog->FlushThreadedLogs(); //im: ???

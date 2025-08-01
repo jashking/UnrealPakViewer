@@ -558,6 +558,18 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 			{
 				HeaderDataReader << VersioningInfo;
 			}
+
+			FZenPackageCellOffsets CellOffsets;
+			if (!PackageSummary->bHasVersioningInfo || VersioningInfo.PackageVersion >= EUnrealEngineObjectUE5Version::VERSE_CELLS)
+			{
+				HeaderDataReader << CellOffsets.CellImportMapOffset;
+				HeaderDataReader << CellOffsets.CellExportMapOffset;
+			}
+			else
+			{
+				CellOffsets.CellImportMapOffset = PackageSummary->ExportBundleEntriesOffset;
+				CellOffsets.CellExportMapOffset = PackageSummary->ExportBundleEntriesOffset;
+			}
 			
 			TArray<FDisplayNameEntryId> PackageNameMap;
 			{
@@ -1307,87 +1319,103 @@ bool FIoStoreAnalyzer::FillPackageInfo(const FIoStoreTocResourceInfo& TocResourc
 
 void FIoStoreAnalyzer::OnExtractFiles()
 {
-	//TAtomic<int32> TotalErrorCount{ 0 };
-	//TAtomic<int32> TotalCompleteCount{ 0 };
-	//const int32 TotalTotalCount = PendingExtracePackages.Num();
+	TAtomic<int32> TotalErrorCount{ 0 };
+	TAtomic<int32> TotalCompleteCount{ 0 };
+	const int32 TotalTotalCount = PendingExtracePackages.Num();
 
-	//ParallelFor(PendingExtracePackages.Num(), [this, TotalTotalCount, &TotalErrorCount, &TotalCompleteCount](int32 Index)
-	//{
-	//	if (IsStopExtract)
-	//	{
-	//		return;
-	//	}
+	ParallelFor(PendingExtracePackages.Num(), [this, TotalTotalCount, &TotalErrorCount, &TotalCompleteCount](int32 Index)
+	{
+		if (IsStopExtract)
+		{
+			return;
+		}
 
-	//	const int32 PackageIndex = PendingExtracePackages[Index];
-	//	if (!PackageInfos.IsValidIndex(PackageIndex))
-	//	{
-	//		TotalCompleteCount.IncrementExchange();
-	//		TotalErrorCount.IncrementExchange();
-	//		UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
-	//		return;
-	//	}
+		const int32 PackageIndex = PendingExtracePackages[Index];
+		if (!PackageInfos.IsValidIndex(PackageIndex))
+		{
+			TotalCompleteCount.IncrementExchange();
+			TotalErrorCount.IncrementExchange();
+			UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+			return;
+		}
 
-	//	const FStorePackageInfo& PackageInfo = PackageInfos[PackageIndex];
-	//	TSharedPtr<FIoStoreReader>& Reader = StoreContainers[PackageInfo.ContainerIndex].Reader;
-	//	if (!Reader.IsValid())
-	//	{
-	//		TotalCompleteCount.IncrementExchange();
-	//		TotalErrorCount.IncrementExchange();
-	//		UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
-	//		return;
-	//	}
+		const FStorePackageInfo& PackageInfo = PackageInfos[PackageIndex];
+		TSharedPtr<FIoStoreReader>& Reader = StoreContainers[PackageInfo.ContainerIndex].Reader;
+		if (!Reader.IsValid())
+		{
+			TotalCompleteCount.IncrementExchange();
+			TotalErrorCount.IncrementExchange();
+			UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+			return;
+		}
 
-	//	FIoReadOptions ReadOptions;
-	//	TIoStatusOr<FIoBuffer> IoBuffer = Reader->Read(PackageInfo.ChunkId, ReadOptions);
-	//	if (!IoBuffer.IsOk())
-	//	{
-	//		TotalCompleteCount.IncrementExchange();
-	//		TotalErrorCount.IncrementExchange();
-	//		UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
-	//		return;
-	//	}
+		FIoReadOptions ReadOptions;
+		TIoStatusOr<FIoBuffer> IoBuffer = Reader->Read(PackageInfo.ChunkId, ReadOptions);
+		if (!IoBuffer.IsOk())
+		{
+			TotalCompleteCount.IncrementExchange();
+			TotalErrorCount.IncrementExchange();
+			UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+			return;
+		}
 
-	//	const FString OutputFilePath = ExtractOutputPath / PackageInfo.PackageName.ToString() + TEXT(".") + PackageInfo.Extension.ToString();
-	//	const FString BasePath = FPaths::GetPath(OutputFilePath);
-	//	if (!FPaths::DirectoryExists(BasePath))
-	//	{
-	//		IFileManager::Get().MakeDirectory(*BasePath, true);
-	//	}
+		const FString OutputFilePath = ExtractOutputPath / PackageInfo.PackageName.ToString() + TEXT(".") + PackageInfo.Extension.ToString();
+		const FString BasePath = FPaths::GetPath(OutputFilePath);
+		if (!FPaths::DirectoryExists(BasePath))
+		{
+			IFileManager::Get().MakeDirectory(*BasePath, true);
+		}
 
-	//	IPlatformFile& PlatformFile = IPlatformFile::GetPlatformPhysical();
-	//	TUniquePtr<IFileHandle>	FileHandle(PlatformFile.OpenWrite(*OutputFilePath));
-	//	if (!FileHandle.IsValid())
-	//	{
-	//		TotalCompleteCount.IncrementExchange();
-	//		TotalErrorCount.IncrementExchange();
-	//		UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
-	//		return;
-	//	}
+		IPlatformFile& PlatformFile = IPlatformFile::GetPlatformPhysical();
+		TUniquePtr<IFileHandle>	FileHandle(PlatformFile.OpenWrite(*OutputFilePath));
+		if (!FileHandle.IsValid())
+		{
+			TotalCompleteCount.IncrementExchange();
+			TotalErrorCount.IncrementExchange();
+			UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+			return;
+		}
 
-	//	if (PackageInfo.ChunkType == EIoChunkType::ExportBundleData)
-	//	{
-	//		const uint8* PackageSummaryData = IoBuffer.ValueOrDie().Data();
-	//		const FPackageSummary* PackageSummary = reinterpret_cast<const FPackageSummary*>(PackageSummaryData);
+		bool bExtractSuccess = true;
+		const uint8* PackageSummaryData = IoBuffer.ValueOrDie().Data();
+		uint64 DataSize = IoBuffer.ValueOrDie().DataSize();
+		if (PackageInfo.ChunkType == EIoChunkType::ExportBundleData)
+		{
+			const FZenPackageSummary* PackageSummary = reinterpret_cast<const FZenPackageSummary*>(PackageSummaryData);
+			uint64 HeaderDataSize = PackageSummary->HeaderSize;
+			check(HeaderDataSize <= DataSize);
+			FString DestFileName = FPaths::ChangeExtension(OutputFilePath, TEXT(".uheader"));
+			if (!FileHandle->Write(PackageSummaryData, HeaderDataSize))
+			{
+				bExtractSuccess = false;
+			}
+			DestFileName = FPaths::ChangeExtension(OutputFilePath, TEXT(".uexp"));
+			if (!FileHandle->Write(PackageSummaryData + HeaderDataSize, DataSize - HeaderDataSize))
+			{
+				bExtractSuccess = false;
+			}
+		}
+		else
+		{
+			if (!FileHandle->Write(PackageSummaryData, DataSize))
+			{
+				bExtractSuccess = false;
+			}
+		}
 
-	//		const uint8* Start = PackageSummaryData + PackageSummary->GraphDataOffset + PackageSummary->GraphDataSize;
-	//		const uint8* End = PackageSummaryData + IoBuffer.ValueOrDie().DataSize();
+		FileHandle->Flush();
 
-	//		FileHandle->Write(Start, End - Start);
+		if (bExtractSuccess)
+		{
+			TotalCompleteCount.IncrementExchange();
+		}
+		else
+		{
+			TotalErrorCount.IncrementExchange();
+		}
 
-	//		const uint32 PackageTag = PACKAGE_FILE_TAG;
-	//		FileHandle->Write((const uint8*)&PackageTag, 4);
-	//	}
-	//	else
-	//	{
-	//		FileHandle->Write(IoBuffer.ValueOrDie().Data(), IoBuffer.ValueOrDie().DataSize());
-	//	}
-
-	//	FileHandle->Flush();
-
-	//	TotalCompleteCount.IncrementExchange();
-
-	//	UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
-	//}, EParallelForFlags::Unbalanced);
+		UpdateExtractProgress(TotalTotalCount, TotalCompleteCount, TotalErrorCount);
+	}, EParallelForFlags::Unbalanced);
 }
 
 void FIoStoreAnalyzer::StopExtract()

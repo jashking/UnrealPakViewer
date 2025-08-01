@@ -6,6 +6,8 @@
 
 #include "PakFileEntry.h"
 
+#include "Runtime/Launch/Resources/Version.h"
+
 #define DECLARE_GET_MEMBER_FUNCTION(MemberName) FORCEINLINE FText Get##MemberName() const
 
 class SHeaderRow;
@@ -29,7 +31,10 @@ public:
 	void SetViewingPackage(FPakFileEntryPtr InPackage);
 
 protected:
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6
+#else
 	DECLARE_GET_MEMBER_FUNCTION(Guid);
+#endif
 	DECLARE_GET_MEMBER_FUNCTION(IsUnversioned);
 	DECLARE_GET_MEMBER_FUNCTION(FileVersionUE4);
 	DECLARE_GET_MEMBER_FUNCTION(FileVersionUE5);

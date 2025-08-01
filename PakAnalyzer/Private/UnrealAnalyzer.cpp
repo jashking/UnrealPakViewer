@@ -43,10 +43,10 @@ bool FUnrealAnalyzer::LoadPakFiles(const TArray<FString>& InPakPaths, const TArr
 
 void FUnrealAnalyzer::ExtractFiles(const FString& InOutputPath, TArray<FPakFileEntryPtr>& InFiles)
 {
-	// if (IoStoreAnalyzer)
-	// {
-	// 	IoStoreAnalyzer->ExtractFiles(InOutputPath, InFiles);
-	// }
+	if (IoStoreAnalyzer)
+	{
+		IoStoreAnalyzer->ExtractFiles(InOutputPath, InFiles);
+	}
 
 	if (PakAnalyzer)
 	{
@@ -56,10 +56,10 @@ void FUnrealAnalyzer::ExtractFiles(const FString& InOutputPath, TArray<FPakFileE
 
 void FUnrealAnalyzer::CancelExtract()
 {
-	// if (IoStoreAnalyzer)
-	// {
-	// 	IoStoreAnalyzer->CancelExtract();
-	// }
+	if (IoStoreAnalyzer)
+	{
+		IoStoreAnalyzer->CancelExtract();
+	}
 
 	if (PakAnalyzer)
 	{
@@ -69,10 +69,10 @@ void FUnrealAnalyzer::CancelExtract()
 
 void FUnrealAnalyzer::SetExtractThreadCount(int32 InThreadCount)
 {
-	// if (IoStoreAnalyzer)
-	// {
-	// 	IoStoreAnalyzer->SetExtractThreadCount(InThreadCount);
-	// }
+	if (IoStoreAnalyzer)
+	{
+		IoStoreAnalyzer->SetExtractThreadCount(InThreadCount);
+	}
 
 	if (PakAnalyzer)
 	{
