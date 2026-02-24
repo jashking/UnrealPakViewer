@@ -5,6 +5,11 @@
 #include "Misc/Base64.h"
 #include "Misc/Char.h"
 #include "Misc/Paths.h"
+#include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/Layout/SBorder.h"
+#include "Widgets/Layout/SBox.h"
+#include "Widgets/Text/STextBlock.h"
 
 #define LOCTEXT_NAMESPACE "SKeyInputWindow"
 

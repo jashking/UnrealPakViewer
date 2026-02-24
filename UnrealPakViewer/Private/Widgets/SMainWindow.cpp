@@ -25,6 +25,7 @@
 #include "SPakSummaryView.h"
 #include "SPakTreeView.h"
 #include "UnrealPakViewerStyle.h"
+#include "Misc/ConfigCacheIni.h"
 #include "ViewModels/WidgetDelegates.h"
 
 #define LOCTEXT_NAMESPACE "SMainWindow"

@@ -21,9 +21,11 @@
 #include "CommonDefines.h"
 #include "PakAnalyzerModule.h"
 #include "UnrealPakViewerStyle.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "ViewModels/ClassColumn.h"
 #include "ViewModels/FileSortAndFilter.h"
 #include "ViewModels/WidgetDelegates.h"
+#include "Widgets/Input/SComboButton.h"
 
 #define LOCTEXT_NAMESPACE "SPakFileView"
 

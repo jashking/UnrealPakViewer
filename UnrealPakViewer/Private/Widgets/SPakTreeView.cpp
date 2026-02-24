@@ -18,6 +18,7 @@
 #include "SPakClassView.h"
 #include "SAssetSummaryView.h"
 #include "UnrealPakViewerStyle.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "ViewModels/WidgetDelegates.h"
 
 #define LOCTEXT_NAMESPACE "SPakTreeView"

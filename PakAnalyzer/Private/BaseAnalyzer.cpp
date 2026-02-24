@@ -430,11 +430,11 @@ FName FBaseAnalyzer::GetAssetClass(const FString& InFilename, FName InPackagePat
 	FName AssetClass = *FPaths::GetExtension(InFilename);
 	if (AssetRegistryState.IsValid())
 	{
-		TArrayView<FAssetData const* const> AssetDataArray = AssetRegistryState->GetAssetsByPackageName(InPackagePath);
-		if (AssetDataArray.Num() > 0)
+		FSoftObjectPath ObjectPath(InPackagePath.ToString());
+		if (FAssetData const* const AssetData = AssetRegistryState->GetAssetByObjectPath(ObjectPath))
 		{
 			bFoundClassInRegistry = true;
-			AssetClass = AssetDataArray[0]->AssetClassPath.GetAssetName();
+			AssetClass = AssetData->AssetClassPath.GetAssetName();
 		}
 	}
 	
