@@ -576,7 +576,7 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 				PackageNameMap = LoadNameBatch(HeaderDataReader);
 			}
 
-			PackageInfo.CookedHeaderSize = PackageSummary->CookedHeaderSize;
+			PackageInfo.CookedHeaderSize = PackageSummary->_Unused;
 			PackageInfo.PackageName = PackageNameMap[PackageSummary->Name.GetIndex()].ToName(PackageSummary->Name.GetNumber());
 			PackageInfo.ImportedPublicExportHashes = MakeArrayView<const uint64>(reinterpret_cast<const uint64*>(PackageSummaryData + PackageSummary->ImportedPublicExportHashesOffset), (PackageSummary->ImportMapOffset - PackageSummary->ImportedPublicExportHashesOffset) / sizeof(uint64));
 			
@@ -620,7 +620,7 @@ bool FIoStoreAnalyzer::InitializeReaders(const TArray<FString>& InPaks, const TA
 			AssetPackageSummary.Tag = PACKAGE_FILE_TAG;
 			//AssetPackageSummary.PackageFlags = PackageSummary->PackageFlags;
 			AssetPackageSummary.SetPackageFlags(PackageSummary->PackageFlags);
-			AssetPackageSummary.TotalHeaderSize = PackageSummary->CookedHeaderSize;
+			AssetPackageSummary.TotalHeaderSize = PackageSummary->_Unused;
 
 			// FNames
 			PackageInfo.AssetSummary->Names.SetNum(PackageNameMap.Num());
