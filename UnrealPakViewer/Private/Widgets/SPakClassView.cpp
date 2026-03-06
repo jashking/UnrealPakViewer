@@ -10,6 +10,7 @@
 #include "Widgets/Views/STableViewBase.h"
 
 #include "UnrealPakViewerStyle.h"
+#include "Widgets/Layout/SScrollBox.h"
 
 #define LOCTEXT_NAMESPACE "SPakClassView"
 

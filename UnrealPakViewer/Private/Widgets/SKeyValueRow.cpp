@@ -1,5 +1,8 @@
 #include "SKeyValueRow.h"
 
+#include "Widgets/SBoxPanel.h"
+#include "Widgets/Text/STextBlock.h"
+
 void SKeyValueRow::Construct(const FArguments& InArgs)
 {
 	KeyText = InArgs._KeyText;

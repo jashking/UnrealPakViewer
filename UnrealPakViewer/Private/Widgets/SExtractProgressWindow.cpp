@@ -1,13 +1,14 @@
 #include "SExtractProgressWindow.h"
 
 //#include "EditorStyle.h"
-#include "HAL/PlatformApplicationMisc.h"
-#include "Misc/Timespan.h"
-#include "Widgets/Notifications/SProgressBar.h"
-
 #include "CommonDefines.h"
 #include "PakAnalyzerModule.h"
 #include "SKeyValueRow.h"
+#include "HAL/PlatformApplicationMisc.h"
+#include "Misc/Timespan.h"
+#include "Widgets/Layout/SBorder.h"
+#include "Widgets/Notifications/SProgressBar.h"
+#include "Widgets/Text/STextBlock.h"
 
 #define LOCTEXT_NAMESPACE "SExtractProgressWindow"
 

@@ -1,11 +1,12 @@
 #pragma once
 
-#include "Async/AsyncWork.h"
 #include "CoreMinimal.h"
+#include "PakFileEntry.h"
+#include "Async/AsyncWork.h"
 #include "HAL/CriticalSection.h"
 #include "Stats/Stats.h"
+#include "Widgets/Views/SHeaderRow.h"
 
-#include "PakFileEntry.h"
 
 DECLARE_DELEGATE_ThreeParams(FOnSortAndFilterFinished, const FName, EColumnSortMode::Type, const FString&);
 

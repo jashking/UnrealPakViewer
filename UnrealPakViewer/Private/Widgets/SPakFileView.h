@@ -6,6 +6,7 @@
 
 #include "ViewModels/FileColumn.h"
 #include "PakFileEntry.h"
+#include "Async/AsyncWork.h"
 
 /** Implements the Pak Info window. */
 class SPakFileView : public SCompoundWidget

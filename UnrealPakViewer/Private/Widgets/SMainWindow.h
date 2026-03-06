@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "Widgets/SWindow.h"
 
+class FSpawnTabArgs;
+
 class SMainWindow : public SWindow
 {
 public:

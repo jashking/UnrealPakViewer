@@ -439,7 +439,7 @@ FName FBaseAnalyzer::GetAssetClass(const FString& InFilename, FName InPackagePat
 		if (AssetDataArray.Num() > 0)
 		{
 			bFoundClassInRegistry = true;
-			AssetClass = AssetDataArray[0]->AssetClassPath.GetAssetName();
+			AssetClass = AssetData->AssetClassPath.GetAssetName();
 		}
 	}
 	

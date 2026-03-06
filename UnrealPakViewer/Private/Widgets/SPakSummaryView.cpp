@@ -13,6 +13,8 @@
 #include "PakAnalyzerModule.h"
 #include "SKeyValueRow.h"
 #include "ViewModels/WidgetDelegates.h"
+#include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SEditableTextBox.h"
 
 #define LOCTEXT_NAMESPACE "SPakSummaryView"
 
